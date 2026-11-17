@@ -1,0 +1,3 @@
+# Переводы строк — LF везде: Prettier проверяет LF, а Git на Windows иначе подставит CRLF.
+* text=auto eol=lf
+*.ico binary

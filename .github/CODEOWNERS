@@ -1,0 +1,5 @@
+# Владелец проверок: тесты и CI. PR, меняющий их, зовёт владельца (home/workflow.md, «Проверка»).
+/src/**/*.spec.ts       @Denmurzik
+/src/test-setup.ts      @Denmurzik
+/eslint.config.js       @Denmurzik
+/.github/workflows/     @Denmurzik

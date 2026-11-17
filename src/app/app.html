@@ -1,0 +1,21 @@
+<tui-root>
+  <header class="header">
+    <span class="tui-text_body-l">Т-Инвестиции: тренажёр и лаборатория стратегий</span>
+    <nav class="nav">
+      @for (section of sections; track section.path) {
+        <a
+          tuiButton
+          size="s"
+          appearance="flat"
+          routerLinkActive="active"
+          [routerLink]="section.path"
+        >
+          {{ section.title }}
+        </a>
+      }
+    </nav>
+  </header>
+  <main class="content">
+    <router-outlet />
+  </main>
+</tui-root>

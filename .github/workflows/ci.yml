@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # npm 10.9 падает на разрешении peer-зависимостей Taiga UI — ставим npm из packageManager.
+      - name: Зависимости
+        run: npx -y npm@11.21.2 ci --no-fund --no-audit
+      - name: Формат
+        run: npm run format:check
+      - name: Линтер
+        run: npm run lint
+      - name: Копия OpenAPI совпадает с backend
+        run: npm run api:check
+      - name: Тесты
+        run: npm test
+      - name: Сборка
+        run: npm run build
