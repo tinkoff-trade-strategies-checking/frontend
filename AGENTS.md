@@ -10,16 +10,17 @@ Node 22 LTS (`^22.12`), npm 11 (`packageManager`; npm 10.9 падает на pee
 
 ```sh
 npx -y npm@11.21.2 install   # зависимости
-npm start                    # dev-сервер, http://localhost:4200
+npm start                    # генерация клиента API + dev-сервер, http://localhost:4200
 npm run lint                 # ESLint (angular-eslint)
 npm run format               # Prettier — исправить формат; format:check — проверить
-npm test                     # юнит-тесты (Vitest через @angular/build:unit-test), один прогон
+npm test                     # генерация клиента API + юнит-тесты (Vitest через @angular/build:unit-test), один прогон
 npm run build                # генерация клиента API + сборка в dist/
-npm run check                # всё, что проверяет CI: формат, линтер, тесты, сборка
-npm run api:sync             # скопировать backend/api/openapi.yaml в api/openapi.yaml
+npm run check                # всё, что проверяет CI: формат, линтер, сверка OpenAPI, тесты, сборка
+npm run api:sync             # скопировать контракт в api/openapi.yaml: из ../backend, если он рядом, иначе с GitHub (main)
+npm run api:check            # копия совпадает с backend на GitHub (main) — как в CI
 ```
 
-CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend`, тесты, сборка — на PR и `main`.
+CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`.
 
 ## Структура
 

@@ -3,3 +3,4 @@ dist
 .angular
 src/app/api
 package-lock.json
+api/openapi.yaml

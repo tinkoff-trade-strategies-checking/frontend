@@ -2,8 +2,10 @@
   "name": "frontend",
   "version": "0.0.0",
   "scripts": {
+    "prestart": "npm run api:gen",
     "start": "ng serve",
     "build": "npm run api:gen && ng build",
+    "pretest": "npm run api:gen",
     "test": "ng test --watch=false",
     "lint": "ng lint",
     "format": "prettier --write .",
@@ -11,7 +13,7 @@
     "api:sync": "node scripts/api.mjs sync",
     "api:check": "node scripts/api.mjs check",
     "api:gen": "node scripts/api.mjs gen",
-    "check": "npm run format:check && npm run lint && npm run test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run api:check && npm run test && npm run build"
   },
   "private": true,
   "packageManager": "npm@11.21.2",
@@ -27,6 +29,7 @@
     "@taiga-ui/core": "^5.33.0",
     "@taiga-ui/icons": "^5.33.0",
     "@taiga-ui/kit": "^5.33.0",
+    "@taiga-ui/styles": "^5.33.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
