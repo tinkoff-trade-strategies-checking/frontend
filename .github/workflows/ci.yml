@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.5
           cache: npm
       # npm 10.9 падает на разрешении peer-зависимостей Taiga UI — ставим npm из packageManager.
       - name: Зависимости
