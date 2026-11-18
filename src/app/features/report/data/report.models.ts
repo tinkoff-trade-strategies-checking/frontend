@@ -52,6 +52,7 @@ export interface ReportMetrics {
   readonly partialFillsCount: number;
   readonly hhi: number;
   readonly largestPositionPct: number;
+  readonly bankrupt: boolean;
   readonly costsRub: ReportCostsBreakdown;
   readonly benchmarkImoexPct: number;
 }
@@ -119,7 +120,7 @@ export interface ReportFill {
   readonly priceRub: number;
   readonly costRub: number;
   readonly partial: boolean;
-  readonly note?: string;
+  readonly note: string | null;
 }
 
 export interface SessionReport {
@@ -148,6 +149,11 @@ export type SessionReportResult =
   | {
       readonly status: 'READY';
       readonly report: SessionReport;
+    }
+  | {
+      readonly status: 'BUILDING';
+      readonly sessionId: string;
+      readonly message: string;
     }
   | {
       readonly status: 'BLIND_UNFINISHED';

@@ -14,6 +14,7 @@ import {
 } from './data/report.models';
 import { StubReportApi } from './data/stub-report.api';
 import { ReportPage } from './report-page';
+import { ReportStore } from './report.store';
 
 @Component({
   selector: 'app-report-equity-chart',
@@ -62,7 +63,7 @@ describe('ReportPage', () => {
       .compileComponents();
   });
 
-  it('INV-6: отображает метрики и сравнение «кто лучше и на сколько» из источника без пересчёта', async () => {
+  it('INV-6: отображает метрики и подпись сравнения из источника без пересчёта (даже если подпись расходится с числами)', async () => {
     const base = await stubApi.getReport('S-0103');
     if (base.status !== 'READY') {
       throw new Error('Ожидался готовый отчёт S-0103');
@@ -85,7 +86,8 @@ describe('ReportPage', () => {
             algoRub: 1_100_000,
             winner: 'human',
             diffRub: 134_567,
-            diffLabel: 'Вы лучше на 134 567 ₽',
+            // Намеренно не равно 1 234 567 - 1 100 000 = 134 567 ₽, чтобы поймать клиентский пересчёт.
+            diffLabel: 'Сентинел: вы лучше на 999 888 ₽',
           },
         },
       },
@@ -100,7 +102,7 @@ describe('ReportPage', () => {
     const root = fixture.nativeElement as HTMLElement;
     const text = root.textContent ?? '';
 
-    expect(text).toContain('Вы лучше на 134 567 ₽');
+    expect(text).toContain('Сентинел: вы лучше на 999 888 ₽');
     expect(text).toContain('3,14');
     expect(text).toContain('4,21');
     expect(text).toContain('rf = RUONIA');
@@ -130,5 +132,61 @@ describe('ReportPage', () => {
     for (const forbidden of ['SBER', 'GAZP', 'YDEX', 'Сбербанк', '26.02.2020', '21.05.2020']) {
       expect(text).not.toContain(forbidden);
     }
+  });
+
+  it('отбрасывает устаревший ответ при гонке load() и сбрасывает вкладку/фильтр при смене id', async () => {
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+
+    let resolveSlow!: (value: SessionReportResult) => void;
+    const slowPromise = new Promise<SessionReportResult>((resolve) => {
+      resolveSlow = resolve;
+    });
+
+    const spy = vi.spyOn(stubApi, 'getReport');
+    spy.mockReturnValueOnce(slowPromise);
+
+    store.setTab('fills');
+    store.setDivergenceFilter('extra');
+
+    const firstLoad = store.load('S-0103');
+    expect(store.result()).toBeNull();
+    expect(store.activeTab()).toBe('metrics');
+    expect(store.divergenceFilter()).toBe('all');
+    expect(store.loading()).toBe(true);
+
+    const secondLoad = store.load('S-0105');
+    await secondLoad;
+    expect(store.result()?.status).toBe('READY');
+    if (store.result()?.status === 'READY') {
+      expect(
+        store.result()!.status === 'READY' &&
+          (store.result() as { report: { sessionId: string } }).report.sessionId,
+      ).toBe('S-0105');
+    }
+
+    // Приходит запоздавший ответ первого запроса — он должен быть отброшен.
+    const ready0103 = await new StubReportApi().getReport('S-0103');
+    resolveSlow(ready0103);
+    await firstLoad;
+
+    const current = store.result();
+    expect(current?.status).toBe('READY');
+    if (current?.status === 'READY') {
+      expect(current.report.sessionId).toBe('S-0105');
+    }
+  });
+
+  it('отображает состояние BUILDING («Отчёт строится») с кнопкой обновления', async () => {
+    paramMap$.next(convertToParamMap({ id: 'S-BUILDING' }));
+
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Отчёт строится');
+    expect(text).toContain('Обновить');
   });
 });

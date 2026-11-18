@@ -3,8 +3,29 @@
     <div tuiNotification appearance="negative" size="s">{{ store.error() }}</div>
   }
 
-  @if (store.result(); as res) {
-    @if (res.status === 'BLIND_UNFINISHED') {
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка отчёта…</div>
+  } @else if (store.result(); as res) {
+    @if (res.status === 'BUILDING') {
+      <header class="report-header">
+        <h1 class="tui-text_h3">Отчёт сессии {{ res.sessionId }}</h1>
+      </header>
+      <div tuiNotification appearance="info" size="s">
+        <strong>Отчёт строится</strong>
+        <div class="tui-text_body-s">{{ res.message }}</div>
+      </div>
+      <div>
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          appearance="primary"
+          (click)="store.load(res.sessionId)"
+        >
+          Обновить
+        </button>
+      </div>
+    } @else if (res.status === 'BLIND_UNFINISHED') {
       <header class="report-header">
         <div class="title-group">
           <h1 class="tui-text_h3">{{ res.title }}</h1>
@@ -47,6 +68,9 @@
             <span tuiBadge size="s" appearance="warning">
               Завершена досрочно: {{ rep.playedDays }} из {{ rep.totalDays }} дн.
             </span>
+          }
+          @if (rep.humanMetrics.bankrupt) {
+            <span tuiBadge size="s" appearance="negative">Банкротство</span>
           }
         </div>
 
@@ -172,13 +196,13 @@
               <div>
                 <span class="tui-text_body-xs muted">Вы</span>
                 <div class="tui-text_h5 num neg">
-                  {{ formatPct(rep.comparison.maxDrawdown.humanPct) }}
+                  −{{ formatPct(rep.comparison.maxDrawdown.humanPct) }}
                 </div>
               </div>
               <div>
                 <span class="tui-text_body-xs muted">Алгоритм</span>
                 <div class="tui-text_h5 num neg">
-                  {{ formatPct(rep.comparison.maxDrawdown.algoPct) }}
+                  −{{ formatPct(rep.comparison.maxDrawdown.algoPct) }}
                 </div>
               </div>
             </div>
@@ -262,8 +286,8 @@
                   </tr>
                   <tr>
                     <td>Макс. просадка</td>
-                    <td class="num neg">{{ formatPct(hm.maxDrawdownPct) }}</td>
-                    <td class="num neg">{{ formatPct(am.maxDrawdownPct) }}</td>
+                    <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
+                    <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
                   </tr>
                   <tr>
                     <td>Длительность просадки</td>

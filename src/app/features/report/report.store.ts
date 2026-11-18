@@ -7,6 +7,7 @@ export type DivergenceFilter = 'all' | DivergenceType;
 @Injectable()
 export class ReportStore {
   private readonly api = inject(REPORT_API);
+  private loadSeq = 0;
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -32,15 +33,28 @@ export class ReportStore {
   });
 
   async load(sessionId: string): Promise<void> {
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
+    this.result.set(null);
+    this.activeTab.set('metrics');
+    this.divergenceFilter.set('all');
+
     try {
       const res = await this.api.getReport(sessionId);
+      if (seq !== this.loadSeq) {
+        return;
+      }
       this.result.set(res);
     } catch {
+      if (seq !== this.loadSeq) {
+        return;
+      }
       this.error.set('Не удалось загрузить отчёт.');
     } finally {
-      this.loading.set(false);
+      if (seq === this.loadSeq) {
+        this.loading.set(false);
+      }
     }
   }
 
