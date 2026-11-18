@@ -25,10 +25,16 @@ export interface WorkshopAlgorithmVersion {
   readonly immutable: true;
 }
 
+export interface WorkshopAuthorOption {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface WorkshopAlgorithmSummary {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  readonly authorId: string;
   readonly author: string;
   readonly isMine: boolean;
   readonly isSystem: boolean;
@@ -49,7 +55,7 @@ export type WorkshopDetailResult =
 
 export interface WorkshopQuery {
   readonly sort?: WorkshopSortField;
-  readonly author?: string;
+  readonly authorId?: string | null;
   readonly mineOnly?: boolean;
   readonly cleanOnly?: boolean;
   readonly search?: string;
@@ -59,7 +65,7 @@ export interface WorkshopQuery {
 
 export interface WorkshopPage {
   readonly items: readonly WorkshopAlgorithmSummary[];
-  readonly authors: readonly string[];
+  readonly authors: readonly WorkshopAuthorOption[];
   readonly total: number;
   readonly page: number;
   readonly pageSize: number;

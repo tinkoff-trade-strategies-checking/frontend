@@ -164,6 +164,162 @@ describe('WorkshopPage', () => {
     ) as HTMLButtonElement | undefined;
     expect(addSixthBtn?.disabled).toBe(true);
   });
+
+  it('при ошибке первой загрузки не показывает таблицу и «Страница 1 из 1», кнопка «Повторить» перезагружает', async () => {
+    let shouldFail = true;
+    const fakeApi: WorkshopApi = {
+      async list(): Promise<WorkshopPageData> {
+        if (shouldFail) {
+          throw new Error('offline');
+        }
+        return {
+          items: [
+            {
+              id: 'A-1',
+              name: 'Recovered Algo',
+              description: 'Desc',
+              authorId: 'user',
+              author: 'Вы',
+              isMine: true,
+              isSystem: false,
+              visibility: 'public',
+              latestVersion: 1,
+              publishedAt: '2026-11-18T12:00:00+03:00',
+              license: 'MIT',
+              linterWarnings: [],
+            },
+          ],
+          authors: [{ id: 'user', name: 'Вы' }],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+        };
+      },
+      async getById(): Promise<WorkshopDetailResult> {
+        return { status: 'NOT_FOUND' };
+      },
+    };
+
+    TestBed.overrideProvider(WORKSHOP_API, { useValue: fakeApi });
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('table')).toBeNull();
+    expect(el.textContent).not.toContain('Страница 1 из 1');
+    expect(el.textContent).toContain('Не удалось загрузить каталог алгоритмов.');
+
+    shouldFail = false;
+    const retryBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Повторить',
+    );
+    expect(retryBtn).toBeDefined();
+    retryBtn?.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Recovered Algo');
+  });
+
+  it('при пустом результате не показывает таблицу и пагинацию, а «текущая» ставится по latestVersion', async () => {
+    let returnEmpty = true;
+    const fakeApi: WorkshopApi = {
+      async list(): Promise<WorkshopPageData> {
+        if (returnEmpty) {
+          return { items: [], authors: [], total: 0, page: 1, pageSize: 20, totalPages: 1 };
+        }
+        return {
+          items: [
+            {
+              id: 'A-1',
+              name: 'Versioned Algo',
+              description: 'Desc',
+              authorId: 'user',
+              author: 'Вы',
+              isMine: true,
+              isSystem: false,
+              visibility: 'public',
+              latestVersion: 2,
+              publishedAt: '2026-11-18T12:00:00+03:00',
+              license: 'MIT',
+              linterWarnings: [],
+            },
+          ],
+          authors: [{ id: 'user', name: 'Вы' }],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+        };
+      },
+      async getById(): Promise<WorkshopDetailResult> {
+        return {
+          status: 'READY',
+          algorithm: {
+            id: 'A-1',
+            name: 'Versioned Algo',
+            description: 'Desc',
+            authorId: 'user',
+            author: 'Вы',
+            isMine: true,
+            isSystem: false,
+            visibility: 'public',
+            latestVersion: 2,
+            publishedAt: '2026-11-18T12:00:00+03:00',
+            license: 'MIT',
+            linterWarnings: [],
+            versions: [
+              {
+                version: 1,
+                publishedAt: '2026-11-10T10:00:00+03:00',
+                summary: 'Старая',
+                immutable: true,
+              },
+              {
+                version: 2,
+                publishedAt: '2026-11-18T12:00:00+03:00',
+                summary: 'Новая',
+                immutable: true,
+              },
+            ],
+          },
+        };
+      },
+    };
+
+    TestBed.overrideProvider(WORKSHOP_API, { useValue: fakeApi });
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('table')).toBeNull();
+    expect(el.textContent).not.toContain('Страница 1 из 1');
+    expect(el.textContent).toContain('Алгоритмы под выбранные фильтры не найдены.');
+
+    returnEmpty = false;
+    const resetBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Сбросить фильтры',
+    );
+    resetBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const openBtn = el.querySelector('tr[data-algo-id="A-1"] button');
+    openBtn?.dispatchEvent(new Event('click'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const versionItems = Array.from(el.querySelectorAll('.version-item'));
+    expect(versionItems.length).toBe(2);
+    expect(versionItems[0].textContent).not.toContain('текущая');
+    expect(versionItems[1].textContent).toContain('текущая');
+  });
 });
 
 describe('WorkshopStore race protection', () => {
@@ -200,6 +356,7 @@ describe('WorkshopStore race protection', () => {
       id: 'A-NEW',
       name: 'Fresh Algo',
       description: 'Fresh',
+      authorId: 'user',
       author: 'Вы',
       isMine: true,
       isSystem: false,
@@ -213,7 +370,7 @@ describe('WorkshopStore race protection', () => {
 
     resolveSecond({
       items: [freshDetail],
-      authors: ['Вы'],
+      authors: [{ id: 'user', name: 'Вы' }],
       total: 1,
       page: 1,
       pageSize: 20,

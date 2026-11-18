@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
 import {
   WORKSHOP_API,
   WORKSHOP_COMPARE_LIMIT,
@@ -8,6 +8,8 @@ import {
   WorkshopSortField,
 } from './data/workshop.models';
 
+export const WORKSHOP_SEARCH_DEBOUNCE_MS = 300;
+
 export interface CompareEntry {
   readonly id: string;
   readonly name: string;
@@ -15,17 +17,18 @@ export interface CompareEntry {
 }
 
 @Injectable()
-export class WorkshopStore {
+export class WorkshopStore implements OnDestroy {
   private readonly api = inject(WORKSHOP_API);
   private loadSeq = 0;
   private detailSeq = 0;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly pageData = signal<WorkshopPageData | null>(null);
 
   readonly sort = signal<WorkshopSortField>('published_desc');
-  readonly author = signal<string>('all');
+  readonly authorId = signal<string | null>(null);
   readonly mineOnly = signal(false);
   readonly cleanOnly = signal(false);
   readonly search = signal('');
@@ -50,6 +53,10 @@ export class WorkshopStore {
     () => this.compareList().length >= WORKSHOP_COMPARE_LIMIT,
   );
 
+  ngOnDestroy(): void {
+    this.clearSearchTimer();
+  }
+
   async load(): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
@@ -58,7 +65,7 @@ export class WorkshopStore {
     try {
       const data = await this.api.list({
         sort: this.sort(),
-        author: this.author(),
+        authorId: this.authorId(),
         mineOnly: this.mineOnly(),
         cleanOnly: this.cleanOnly(),
         search: this.search(),
@@ -74,7 +81,6 @@ export class WorkshopStore {
       if (seq !== this.loadSeq) {
         return;
       }
-      this.pageData.set(null);
       this.error.set('Не удалось загрузить каталог алгоритмов.');
     } finally {
       if (seq === this.loadSeq) {
@@ -125,27 +131,31 @@ export class WorkshopStore {
     if (this.sort() === sort) {
       return;
     }
+    this.clearSearchTimer();
     this.sort.set(sort);
     this.page.set(1);
     void this.load();
   }
 
-  setAuthor(author: string): void {
-    if (this.author() === author) {
+  setAuthor(authorId: string | null): void {
+    if (this.authorId() === authorId) {
       return;
     }
-    this.author.set(author);
+    this.clearSearchTimer();
+    this.authorId.set(authorId);
     this.page.set(1);
     void this.load();
   }
 
   toggleMineOnly(): void {
+    this.clearSearchTimer();
     this.mineOnly.update((prev) => !prev);
     this.page.set(1);
     void this.load();
   }
 
   toggleCleanOnly(): void {
+    this.clearSearchTimer();
     this.cleanOnly.update((prev) => !prev);
     this.page.set(1);
     void this.load();
@@ -157,7 +167,11 @@ export class WorkshopStore {
     }
     this.search.set(search);
     this.page.set(1);
-    void this.load();
+    this.clearSearchTimer();
+    this.searchTimer = setTimeout(() => {
+      this.searchTimer = null;
+      void this.load();
+    }, WORKSHOP_SEARCH_DEBOUNCE_MS);
   }
 
   setPage(nextPage: number): void {
@@ -165,13 +179,15 @@ export class WorkshopStore {
     if (clamped === this.currentPage()) {
       return;
     }
+    this.clearSearchTimer();
     this.page.set(clamped);
     void this.load();
   }
 
   resetFilters(): void {
+    this.clearSearchTimer();
     this.sort.set('published_desc');
-    this.author.set('all');
+    this.authorId.set(null);
     this.mineOnly.set(false);
     this.cleanOnly.set(false);
     this.search.set('');
@@ -204,5 +220,12 @@ export class WorkshopStore {
 
   clearCompare(): void {
     this.compareList.set([]);
+  }
+
+  private clearSearchTimer(): void {
+    if (this.searchTimer !== null) {
+      clearTimeout(this.searchTimer);
+      this.searchTimer = null;
+    }
   }
 }

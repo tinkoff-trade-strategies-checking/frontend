@@ -40,9 +40,16 @@ export class WorkshopPage implements OnInit {
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
   protected readonly dslPendingHint = 'Доступно после решения по DSL';
-  protected readonly authorOptions = computed(() => ['all', ...this.store.authors()]);
-  protected readonly authorStringify = (value: string): string =>
-    value === 'all' ? 'Все авторы' : value;
+  protected readonly authorOptions = computed<readonly (string | null)[]>(() => [
+    null,
+    ...this.store.authors().map((author) => author.id),
+  ]);
+  protected readonly authorStringify = (authorId: string | null): string => {
+    if (authorId === null) {
+      return 'Все авторы';
+    }
+    return this.store.authors().find((author) => author.id === authorId)?.name ?? authorId;
+  };
 
   protected readonly formatDateTime = formatWorkshopDateTime;
   protected readonly formatLinter = formatLinterSummary;

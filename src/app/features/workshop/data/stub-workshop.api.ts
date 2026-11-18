@@ -6,15 +6,26 @@ import {
   WorkshopAlgorithmDetail,
   WorkshopAlgorithmSummary,
   WorkshopApi,
+  WorkshopAuthorOption,
   WorkshopDetailResult,
   WorkshopPage,
   WorkshopQuery,
   WorkshopSortField,
 } from './workshop.models';
 
+const AUTHOR_IDS: Readonly<Record<string, string>> = {
+  [WORKSHOP_SYSTEM_AUTHOR]: 'platform',
+  Вы: 'user',
+  'Алексей Смирнов': 'alexey-smirnov',
+  'Иван Петров': 'ivan-petrov',
+  'Мария Волкова': 'maria-volkova',
+  'Ольга Кузнецова': 'olga-kuznetsova',
+  'Дмитрий Соколов': 'dmitry-sokolov',
+};
+
 // Коды предупреждений линтера (MAGIC_CONST, UNUSED_PARAM, LOOKAHEAD_GUARD) —
 // коды условные до решения по DSL (documentation#34).
-const STUB_ALGORITHMS: readonly WorkshopAlgorithmDetail[] = [
+const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] = [
   {
     id: 'A-0001',
     name: 'Эталон платформы',
@@ -710,11 +721,17 @@ const STUB_ALGORITHMS: readonly WorkshopAlgorithmDetail[] = [
   },
 ];
 
+const STUB_ALGORITHMS: readonly WorkshopAlgorithmDetail[] = RAW_STUB_ALGORITHMS.map((item) => ({
+  ...item,
+  authorId: AUTHOR_IDS[item.author] ?? item.author.toLowerCase().replace(/\s+/g, '-'),
+}));
+
 function toSummary(detail: WorkshopAlgorithmDetail): WorkshopAlgorithmSummary {
   return {
     id: detail.id,
     name: detail.name,
     description: detail.description,
+    authorId: detail.authorId,
     author: detail.author,
     isMine: detail.isMine,
     isSystem: detail.isSystem,
@@ -762,14 +779,20 @@ export class StubWorkshopApi implements WorkshopApi {
     const searchNorm = query.search?.trim().toLowerCase() ?? '';
 
     const visible = STUB_ALGORITHMS.filter(isVisibleToViewer);
-    const authors = Array.from(new Set(visible.map((item) => item.author))).sort((a, b) => {
-      if (a === WORKSHOP_SYSTEM_AUTHOR) {
+    const authorMap = new Map<string, WorkshopAuthorOption>();
+    for (const item of visible) {
+      if (!authorMap.has(item.authorId)) {
+        authorMap.set(item.authorId, { id: item.authorId, name: item.author });
+      }
+    }
+    const authors = Array.from(authorMap.values()).sort((a, b) => {
+      if (a.name === WORKSHOP_SYSTEM_AUTHOR) {
         return -1;
       }
-      if (b === WORKSHOP_SYSTEM_AUTHOR) {
+      if (b.name === WORKSHOP_SYSTEM_AUTHOR) {
         return 1;
       }
-      return a.localeCompare(b, 'ru');
+      return a.name.localeCompare(b.name, 'ru');
     });
 
     const filtered = visible
@@ -780,7 +803,7 @@ export class StubWorkshopApi implements WorkshopApi {
         if (query.cleanOnly && item.linterWarnings.length > 0) {
           return false;
         }
-        if (query.author && query.author !== 'all' && item.author !== query.author) {
+        if (query.authorId != null && item.authorId !== query.authorId) {
           return false;
         }
         if (searchNorm) {

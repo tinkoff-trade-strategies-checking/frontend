@@ -50,11 +50,14 @@ describe('StubWorkshopApi', () => {
     expect(clean.items.every((item) => item.linterWarnings.length === 0)).toBe(true);
 
     const byAuthor = await api.list({
-      author: WORKSHOP_SYSTEM_AUTHOR,
+      authorId: 'platform',
       pageSize: WORKSHOP_MAX_PAGE_SIZE,
     });
     expect(byAuthor.items.length).toBe(1);
     expect(byAuthor.items[0].id).toBe('A-0001');
+    expect(
+      byAuthor.authors.some((a) => a.id === 'platform' && a.name === WORKSHOP_SYSTEM_AUTHOR),
+    ).toBe(true);
 
     const byName = await api.list({ search: 'Donchian', pageSize: WORKSHOP_MAX_PAGE_SIZE });
     expect(byName.items.some((item) => item.id === 'A-0010')).toBe(true);
