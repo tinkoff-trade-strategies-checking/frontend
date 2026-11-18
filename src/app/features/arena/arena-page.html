@@ -161,7 +161,6 @@
           [finished]="store.finished()"
           [editingOrder]="store.editingOrder()"
           [estimatedPct]="store.estimatedPct()"
-          [error]="store.error()"
           (paperSelect)="store.selectPaper($event)"
           (estimateRequest)="store.estimateOrder($event.paperId, $event.lots)"
           (submitOrder)="store.placeOrder($event)"

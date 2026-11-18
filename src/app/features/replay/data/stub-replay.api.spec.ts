@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import { StubSessionRegistry } from '../../../shared/stub-session-registry';
 import { StubReportApi } from '../../report/data/stub-report.api';
 import { StubReplayApi } from './stub-replay.api';
 
@@ -122,5 +124,38 @@ describe('StubReplayApi', () => {
     const next = await api.step('S-0103');
     expect(next.step).toBe(19);
     expect(next.day).toBe(20);
+  });
+
+  it('для сессии из StubSessionRegistry возвращает NOT_FINISHED до завершения и READY после', async () => {
+    TestBed.configureTestingModule({ providers: [StubReplayApi] });
+    const registry = TestBed.inject(StubSessionRegistry);
+    const api = TestBed.inject(StubReplayApi);
+
+    registry.register({
+      sessionId: 'S-0106',
+      blind: true,
+      regime: 'calm',
+      timeframe: '1d',
+      totalDays: 20,
+      playedDays: 3,
+      finished: false,
+      finishedEarly: false,
+      createdAt: '2026-11-18T15:00:00+03:00',
+      initialCapitalRub: 1_000_000,
+      paperIds: null,
+      paperCount: 3,
+      customStartDate: null,
+      netReturnPct: null,
+    });
+
+    const unfinished = await api.loadSession('S-0106');
+    expect(unfinished.status).toBe('NOT_FINISHED');
+    await expect(api.step('S-0106')).rejects.toThrow();
+
+    registry.markFinished('S-0106', { playedDays: 3, finishedEarly: true, netReturnPct: 1.1 });
+    const ready = await api.loadSession('S-0106');
+    expect(ready.status).toBe('READY');
+    const stepRes = await api.step('S-0106');
+    expect(stepRes.step).toBe(1);
   });
 });

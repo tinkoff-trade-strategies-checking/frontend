@@ -1,5 +1,10 @@
 import { Injectable } from '@angular/core';
 import {
+  formatMoscowDate,
+  formatMoscowDateTime,
+  injectSessionRegistry,
+} from '../../../shared/stub-session-registry';
+import {
   ArenaCandle,
   ArenaFill,
   ArenaOrder,
@@ -385,6 +390,7 @@ const SESSION_META_S0103: ReplaySessionMeta = {
 
 @Injectable()
 export class StubReplayApi implements ReplayApi {
+  private readonly registry = injectSessionRegistry();
   private readonly stepDates = buildStepDates();
   private readonly candlesByPaper = new Map<string, readonly ArenaCandle[]>(
     PAPER_SPECS.map((spec) => [spec.id, buildPaperCandles(spec, this.stepDates)]),
@@ -392,6 +398,50 @@ export class StubReplayApi implements ReplayApi {
   private readonly cursors = new Map<string, number>();
 
   async loadSession(sessionId: string, initialStep?: number): Promise<ReplaySessionResult> {
+    const registered = this.registry?.get(sessionId);
+    if (registered) {
+      if (!registered.finished) {
+        return {
+          status: 'NOT_FINISHED',
+          sessionId,
+          blind: registered.blind,
+          title: registered.blind
+            ? `Слепая сессия от ${formatMoscowDate(registered.createdAt)}`
+            : `Сессия ${sessionId}`,
+          createdAt: formatMoscowDateTime(registered.createdAt),
+          playedDays: registered.playedDays,
+          totalDays: registered.totalDays,
+          regime: registered.regime,
+        };
+      }
+      const rawStep =
+        initialStep !== undefined && Number.isFinite(initialStep) ? Math.trunc(initialStep) : 0;
+      const cursor = Math.max(0, Math.min(LAST_STEP, rawStep));
+      this.cursors.set(sessionId, cursor);
+      return {
+        status: 'READY',
+        session: {
+          ...SESSION_META_S0103,
+          sessionId,
+          blind: registered.blind,
+          regime: registered.regime,
+        },
+        snapshot: {
+          sessionId,
+          blind: registered.blind,
+          step: cursor,
+          totalSteps: LAST_STEP,
+          day: cursor + 1,
+          totalDays: TOTAL_DAYS,
+          finished: cursor >= LAST_STEP,
+          papers: this.buildPapersUpTo(cursor),
+          portfolio: this.buildPortfolioAt(cursor),
+          orders: this.buildOrdersAt(cursor),
+          fills: this.buildFillsAt(cursor),
+        },
+      };
+    }
+
     if (sessionId === 'S-0104' || sessionId === 'S-BLIND-ACTIVE') {
       // INV-7: активная слепая сессия не раскрывает тикеры, названия и реальные даты.
       return {
@@ -448,7 +498,8 @@ export class StubReplayApi implements ReplayApi {
   }
 
   async step(sessionId: string): Promise<ArenaStepResult> {
-    if (sessionId !== 'S-0103') {
+    const registered = this.registry?.get(sessionId);
+    if (sessionId !== 'S-0103' && !registered?.finished) {
       throw new Error(`Сессия ${sessionId} недоступна для воспроизведения.`);
     }
 

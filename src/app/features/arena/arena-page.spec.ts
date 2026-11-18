@@ -114,9 +114,10 @@ describe('ArenaPage', () => {
     });
     fixture.detectChanges();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('0 ₽');
-    expect(text).toContain('в ₽ и %');
+    const root = fixture.nativeElement as HTMLElement;
+    const primaryEquity = root.querySelector('.equity-row .metric-item .tui-text_h5');
+    expect(primaryEquity?.textContent?.trim()).toBe('0 ₽');
+    expect(root.textContent ?? '').toContain('в ₽ и %');
   });
 
   it('F8: отображает индикатор загрузки и ошибку на уровне страницы, включая режим только чтения', async () => {

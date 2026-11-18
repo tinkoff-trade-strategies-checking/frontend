@@ -1,5 +1,10 @@
 import { Injectable } from '@angular/core';
-import { injectSessionRegistry, StubSessionRecord } from '../../../shared/stub-session-registry';
+import {
+  formatMoscowDate,
+  formatMoscowDateTime,
+  injectSessionRegistry,
+  StubSessionRecord,
+} from '../../../shared/stub-session-registry';
 import {
   EquityCurvePoint,
   ReportApi,
@@ -665,28 +670,6 @@ const REPORT_S0105: SessionReport = {
   ],
 };
 
-function formatMoscowDate(iso: string): string {
-  return new Intl.DateTimeFormat('ru-RU', {
-    timeZone: 'Europe/Moscow',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(new Date(iso));
-}
-
-function formatMoscowDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('ru-RU', {
-    timeZone: 'Europe/Moscow',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-    .format(new Date(iso))
-    .replace(',', '');
-}
-
 function buildDynamicReport(session: StubSessionRecord): SessionReport {
   const base = session.blind ? REPORT_S0103 : REPORT_S0105;
   return {
@@ -694,7 +677,7 @@ function buildDynamicReport(session: StubSessionRecord): SessionReport {
     sessionId: session.sessionId,
     blind: session.blind,
     finishedEarly: session.finishedEarly,
-    replayAvailable: false,
+    replayAvailable: true,
     playedDays: session.playedDays,
     totalDays: session.totalDays,
     timeframe: session.timeframe,

@@ -157,6 +157,7 @@ export class StubArenaApi implements ArenaApi {
   private readonly registry = injectSessionRegistry();
 
   private sessionId = 'S-0104';
+  private initializedSession = false;
   private blind = true;
   private totalDays = DEFAULT_TOTAL_DAYS;
   private lastStep = DEFAULT_TOTAL_DAYS - 1;
@@ -186,9 +187,10 @@ export class StubArenaApi implements ArenaApi {
   }
 
   async getSnapshot(sessionId?: string): Promise<ArenaSnapshot> {
-    if (sessionId && sessionId !== this.sessionId) {
-      this.sessionId = sessionId;
-      this.cursor = 0;
+    const targetId = sessionId ?? this.sessionId;
+    if (!this.initializedSession || targetId !== this.sessionId) {
+      this.initializedSession = true;
+      this.sessionId = targetId;
       this.cashPct = 100;
       this.costsPct = 0;
       this.orders = [];
@@ -196,11 +198,12 @@ export class StubArenaApi implements ArenaApi {
       this.nextOrderSeq = 1;
       this.nextFillSeq = 1;
 
-      const rec = this.registry?.get(sessionId);
+      const rec = this.registry?.get(targetId);
       if (rec) {
         this.blind = rec.blind;
         this.totalDays = rec.totalDays;
         this.lastStep = rec.totalDays - 1;
+        this.cursor = Math.max(0, Math.min(this.lastStep, rec.playedDays - 1));
         this.finished = rec.finished;
         if (rec.blind) {
           this.paperConfigs = PAPER_CONFIGS.slice(0, rec.paperCount);
@@ -213,6 +216,7 @@ export class StubArenaApi implements ArenaApi {
         this.blind = true;
         this.totalDays = DEFAULT_TOTAL_DAYS;
         this.lastStep = DEFAULT_TOTAL_DAYS - 1;
+        this.cursor = 0;
         this.finished = false;
         this.paperConfigs = PAPER_CONFIGS.slice(0, 3);
       }
@@ -235,6 +239,7 @@ export class StubArenaApi implements ArenaApi {
   }
 
   async step(): Promise<ArenaStepResult> {
+    this.initializedSession = true;
     if (!this.finished && this.cursor < this.lastStep) {
       this.cursor += 1;
       this.executeMarketOrdersAtCursor();

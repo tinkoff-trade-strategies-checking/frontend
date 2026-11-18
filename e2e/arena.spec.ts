@@ -310,3 +310,21 @@ test('F1: Новая сессия → Запустить → /arena/:id → За
   await expect(page.getByRole('heading', { name: `Отчёт сессии ${sessionId}` })).toBeVisible();
   await expect(page.getByText('Период раскрыт')).toBeVisible();
 });
+
+test('Арена в навигации (S-0104) → Завершить → Открыть отчёт этой сессии', async ({ page }) => {
+  await page.goto('/new');
+  await page.locator('nav').getByRole('link', { name: 'Арена' }).click();
+
+  await expect(page).toHaveURL(/\/arena$/);
+  await expect(page.getByText('S-0104')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Завершить сессию' }).click();
+  await page.locator('tui-dialog').getByRole('button', { name: 'Завершить сессию' }).click();
+
+  await expect(page.getByText('Завершена', { exact: true })).toBeVisible();
+  await page.locator('main').getByRole('link', { name: 'Открыть отчёт' }).click();
+
+  await expect(page).toHaveURL(/\/report\/S-0104$/);
+  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-0104' })).toBeVisible();
+  await expect(page.getByText('Период раскрыт')).toBeVisible();
+});

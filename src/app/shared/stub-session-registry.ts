@@ -22,12 +22,53 @@ export interface StubSessionRecord {
   readonly netReturnPct: number | null;
 }
 
+export function formatMoscowDate(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(iso));
+}
+
+export function formatMoscowDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+    .format(new Date(iso))
+    .replace(',', '');
+}
+
 @Injectable({ providedIn: 'root' })
 export class StubSessionRegistry {
   private readonly sessions = new Map<string, StubSessionRecord>();
   private nextSessionSeq = 106;
 
   readonly lastFinishedSessionId = signal<string | null>(null);
+
+  constructor() {
+    this.sessions.set('S-0104', {
+      sessionId: 'S-0104',
+      blind: true,
+      regime: 'stress',
+      timeframe: '1d',
+      totalDays: 60,
+      playedDays: 1,
+      finished: false,
+      finishedEarly: false,
+      createdAt: '2026-11-18T14:20:00+03:00',
+      initialCapitalRub: 1_000_000,
+      paperIds: null,
+      paperCount: 3,
+      customStartDate: null,
+      netReturnPct: null,
+    });
+  }
 
   allocateSessionId(): string {
     return `S-${String(this.nextSessionSeq++).padStart(4, '0')}`;
