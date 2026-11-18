@@ -1,0 +1,237 @@
+import { TestBed } from '@angular/core/testing';
+import { provideTaiga } from '@taiga-ui/core';
+import {
+  WORKSHOP_API,
+  WORKSHOP_COMPARE_LIMIT,
+  WorkshopAlgorithmDetail,
+  WorkshopApi,
+  WorkshopDetailResult,
+  WorkshopPage as WorkshopPageData,
+} from './data/workshop.models';
+import { WorkshopPage } from './workshop-page';
+import { WorkshopStore } from './workshop.store';
+
+describe('WorkshopPage', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [WorkshopPage],
+      providers: [provideTaiga()],
+    }).compileComponents();
+  });
+
+  it('загружает первую страницу из 20 алгоритмов, показывает лицензию MIT, версии и пометку «Скрыт» для своего скрытого алгоритма', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const rows = Array.from(el.querySelectorAll('tbody tr'));
+    expect(rows.length).toBe(20);
+    expect(el.textContent).toContain('Страница 1 из 2');
+    expect(el.textContent).toContain('Эталон платформы');
+    expect(el.textContent).toContain('MIT');
+
+    const ownHiddenRow = el.querySelector('tr[data-algo-id="A-0004"]');
+    expect(ownHiddenRow).not.toBeNull();
+    expect(ownHiddenRow?.textContent).toContain('Скрыт');
+
+    expect(el.querySelector('tr[data-algo-id="A-0005"]')).toBeNull();
+  });
+
+  it('фильтрует алгоритмы по «Мои», «Без предупреждений линтера», автору и поиску', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+
+    const mineBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Мои',
+    );
+    expect(mineBtn).toBeDefined();
+    mineBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const mineRows = Array.from(el.querySelectorAll('tbody tr'));
+    expect(mineRows.length).toBe(4);
+    expect(el.querySelector('tr[data-algo-id="A-0004"]')).not.toBeNull();
+
+    const cleanBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Без предупреждений линтера',
+    );
+    cleanBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('tr[data-algo-id="A-0002"]')).toBeNull();
+    expect(el.querySelector('tr[data-algo-id="A-0004"]')).not.toBeNull();
+  });
+
+  it('переключает страницы пагинации (страница 1 → страница 2)', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const nextBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Вперёд',
+    );
+    nextBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Страница 2 из 2');
+    expect(el.querySelectorAll('tbody tr').length).toBe(5);
+  });
+
+  it('открывает карточку алгоритма с версиями (INV-5), предупреждениями линтера и неактивными действиями «Форк» и «Запустить прогон»', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const rowA3 = el.querySelector('tr[data-algo-id="A-0003"]');
+    const openBtn = rowA3?.querySelector('button');
+    openBtn?.click();
+
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const detail = el.querySelector('.detail-panel');
+    expect(detail).not.toBeNull();
+    const detailText = detail?.textContent ?? '';
+    expect(detailText).toContain('Breakout ATR');
+    expect(detailText).toContain('MAGIC_CONST');
+    expect(detailText).toContain('UNUSED_PARAM');
+    expect(detailText).toContain('неизменяема');
+    expect(detailText).toContain('v3');
+    expect(detailText).toContain('v2');
+    expect(detailText).toContain('v1');
+    expect(detailText).toContain('после решения по DSL');
+
+    const forkBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Форк',
+    ) as HTMLButtonElement | undefined;
+    const runBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Запустить прогон',
+    ) as HTMLButtonElement | undefined;
+
+    expect(forkBtn?.disabled).toBe(true);
+    expect(forkBtn?.title).toContain('после решения по DSL');
+    expect(runBtn?.disabled).toBe(true);
+    expect(runBtn?.title).toContain('после решения по DSL');
+  });
+
+  it('ограничивает добавление в сравнение максимум 5 алгоритмами', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const ids = ['A-0001', 'A-0002', 'A-0003', 'A-0004', 'A-0006'];
+
+    for (const id of ids) {
+      const openBtn = el.querySelector(`tr[data-algo-id="${id}"] button`);
+      openBtn?.dispatchEvent(new Event('click'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const addBtn = Array.from(el.querySelectorAll('.detail-panel button')).find((b) =>
+        b.textContent?.includes('Добавить в сравнение'),
+      ) as HTMLButtonElement | undefined;
+      expect(addBtn?.disabled).toBe(false);
+      addBtn?.click();
+      fixture.detectChanges();
+    }
+
+    expect(el.textContent).toContain(
+      `В сравнении: ${WORKSHOP_COMPARE_LIMIT} из ${WORKSHOP_COMPARE_LIMIT}`,
+    );
+
+    const openSixth = el.querySelector('tr[data-algo-id="A-0007"] button');
+    openSixth?.dispatchEvent(new Event('click'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const addSixthBtn = Array.from(el.querySelectorAll('.detail-panel button')).find((b) =>
+      b.textContent?.includes('Добавить в сравнение'),
+    ) as HTMLButtonElement | undefined;
+    expect(addSixthBtn?.disabled).toBe(true);
+  });
+});
+
+describe('WorkshopStore race protection', () => {
+  it('игнорирует устаревший ответ list при быстром переключении фильтров', async () => {
+    let resolveFirst!: (page: WorkshopPageData) => void;
+    let resolveSecond!: (page: WorkshopPageData) => void;
+    let callCount = 0;
+
+    const fakeApi: WorkshopApi = {
+      list(): Promise<WorkshopPageData> {
+        callCount++;
+        return new Promise<WorkshopPageData>((resolve) => {
+          if (callCount === 1) {
+            resolveFirst = resolve;
+          } else {
+            resolveSecond = resolve;
+          }
+        });
+      },
+      async getById(): Promise<WorkshopDetailResult> {
+        return { status: 'NOT_FOUND' };
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: fakeApi }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    const firstLoad = store.load();
+    store.toggleMineOnly();
+
+    const freshDetail: WorkshopAlgorithmDetail = {
+      id: 'A-NEW',
+      name: 'Fresh Algo',
+      description: 'Fresh',
+      author: 'Вы',
+      isMine: true,
+      isSystem: false,
+      visibility: 'public',
+      latestVersion: 1,
+      publishedAt: '2026-11-18T12:00:00+03:00',
+      license: 'MIT',
+      linterWarnings: [],
+      versions: [],
+    };
+
+    resolveSecond({
+      items: [freshDetail],
+      authors: ['Вы'],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+    });
+    await Promise.resolve();
+
+    resolveFirst({
+      items: [],
+      authors: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      totalPages: 1,
+    });
+    await firstLoad;
+
+    expect(store.items().map((x) => x.id)).toEqual(['A-NEW']);
+    expect(store.loading()).toBe(false);
+  });
+});

@@ -1,11 +1,55 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { StubWorkshopApi } from './data/stub-workshop.api';
+import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
+import {
+  formatLinterSummary,
+  formatWorkshopDateTime,
+  WORKSHOP_SORT_LABELS,
+} from './workshop.format';
+import { WorkshopStore } from './workshop.store';
+
+const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: string }[] = [
+  { id: 'published_desc', label: WORKSHOP_SORT_LABELS.published_desc },
+  { id: 'name_asc', label: WORKSHOP_SORT_LABELS.name_asc },
+  { id: 'author_asc', label: WORKSHOP_SORT_LABELS.author_asc },
+];
 
 @Component({
   selector: 'app-workshop-page',
+  imports: [FormsModule, TuiButton, TuiBadge, TuiNotification, TuiSegmented, TuiTextfield],
+  providers: [{ provide: WORKSHOP_API, useClass: StubWorkshopApi }, WorkshopStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <h1 class="tui-text_h3">Мастерская</h1>
-    <p class="tui-text_body-m">Алгоритмы на DSL — в разработке.</p>
-  `,
+  templateUrl: './workshop-page.html',
+  styleUrl: './workshop-page.less',
 })
-export class WorkshopPage {}
+export class WorkshopPage implements OnInit {
+  protected readonly store = inject(WorkshopStore);
+
+  protected readonly sortOptions = SORT_OPTIONS;
+  protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
+  protected readonly dslPendingHint = 'Доступно после решения по DSL';
+
+  protected readonly formatDateTime = formatWorkshopDateTime;
+  protected readonly formatLinter = formatLinterSummary;
+
+  ngOnInit(): void {
+    void this.store.load();
+  }
+
+  protected sortIndex(current: WorkshopSortField): number {
+    return Math.max(
+      0,
+      this.sortOptions.findIndex((opt) => opt.id === current),
+    );
+  }
+
+  protected onSortIndexChange(index: number): void {
+    const next = this.sortOptions[index];
+    if (next) {
+      this.store.setSort(next.id);
+    }
+  }
+}

@@ -21,7 +21,7 @@ npm run api:sync             # скопировать контракт в api/op
 npm run api:check            # копия совпадает с backend на GitHub (main) — как в CI
 ```
 
-CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джоба `e2e` пока в режиме наблюдения (не обязательна).
+CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джоба `e2e` теперь ОБЯЗАТЕЛЬНА в ruleset `main`.
 
 ## Структура
 
@@ -31,6 +31,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
   - `features/launch/` — экран «Новая сессия» (`/new`): `launch-page.*`, `launch.store.ts`, `launch.format.ts`, `data/` (`LaunchApi`, `StubLaunchApi`, модели и коды отказов).
   - `features/arena/` — экран арены: `arena-page.*` (композиция, подтверждение завершения и режим только чтения), `arena.store.ts` (Signals-состояние и таймер плеера), `arena.format.ts` (форматирование слепого режима), `data/` (`ArenaApi`, `StubArenaApi`, модели), `components/` (`arena-player`, `arena-chart` над `lightweight-charts`, `arena-order-ticket`, `arena-orders-panel`, `arena-portfolio-panel`).
   - `features/replay/` — экран воспроизведения прошедшей сессии (`/replay/:id`, поддержка `?step=N`): `replay-page.*`, `replay.store.ts` (адаптер только для чтения поверх `ArenaPage`), `data/` (`ReplayApi`, `StubReplayApi`, модели).
+  - `features/workshop/` — экран «Мастерская» (`/workshop`, каталог алгоритмов и карточка с неизменяемыми версиями INV-5): `workshop-page.*`, `workshop.store.ts` (сортировка, фильтры, поиск, пагинация, выбор до 5 алгоритмов в сравнение, защита от гонки запросов), `workshop.format.ts`, `data/` (`WorkshopApi`, `StubWorkshopApi`, модели).
   - `features/report/` — экран отчёта (`/report/:id`, вкладки метрик, расхождений, обратной проверки и сделок): `report-page.*`, `report.store.ts`, `report.format.ts`, `data/` (`ReportApi`, `StubReportApi`, модели), `components/` (`report-equity-chart`, `report-underwater-chart` над `lightweight-charts`).
   - `features/history/` — экран «История» (`/history`): `history-page.*`, `history.store.ts` (фильтры, пагинация, защита от гонки запросов), `history.format.ts`, `data/` (`HistoryApi`, `StubHistoryApi` — данные согласованы с заглушками арены и отчёта). Незавершённая слепая запись — отдельная ветка union `HistoryEntry` без бумаг, периода, названия и итога (INV-7), стор дополнительно маскирует лишние поля.
 - `src/app/shared/` — общие компоненты и утилиты, когда понадобятся двум и более фичам.

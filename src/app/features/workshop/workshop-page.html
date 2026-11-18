@@ -1,0 +1,382 @@
+<section class="workshop-page">
+  <header class="workshop-header">
+    <div>
+      <h1 class="tui-text_h3">Мастерская</h1>
+      <p class="tui-text_body-m muted">
+        Открытая бесплатная библиотека алгоритмов под лицензией MIT. Опубликованные версии
+        неизменяемы.
+      </p>
+    </div>
+  </header>
+
+  @if (store.error()) {
+    <div tuiNotification appearance="negative" size="s" class="error-row">
+      <span>{{ store.error() }}</span>
+      <button tuiButton type="button" size="xs" appearance="outline" (click)="store.load()">
+        Повторить
+      </button>
+    </div>
+  }
+
+  @if (store.compareCount() > 0) {
+    <section class="panel compare-bar" aria-label="Выбранные для сравнения алгоритмы">
+      <div class="compare-head">
+        <strong class="tui-text_body-s">
+          В сравнении: {{ store.compareCount() }} из {{ compareLimit }}
+        </strong>
+        <button tuiButton type="button" size="xs" appearance="flat" (click)="store.clearCompare()">
+          Очистить
+        </button>
+      </div>
+      <div class="compare-chips">
+        @for (item of store.compareList(); track item.id) {
+          <span class="compare-chip">
+            <span class="tui-text_body-s">{{ item.name }} v{{ item.latestVersion }}</span>
+            <button
+              type="button"
+              class="chip-remove"
+              [attr.aria-label]="'Убрать ' + item.name + ' из сравнения'"
+              (click)="store.removeFromCompare(item.id)"
+            >
+              ×
+            </button>
+          </span>
+        }
+      </div>
+    </section>
+  }
+
+  <div class="workshop-layout" [class.with-detail]="store.selectedId() !== null">
+    <section class="panel catalog-panel">
+      <div class="filters-bar">
+        <div class="filter-group">
+          <span class="tui-text_body-xs muted">Сортировка</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="sortIndex(store.sort())"
+            (activeItemIndexChange)="onSortIndexChange($event)"
+          >
+            @for (opt of sortOptions; track opt.id) {
+              <button type="button">{{ opt.label }}</button>
+            }
+          </tui-segmented>
+        </div>
+
+        <div class="filter-group">
+          <label class="tui-text_body-xs muted" for="workshop-author-filter">Автор</label>
+          <select
+            id="workshop-author-filter"
+            class="author-select"
+            [ngModel]="store.author()"
+            (ngModelChange)="store.setAuthor($event)"
+          >
+            <option value="all">Все авторы</option>
+            @for (authorName of store.authors(); track authorName) {
+              <option [value]="authorName">{{ authorName }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="filter-group search-group">
+          <tui-textfield tuiTextfieldSize="s" class="search-field">
+            <label tuiLabel for="workshop-search">Поиск по названию и описанию</label>
+            <input
+              id="workshop-search"
+              tuiTextfield
+              type="search"
+              [ngModel]="store.search()"
+              (ngModelChange)="store.setSearch($event)"
+            />
+          </tui-textfield>
+        </div>
+
+        <div class="filter-actions">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            [appearance]="store.mineOnly() ? 'primary' : 'outline'"
+            [attr.aria-pressed]="store.mineOnly()"
+            (click)="store.toggleMineOnly()"
+          >
+            Мои
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            [appearance]="store.cleanOnly() ? 'primary' : 'outline'"
+            [attr.aria-pressed]="store.cleanOnly()"
+            (click)="store.toggleCleanOnly()"
+          >
+            Без предупреждений линтера
+          </button>
+          <span class="tui-text_body-s muted count-label">Всего: {{ store.total() }}</span>
+        </div>
+      </div>
+
+      @if (store.loading() && store.items().length === 0) {
+        <div class="empty-state tui-text_body-m muted">Загрузка каталога…</div>
+      } @else if (store.items().length === 0 && !store.error()) {
+        <div class="empty-state">
+          <span class="tui-text_body-m muted">Алгоритмы под выбранные фильтры не найдены.</span>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            (click)="store.resetFilters()"
+          >
+            Сбросить фильтры
+          </button>
+        </div>
+      } @else {
+        <div class="table-scroll">
+          <table class="workshop-table">
+            <thead>
+              <tr>
+                <th>Алгоритм</th>
+                <th>Автор</th>
+                <th>Версия</th>
+                <th>Публикация</th>
+                <th>Линтер</th>
+                <th class="actions-col">Карточка</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of store.items(); track item.id) {
+                <tr [attr.data-algo-id]="item.id" [class.selected]="store.selectedId() === item.id">
+                  <td>
+                    <div class="title-cell">
+                      <div class="title-top">
+                        <strong>{{ item.name }}</strong>
+                        <span tuiBadge size="s" appearance="neutral">{{ item.license }}</span>
+                        @if (item.isSystem) {
+                          <span tuiBadge size="s" appearance="info">Эталон</span>
+                        }
+                        @if (item.visibility === 'hidden') {
+                          <span tuiBadge size="s" appearance="warning">Скрыт</span>
+                        }
+                      </div>
+                      <p class="tui-text_body-xs muted desc-preview">{{ item.description }}</p>
+                    </div>
+                  </td>
+                  <td class="nowrap">{{ item.author }}</td>
+                  <td class="nowrap num">v{{ item.latestVersion }}</td>
+                  <td class="date-col muted">{{ formatDateTime(item.publishedAt) }}</td>
+                  <td>
+                    @if (item.linterWarnings.length === 0) {
+                      <span tuiBadge size="s" appearance="positive">Чисто</span>
+                    } @else {
+                      <span tuiBadge size="s" appearance="warning">
+                        {{ formatLinter(item.linterWarnings) }}
+                      </span>
+                    }
+                  </td>
+                  <td class="actions-col">
+                    <button
+                      tuiButton
+                      type="button"
+                      size="xs"
+                      [appearance]="store.selectedId() === item.id ? 'primary' : 'outline'"
+                      (click)="store.selectAlgorithm(item.id)"
+                    >
+                      Открыть
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pagination-bar">
+          <span class="tui-text_body-s muted">
+            Страница {{ store.currentPage() }} из {{ store.totalPages() }}
+          </span>
+          <div class="pagination-actions">
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              [disabled]="!store.hasPrevPage()"
+              (click)="store.setPage(store.currentPage() - 1)"
+            >
+              Назад
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              [disabled]="!store.hasNextPage()"
+              (click)="store.setPage(store.currentPage() + 1)"
+            >
+              Вперёд
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+
+    @if (store.selectedId() !== null) {
+      <aside class="panel detail-panel" aria-label="Карточка алгоритма">
+        @if (store.detailLoading()) {
+          <div class="empty-state tui-text_body-m muted">Загрузка карточки…</div>
+        } @else if (store.detailError()) {
+          <div class="detail-body">
+            <div class="detail-header">
+              <h2 class="tui-text_h5">Карточка алгоритма</h2>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="flat"
+                (click)="store.closeDetail()"
+              >
+                Закрыть
+              </button>
+            </div>
+            <div tuiNotification appearance="warning" size="s">{{ store.detailError() }}</div>
+          </div>
+        } @else if (store.selectedDetail(); as algo) {
+          <div class="detail-body">
+            <div class="detail-header">
+              <div class="detail-title-wrap">
+                <h2 class="tui-text_h5">{{ algo.name }}</h2>
+                <div class="title-top">
+                  <span tuiBadge size="s" appearance="neutral">{{ algo.license }}</span>
+                  <span tuiBadge size="s" appearance="info">v{{ algo.latestVersion }}</span>
+                  @if (algo.visibility === 'hidden') {
+                    <span tuiBadge size="s" appearance="warning">Скрыт</span>
+                  }
+                </div>
+              </div>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="flat"
+                (click)="store.closeDetail()"
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <div class="tui-text_body-s muted">
+              Автор: <strong>{{ algo.author }}</strong> · Опубликован:
+              {{ formatDateTime(algo.publishedAt) }}
+            </div>
+
+            <p class="tui-text_body-m detail-desc">{{ algo.description }}</p>
+
+            <div class="detail-actions">
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                [appearance]="store.isInCompare(algo.id) ? 'primary' : 'outline'"
+                [disabled]="!store.canAddToCompare(algo.id)"
+                [title]="
+                  !store.canAddToCompare(algo.id)
+                    ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
+                    : ''
+                "
+                (click)="
+                  store.toggleCompare({
+                    id: algo.id,
+                    name: algo.name,
+                    latestVersion: algo.latestVersion,
+                  })
+                "
+              >
+                {{ store.isInCompare(algo.id) ? 'Убрать из сравнения' : 'Добавить в сравнение' }}
+              </button>
+
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                disabled
+                [title]="dslPendingHint"
+              >
+                Форк
+              </button>
+
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                disabled
+                [title]="dslPendingHint"
+              >
+                Запустить прогон
+              </button>
+            </div>
+
+            <p class="tui-text_body-xs muted">
+              Действия «Форк» и «Запустить прогон» будут доступны после решения по DSL.
+            </p>
+
+            <section class="detail-section">
+              <div class="section-head">
+                <h3 class="tui-text_h6">Предупреждения линтера</h3>
+                @if (algo.linterWarnings.length === 0) {
+                  <span tuiBadge size="s" appearance="positive">Чисто</span>
+                } @else {
+                  <span tuiBadge size="s" appearance="warning">
+                    {{ algo.linterWarnings.length }}
+                  </span>
+                }
+              </div>
+
+              @if (algo.linterWarnings.length === 0) {
+                <p class="tui-text_body-s muted">Предупреждений линтера нет.</p>
+              } @else {
+                <ul class="warnings-list">
+                  @for (warn of algo.linterWarnings; track warn.code + '-' + warn.line) {
+                    <li class="warning-item">
+                      <div class="warning-meta">
+                        <span tuiBadge size="s" appearance="warning">{{ warn.code }}</span>
+                        <span class="tui-text_body-xs muted">стр. {{ warn.line }}</span>
+                      </div>
+                      <span class="tui-text_body-s">{{ warn.message }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+
+            <section class="detail-section">
+              <div class="section-head">
+                <h3 class="tui-text_h6">Версии (неизменяемые)</h3>
+                <span class="tui-text_body-xs muted">Всего: {{ algo.versions.length }}</span>
+              </div>
+
+              <ul class="versions-list">
+                @for (ver of algo.versions; track ver.version; let isFirst = $first) {
+                  <li class="version-item">
+                    <div class="version-top">
+                      <strong>v{{ ver.version }}</strong>
+                      <span class="tui-text_body-xs muted">
+                        {{ formatDateTime(ver.publishedAt) }}
+                      </span>
+                      @if (isFirst) {
+                        <span tuiBadge size="s" appearance="positive">текущая</span>
+                      }
+                      <span tuiBadge size="s" appearance="neutral">неизменяема</span>
+                    </div>
+                    <p class="tui-text_body-s muted version-summary">{{ ver.summary }}</p>
+                  </li>
+                }
+              </ul>
+            </section>
+          </div>
+        }
+      </aside>
+    }
+  </div>
+</section>
