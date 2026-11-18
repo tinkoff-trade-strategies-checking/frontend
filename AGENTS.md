@@ -31,6 +31,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
   - `features/launch/` — экран «Новая сессия» (`/new`): `launch-page.*`, `launch.store.ts`, `launch.format.ts`, `data/` (`LaunchApi`, `StubLaunchApi`, модели и коды отказов).
   - `features/arena/` — экран арены: `arena-page.*` (композиция и подтверждение завершения), `arena.store.ts` (Signals-состояние и таймер плеера), `arena.format.ts` (форматирование слепого режима), `data/` (`ArenaApi`, `StubArenaApi`, модели), `components/` (`arena-player`, `arena-chart` над `lightweight-charts`, `arena-order-ticket`, `arena-orders-panel`, `arena-portfolio-panel`).
   - `features/report/` — экран отчёта (`/report/:id`): `report-page.*`, `report.store.ts`, `report.format.ts`, `data/` (`ReportApi`, `StubReportApi`, модели), `components/` (`report-equity-chart`, `report-underwater-chart` над `lightweight-charts`).
+  - `features/history/` — экран истории сессий и прогонов (`/history`): `history-page.*`, `history.store.ts`, `history.format.ts`, `data/` (`HistoryApi`, `StubHistoryApi`, модели).
 - `src/app/shared/` — общие компоненты и утилиты, когда понадобятся двум и более фичам.
 - `src/app/api/` — TS-клиент API, генерирует `ng-openapi-gen` из `api/openapi.yaml` при сборке; **не коммитится, не правится руками**.
 - `api/openapi.yaml` — копия контракта из `backend`, обновляется только `npm run api:sync`.

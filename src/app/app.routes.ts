@@ -23,5 +23,10 @@ export const routes: Routes = [
     title: 'Отчёт',
     loadComponent: () => import('./features/report/report-page').then((m) => m.ReportPage),
   },
+  {
+    path: 'history',
+    title: 'История',
+    loadComponent: () => import('./features/history/history-page').then((m) => m.HistoryPage),
+  },
   { path: '**', redirectTo: 'arena' },
 ];

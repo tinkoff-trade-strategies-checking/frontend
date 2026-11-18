@@ -1,0 +1,224 @@
+<section class="history-page">
+  <header class="history-header">
+    <div>
+      <h1 class="tui-text_h3">История сессий и прогонов</h1>
+      <p class="tui-text_body-m muted">
+        Ваши ручные сессии и пользовательские прогоны алгоритмов. Неслепые сессии отмечены отдельно,
+        итог указан после издержек.
+      </p>
+    </div>
+    <a tuiButton size="m" appearance="primary" routerLink="/new">Новая сессия</a>
+  </header>
+
+  @if (store.error()) {
+    <div tuiNotification appearance="negative" size="s" class="error-row">
+      <span>{{ store.error() }}</span>
+      <button tuiButton type="button" size="xs" appearance="outline" (click)="store.load()">
+        Повторить
+      </button>
+    </div>
+  }
+
+  <section class="panel">
+    <div class="filters-bar">
+      <div class="filter-group">
+        <span class="tui-text_body-xs muted">Тип</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="filterIndex(kindFilters, store.kind())"
+          (activeItemIndexChange)="onKindIndexChange($event)"
+        >
+          @for (opt of kindFilters; track opt.id) {
+            <button type="button">{{ opt.label }}</button>
+          }
+        </tui-segmented>
+      </div>
+
+      <div class="filter-group">
+        <span class="tui-text_body-xs muted">Статус</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="filterIndex(statusFilters, store.status())"
+          (activeItemIndexChange)="onStatusIndexChange($event)"
+        >
+          @for (opt of statusFilters; track opt.id) {
+            <button type="button">{{ opt.label }}</button>
+          }
+        </tui-segmented>
+      </div>
+
+      <div class="filter-group">
+        <span class="tui-text_body-xs muted">Период</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="filterIndex(regimeFilters, store.regime())"
+          (activeItemIndexChange)="onRegimeIndexChange($event)"
+        >
+          @for (opt of regimeFilters; track opt.id) {
+            <button type="button">{{ opt.label }}</button>
+          }
+        </tui-segmented>
+      </div>
+
+      <div class="filter-actions">
+        <button
+          tuiButton
+          type="button"
+          size="s"
+          [appearance]="store.blindOnly() ? 'primary' : 'outline'"
+          [attr.aria-pressed]="store.blindOnly()"
+          (click)="store.toggleBlindOnly()"
+        >
+          Только слепые
+        </button>
+        <span class="tui-text_body-s muted count-label">Всего: {{ store.total() }}</span>
+      </div>
+    </div>
+
+    @if (store.loading() && store.items().length === 0) {
+      <div class="empty-state tui-text_body-m muted">Загрузка истории…</div>
+    } @else if (store.items().length === 0) {
+      <div class="empty-state">
+        <span class="tui-text_body-m muted">Сессий и прогонов под выбранные фильтры нет.</span>
+        <button
+          tuiButton
+          type="button"
+          size="s"
+          appearance="outline"
+          (click)="store.resetFilters()"
+        >
+          Сбросить фильтры
+        </button>
+      </div>
+    } @else {
+      <div class="table-scroll">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Сессия / прогон</th>
+              <th>Режим</th>
+              <th>Статус</th>
+              <th>Категория периода</th>
+              <th class="num">Итог (после издержек)</th>
+              <th class="actions-col">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of store.items(); track item.id) {
+              <tr [attr.data-session-id]="item.id">
+                <td class="date-col muted">{{ formatDateTime(item.createdAt) }}</td>
+                <td>
+                  <div class="title-cell">
+                    <div class="title-top">
+                      <strong>{{ formatTitle(item) }}</strong>
+                      <span class="tui-text_body-xs muted">{{ item.id }}</span>
+                      @if (!item.blind) {
+                        <span tuiBadge size="s" appearance="warning">Неслепая</span>
+                      }
+                    </div>
+                    @if (!(item.blind && item.status === 'running')) {
+                      @if (item.papers || item.periodLabel) {
+                        <div class="tui-text_body-xs muted meta-line">
+                          @if (item.papers; as papers) {
+                            <span>{{ papers.join(', ') }}</span>
+                          }
+                          @if (item.periodLabel; as periodLabel) {
+                            <span>{{ periodLabel }}</span>
+                          }
+                        </div>
+                      }
+                    }
+                  </div>
+                </td>
+                <td>
+                  <span>{{ kindLabels[item.kind] }}</span>
+                </td>
+                <td>
+                  <div class="status-cell">
+                    <span tuiBadge size="s" [appearance]="statusAppearance(item.status)">
+                      {{ statusLabels[item.status] }}
+                    </span>
+                    @if (item.status === 'running' || item.status === 'finished_early') {
+                      <span class="tui-text_body-xs muted">
+                        {{ item.playedDays }} / {{ item.totalDays }} дн.
+                      </span>
+                    }
+                  </div>
+                </td>
+                <td>{{ regimeLabels[item.regime] }}</td>
+                <td
+                  class="num"
+                  [class.pos]="item.netReturnPct !== null && item.netReturnPct > 0"
+                  [class.neg]="item.netReturnPct !== null && item.netReturnPct < 0"
+                >
+                  {{ formatSignedPct(item.netReturnPct) }}
+                </td>
+                <td class="actions-col">
+                  <div class="row-actions">
+                    @if (item.status === 'running') {
+                      @if (item.kind === 'session') {
+                        <a tuiButton size="xs" appearance="primary" routerLink="/arena">
+                          Продолжить
+                        </a>
+                      } @else {
+                        <span class="tui-text_body-xs muted">Выполняется…</span>
+                      }
+                    } @else {
+                      <a
+                        tuiButton
+                        size="xs"
+                        appearance="outline"
+                        [routerLink]="['/report', item.id]"
+                      >
+                        Открыть отчёт
+                      </a>
+                      @if (item.kind === 'session') {
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="flat"
+                          [routerLink]="['/replay', item.id]"
+                        >
+                          Воспроизвести
+                        </a>
+                      }
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <span class="tui-text_body-s muted">
+          Страница {{ store.currentPage() }} из {{ store.totalPages() }}
+        </span>
+        <div class="pagination-actions">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            [disabled]="!store.hasPrevPage()"
+            (click)="store.setPage(store.currentPage() - 1)"
+          >
+            Назад
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            [disabled]="!store.hasNextPage()"
+            (click)="store.setPage(store.currentPage() + 1)"
+          >
+            Вперёд
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</section>
