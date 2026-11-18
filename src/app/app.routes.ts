@@ -28,5 +28,10 @@ export const routes: Routes = [
     title: 'История',
     loadComponent: () => import('./features/history/history-page').then((m) => m.HistoryPage),
   },
+  {
+    path: 'replay/:id',
+    title: 'Воспроизведение',
+    loadComponent: () => import('./features/replay/replay-page').then((m) => m.ReplayPage),
+  },
   { path: '**', redirectTo: 'arena' },
 ];

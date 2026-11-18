@@ -11,6 +11,7 @@ import {
 import {
   ArenaFill,
   ArenaOrder,
+  ArenaPaper,
   ORDER_STATUS_LABELS,
   ORDER_TYPE_LABELS,
 } from '../data/arena.models';
@@ -59,7 +60,7 @@ import {
                       <span [class]="order.side === 'buy' ? 'pos' : 'neg'">
                         {{ order.side === 'buy' ? 'Купить' : 'Продать' }}
                       </span>
-                      Бумага {{ order.paperId }}
+                      {{ paperLabel(order.paperId) }}
                     </td>
                     <td>{{ typeLabel(order.type) }}</td>
                     <td class="num">{{ formatLots(order.lots - order.filledLots) }}</td>
@@ -68,7 +69,7 @@ import {
                       {{ order.tif === 'gtc' ? 'до отмены' : 'день' }}
                     </td>
                     <td class="actions-cell">
-                      @if (!finished()) {
+                      @if (!finished() && !readOnly()) {
                         <button
                           tuiButton
                           type="button"
@@ -117,8 +118,14 @@ import {
               <tbody>
                 @for (fill of fills(); track fill.id) {
                   <tr>
-                    <td class="tui-text_body-xs">{{ formatCandle(fill.day, fill.candleInDay) }}</td>
-                    <td>Бумага {{ fill.paperId }}</td>
+                    <td class="tui-text_body-xs">
+                      {{
+                        fill.dateLabel
+                          ? fill.dateLabel + ' (д' + fill.day + ')'
+                          : formatCandle(fill.day, fill.candleInDay)
+                      }}
+                    </td>
+                    <td>{{ paperLabel(fill.paperId) }}</td>
                     <td [class]="fill.side === 'buy' ? 'pos' : 'neg'">
                       {{ fill.side === 'buy' ? 'Покупка' : 'Продажа' }}
                     </td>
@@ -154,7 +161,7 @@ import {
                       <span [class]="order.side === 'buy' ? 'pos' : 'neg'">
                         {{ order.side === 'buy' ? 'Купить' : 'Продать' }}
                       </span>
-                      Бумага {{ order.paperId }}
+                      {{ paperLabel(order.paperId) }}
                     </td>
                     <td>{{ typeLabel(order.type) }}</td>
                     <td class="num">{{ formatLots(order.lots) }}</td>
@@ -255,6 +262,8 @@ export class ArenaOrdersPanel {
   readonly closedOrders = input<readonly ArenaOrder[]>([]);
   readonly fills = input.required<readonly ArenaFill[]>();
   readonly finished = input.required<boolean>();
+  readonly readOnly = input(false);
+  readonly papers = input<readonly ArenaPaper[]>([]);
 
   readonly cancelOrder = output<string>();
   readonly replaceOrder = output<ArenaOrder>();
@@ -265,6 +274,11 @@ export class ArenaOrdersPanel {
   protected readonly formatPct = formatPct;
   protected readonly formatCandle = formatBlindCandleLabel;
   protected readonly formatReason = formatRejectReason;
+
+  protected paperLabel(paperId: string): string {
+    const found = this.papers().find((p) => p.id === paperId);
+    return found ? found.label : `Бумага ${paperId}`;
+  }
 
   protected typeLabel(type: ArenaOrder['type']): string {
     return ORDER_TYPE_LABELS[type];
