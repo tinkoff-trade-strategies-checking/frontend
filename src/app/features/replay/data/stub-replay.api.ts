@@ -395,13 +395,27 @@ export class StubReplayApi implements ReplayApi {
     if (sessionId === 'S-0104' || sessionId === 'S-BLIND-ACTIVE') {
       // INV-7: активная слепая сессия не раскрывает тикеры, названия и реальные даты.
       return {
-        status: 'BLIND_UNFINISHED',
+        status: 'NOT_FINISHED',
         sessionId,
+        blind: true,
         title: 'Слепая сессия от 18.11.2026',
         createdAt: '18.11.2026 14:20',
         playedDays: 14,
         totalDays: TOTAL_DAYS,
         regime: 'stress',
+      };
+    }
+
+    if (sessionId === 'S-OPEN-ACTIVE') {
+      return {
+        status: 'NOT_FINISHED',
+        sessionId,
+        blind: false,
+        title: 'Неслепая сессия от 18.11.2026',
+        createdAt: '18.11.2026 14:25',
+        playedDays: 10,
+        totalDays: TOTAL_DAYS,
+        regime: 'medium',
       };
     }
 

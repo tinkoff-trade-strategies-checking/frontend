@@ -226,7 +226,7 @@ export class LaunchStore {
         return false;
       }
 
-      await this.router.navigate(['/arena']);
+      await this.router.navigate(['/arena', result.sessionId]);
       return true;
     } catch {
       this.error.set('Не удалось запустить сессию. Попробуйте ещё раз.');

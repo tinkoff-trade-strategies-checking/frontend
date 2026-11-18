@@ -1,4 +1,5 @@
 import { StubReplayApi } from '../../replay/data/stub-replay.api';
+import { formatPct, formatRatio } from '../report.format';
 import { StubReportApi } from './stub-report.api';
 
 describe('StubReportApi', () => {
@@ -6,8 +7,9 @@ describe('StubReportApi', () => {
     const api = new StubReportApi();
     const res = await api.getReport('S-0104');
 
-    expect(res.status).toBe('BLIND_UNFINISHED');
+    expect(res.status).toBe('NOT_FINISHED');
     expect(Object.keys(res).sort()).toEqual([
+      'blind',
       'createdAt',
       'playedDays',
       'regime',
@@ -70,6 +72,12 @@ describe('StubReportApi', () => {
       expect(early.report.playedDays).toBe(28);
       expect(early.report.fills.every((f) => f.day <= 28)).toBe(true);
       expect(early.report.divergences.some((d) => d.paperTicker === 'YDEX')).toBe(false);
+    }
+
+    const openActive = await api.getReport('S-OPEN-ACTIVE');
+    expect(openActive.status).toBe('NOT_FINISHED');
+    if (openActive.status === 'NOT_FINISHED') {
+      expect(openActive.blind).toBe(false);
     }
 
     const building = await api.getReport('S-BUILDING');
@@ -201,5 +209,11 @@ describe('StubReportApi', () => {
 
     expect(rep.divergenceSummary.totalErrorCostRub).toBe(sumRub);
     expect(rep.divergenceSummary.totalErrorCostPct).toBe(sumPct);
+  });
+
+  it('F6: formatPct и formatRatio возвращают «—» при null метриках', () => {
+    expect(formatPct(null)).toBe('—');
+    expect(formatPct(null, true)).toBe('—');
+    expect(formatRatio(null)).toBe('—');
   });
 });

@@ -78,16 +78,25 @@ describe('StubReplayApi', () => {
     expect(currentPortfolio.costsRub).toBe(report.humanMetrics.costsRub.totalRub);
   });
 
-  it('INV-7: S-0104 и S-BLIND-ACTIVE недоступны для воспроизведения и не раскрывают данные', async () => {
+  it('INV-7/INV-1: S-0104, S-BLIND-ACTIVE и S-OPEN-ACTIVE возвращают NOT_FINISHED без раскрытия', async () => {
     const api = new StubReplayApi();
     for (const id of ['S-0104', 'S-BLIND-ACTIVE']) {
       const res = await api.loadSession(id);
-      expect(res.status).toBe('BLIND_UNFINISHED');
+      expect(res.status).toBe('NOT_FINISHED');
+      if (res.status === 'NOT_FINISHED') {
+        expect(res.blind).toBe(true);
+      }
       const serialized = JSON.stringify(res);
       expect(serialized).not.toMatch(
         /SBER|GAZP|YDEX|Сбербанк|Газпром|Яндекс|26\.02\.2020|21\.05\.2020/,
       );
       await expect(api.step(id)).rejects.toThrow();
+    }
+
+    const openRes = await api.loadSession('S-OPEN-ACTIVE');
+    expect(openRes.status).toBe('NOT_FINISHED');
+    if (openRes.status === 'NOT_FINISHED') {
+      expect(openRes.blind).toBe(false);
     }
 
     const notFound = await api.loadSession('S-9999');

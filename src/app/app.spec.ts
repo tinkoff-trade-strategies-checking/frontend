@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { App } from './app';
 import { routes } from './app.routes';
+import { StubSessionRegistry } from './shared/stub-session-registry';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -21,6 +22,20 @@ describe('App', () => {
       (a) => a.textContent?.trim(),
     );
     expect(links).toEqual(['Новая сессия', 'Арена', 'Мастерская', 'Отчёт', 'История']);
+
+    const navLinks = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('nav a'),
+    ) as HTMLAnchorElement[];
+    const reportLink = navLinks.find((a) => a.textContent?.trim() === 'Отчёт');
+    expect(reportLink?.getAttribute('href')).toBe('/history');
+
+    TestBed.inject(StubSessionRegistry).markFinished('S-0106', {
+      playedDays: 5,
+      finishedEarly: true,
+      netReturnPct: 1.5,
+    });
+    fixture.detectChanges();
+    expect(reportLink?.getAttribute('href')).toBe('/report/S-0106');
   });
 
   describe('маршруты', () => {

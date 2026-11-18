@@ -1,6 +1,11 @@
 import { StubArenaApi } from '../../arena/data/stub-arena.api';
 import { StubReportApi } from '../../report/data/stub-report.api';
-import { HISTORY_DEFAULT_PAGE_SIZE, HISTORY_MAX_PAGE_SIZE } from './history.models';
+import {
+  HISTORY_DEFAULT_PAGE_SIZE,
+  HISTORY_MAX_PAGE_SIZE,
+  HistoryEntry,
+  maskHistoryEntry,
+} from './history.models';
 import { historyNetReturn } from '../history.format';
 import { StubHistoryApi } from './stub-history.api';
 
@@ -100,5 +105,28 @@ describe('StubHistoryApi', () => {
 
     const capped = await api.list({ pageSize: 500 });
     expect(capped.pageSize).toBe(HISTORY_MAX_PAGE_SIZE);
+  });
+
+  it('F4/INV-1: maskHistoryEntry убирает netReturnPct у незавершённой неслепой сессии', () => {
+    const leakyOpen = {
+      id: 'S-OPEN-ACTIVE',
+      kind: 'session',
+      owner: 'USER',
+      blind: false,
+      status: 'running',
+      createdAt: '2026-11-18T14:25:00+03:00',
+      regime: 'medium',
+      playedDays: 10,
+      totalDays: 60,
+      algoName: null,
+      title: 'Неслепая сессия',
+      papers: ['SBER'],
+      periodLabel: '26.02.2020 — 21.05.2020',
+      netReturnPct: 99.9,
+    } as unknown as HistoryEntry;
+
+    const masked = maskHistoryEntry(leakyOpen);
+    expect(masked).not.toHaveProperty('netReturnPct');
+    expect(historyNetReturn(masked)).toBeNull();
   });
 });

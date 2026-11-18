@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { injectSessionRegistry, StubSessionRecord } from '../../../shared/stub-session-registry';
 import {
   HISTORY_DEFAULT_PAGE_SIZE,
   HISTORY_MAX_PAGE_SIZE,
@@ -438,32 +439,77 @@ const ALL_STUB_RECORDS: readonly HistoryEntry[] = [
   },
 ];
 
+function toHistoryEntry(rec: StubSessionRecord): HistoryEntry {
+  const base = {
+    id: rec.sessionId,
+    kind: 'session' as const,
+    owner: 'USER' as const,
+    createdAt: rec.createdAt,
+    regime: rec.regime,
+    playedDays: rec.playedDays,
+    totalDays: rec.totalDays,
+    algoName: null,
+  };
+  if (!rec.finished) {
+    if (rec.blind) {
+      return { ...base, blind: true, status: 'running' };
+    }
+    return {
+      ...base,
+      blind: false,
+      status: 'running',
+      title: `Неслепая сессия ${rec.sessionId}`,
+      papers: rec.paperIds ?? ['SBER', 'GAZP', 'YDEX'],
+      periodLabel: rec.customStartDate ? `с ${rec.customStartDate}` : 'выбранный период',
+    };
+  }
+  return {
+    ...base,
+    blind: rec.blind,
+    status: rec.finishedEarly ? 'finished_early' : 'completed',
+    title: rec.blind ? `Слепая сессия ${rec.sessionId}` : `Сессия ${rec.sessionId}`,
+    papers: rec.paperIds ?? ['SBER', 'GAZP', 'YDEX'],
+    periodLabel: '26.02.2020 — 21.05.2020',
+    netReturnPct: rec.netReturnPct ?? 0,
+  };
+}
+
 @Injectable()
 export class StubHistoryApi implements HistoryApi {
+  private readonly registry = injectSessionRegistry();
+
   async list(query: HistoryQuery = {}): Promise<HistoryPage> {
     const pageSize = Math.min(
       HISTORY_MAX_PAGE_SIZE,
       Math.max(1, Math.floor(query.pageSize ?? HISTORY_DEFAULT_PAGE_SIZE)),
     );
 
-    const filtered = ALL_STUB_RECORDS.filter((item) => {
-      if (item.owner !== 'USER') {
-        return false;
-      }
-      if (query.kind && query.kind !== 'all' && item.kind !== query.kind) {
-        return false;
-      }
-      if (query.blindOnly && !item.blind) {
-        return false;
-      }
-      if (query.status && query.status !== 'all' && item.status !== query.status) {
-        return false;
-      }
-      if (query.regime && query.regime !== 'all' && item.regime !== query.regime) {
-        return false;
-      }
-      return true;
-    })
+    const dynamicEntries = (this.registry?.list() ?? []).map(toHistoryEntry);
+    const dynamicIds = new Set(dynamicEntries.map((e) => e.id));
+    const allRecords = [
+      ...dynamicEntries,
+      ...ALL_STUB_RECORDS.filter((item) => !dynamicIds.has(item.id)),
+    ];
+
+    const filtered = allRecords
+      .filter((item) => {
+        if (item.owner !== 'USER') {
+          return false;
+        }
+        if (query.kind && query.kind !== 'all' && item.kind !== query.kind) {
+          return false;
+        }
+        if (query.blindOnly && !item.blind) {
+          return false;
+        }
+        if (query.status && query.status !== 'all' && item.status !== query.status) {
+          return false;
+        }
+        if (query.regime && query.regime !== 'all' && item.regime !== query.regime) {
+          return false;
+        }
+        return true;
+      })
       .slice()
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 

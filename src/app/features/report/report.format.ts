@@ -75,7 +75,10 @@ export function formatDeltaBars(delta: number): string {
   return 'Δt = 0 бар.';
 }
 
-export function formatPct(value: number, signed = false): string {
+export function formatPct(value: number | null, signed = false): string {
+  if (value === null) {
+    return '—';
+  }
   const formatted = Math.abs(value).toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -92,7 +95,10 @@ export function formatPct(value: number, signed = false): string {
   return `${value < 0 ? '−' : ''}${formatted} %`;
 }
 
-export function formatRatio(value: number): string {
+export function formatRatio(value: number | null): string {
+  if (value === null) {
+    return '—';
+  }
   return value.toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

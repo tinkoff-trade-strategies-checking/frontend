@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { injectSessionRegistry, StubSessionRecord } from '../../../shared/stub-session-registry';
 import {
   EquityCurvePoint,
   ReportApi,
@@ -664,19 +665,92 @@ const REPORT_S0105: SessionReport = {
   ],
 };
 
+function formatMoscowDate(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(iso));
+}
+
+function formatMoscowDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+    .format(new Date(iso))
+    .replace(',', '');
+}
+
+function buildDynamicReport(session: StubSessionRecord): SessionReport {
+  const base = session.blind ? REPORT_S0103 : REPORT_S0105;
+  return {
+    ...base,
+    sessionId: session.sessionId,
+    blind: session.blind,
+    finishedEarly: session.finishedEarly,
+    replayAvailable: false,
+    playedDays: session.playedDays,
+    totalDays: session.totalDays,
+    timeframe: session.timeframe,
+    regime: session.regime,
+    createdAt: formatMoscowDateTime(session.createdAt),
+  };
+}
+
 @Injectable()
 export class StubReportApi implements ReportApi {
+  private readonly registry = injectSessionRegistry();
+
   async getReport(sessionId: string): Promise<SessionReportResult> {
+    const registered = this.registry?.get(sessionId);
+    if (registered) {
+      if (!registered.finished) {
+        return {
+          status: 'NOT_FINISHED',
+          sessionId,
+          blind: registered.blind,
+          title: registered.blind
+            ? `Слепая сессия от ${formatMoscowDate(registered.createdAt)}`
+            : `Сессия ${sessionId}`,
+          createdAt: formatMoscowDateTime(registered.createdAt),
+          playedDays: registered.playedDays,
+          totalDays: registered.totalDays,
+          regime: registered.regime,
+        };
+      }
+      return { status: 'READY', report: buildDynamicReport(registered) };
+    }
+
     if (sessionId === 'S-0104' || sessionId === 'S-BLIND-ACTIVE') {
       // INV-7: активная слепая сессия арены (S-0104) не раскрывает тикеры, названия и реальный период.
       return {
-        status: 'BLIND_UNFINISHED',
+        status: 'NOT_FINISHED',
         sessionId,
+        blind: true,
         title: 'Слепая сессия от 18.11.2026',
         createdAt: '18.11.2026 14:20',
         playedDays: 14,
         totalDays: 60,
         regime: 'stress',
+      };
+    }
+
+    if (sessionId === 'S-OPEN-ACTIVE') {
+      return {
+        status: 'NOT_FINISHED',
+        sessionId,
+        blind: false,
+        title: 'Неслепая сессия от 18.11.2026',
+        createdAt: '18.11.2026 14:25',
+        playedDays: 10,
+        totalDays: 60,
+        regime: 'medium',
       };
     }
 

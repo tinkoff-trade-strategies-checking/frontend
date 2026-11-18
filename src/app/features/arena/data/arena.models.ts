@@ -17,7 +17,12 @@ export type ArenaRejectReason =
   | 'INSUFFICIENT_POSITION'
   | 'SESSION_NOT_ACTIVE'
   | 'ORDER_NOT_ACTIVE'
-  | 'LIQUIDITY_LIMIT';
+  | 'LIQUIDITY_LIMIT'
+  | 'REPLACED'
+  | 'DAY_EXPIRED'
+  | 'OCO_SIBLING_FILLED'
+  | 'SESSION_END'
+  | 'CANCELLED_BY_USER';
 
 export interface ArenaCandle {
   readonly step: number;
@@ -182,10 +187,11 @@ export interface ArenaFinishResult {
   readonly finishedAtStep: number;
   readonly finishedAtDay: number;
   readonly portfolio: ArenaPortfolio;
+  readonly orders?: readonly ArenaOrder[];
 }
 
 export interface ArenaApi {
-  getSnapshot(): Promise<ArenaSnapshot>;
+  getSnapshot(sessionId?: string): Promise<ArenaSnapshot>;
   step(): Promise<ArenaStepResult>;
   estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;
   placeOrder(command: PlaceOrderCommand): Promise<ArenaCommandResult>;
@@ -209,10 +215,27 @@ export const ORDER_TYPE_LABELS: Readonly<Record<OrderType, string>> = {
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   active: 'Активна',
   filled: 'Исполнена',
-  partial: 'Частично',
+  partial: 'Частично исполнена',
   cancelled: 'Отменена',
   expired: 'Истёк срок',
   rejected: 'Отклонена',
 };
+
+const CLOSED_ORDER_STATUSES = new Set<OrderStatus>(['cancelled', 'rejected', 'expired']);
+
+/** Остаток частично исполненной лимитной заявки остаётся активным, если нет причины снятия. */
+export function isOrderActive(order: ArenaOrder): boolean {
+  return (
+    order.status === 'active' ||
+    (order.status === 'partial' && !order.rejectReason && order.filledLots < order.lots)
+  );
+}
+
+export function isOrderClosed(order: ArenaOrder): boolean {
+  return (
+    CLOSED_ORDER_STATUSES.has(order.status) ||
+    (order.status === 'partial' && Boolean(order.rejectReason))
+  );
+}
 
 export const ARENA_SPEEDS: readonly ArenaSpeed[] = [1, 5, 10, 100];

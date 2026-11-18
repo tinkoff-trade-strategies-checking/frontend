@@ -40,9 +40,9 @@ describe('ReplayStore', () => {
     await expect(api.finishSession()).rejects.toThrow();
   });
 
-  it('для S-0104 возвращает BLIND_UNFINISHED без arenaApi', async () => {
+  it('для S-0104 возвращает NOT_FINISHED без arenaApi', async () => {
     await store.load('S-0104');
-    expect(store.result()?.status).toBe('BLIND_UNFINISHED');
+    expect(store.result()?.status).toBe('NOT_FINISHED');
     expect(store.ready()).toBeNull();
     expect(store.arenaApi()).toBeNull();
   });

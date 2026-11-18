@@ -36,25 +36,25 @@ export interface ReportMetrics {
   readonly initialCapitalRub: number;
   readonly finalCapitalRub: number;
   readonly totalReturnPct: number;
-  readonly cagrPct: number;
+  readonly cagrPct: number | null;
   readonly grossReturnPct: number;
   readonly netReturnPct: number;
   readonly maxDrawdownPct: number;
   readonly maxDrawdownDurationDays: number;
   readonly maxDrawdownDurationSteps: number;
-  readonly volatilityPct: number;
-  readonly sharpe: number;
-  readonly sortino: number;
+  readonly volatilityPct: number | null;
+  readonly sharpe: number | null;
+  readonly sortino: number | null;
   readonly turnover: number;
   readonly tradesCount: number;
-  readonly winRatePct: number;
+  readonly winRatePct: number | null;
   readonly rejectedOrdersCount: number;
   readonly partialFillsCount: number;
   readonly hhi: number;
   readonly largestPositionPct: number;
   readonly bankrupt: boolean;
   readonly costsRub: ReportCostsBreakdown;
-  readonly benchmarkImoexPct: number;
+  readonly benchmarkImoexPct: number | null;
 }
 
 export interface ComparisonCapitalItem {
@@ -188,8 +188,9 @@ export type SessionReportResult =
       readonly message: string;
     }
   | {
-      readonly status: 'BLIND_UNFINISHED';
+      readonly status: 'NOT_FINISHED';
       readonly sessionId: string;
+      readonly blind: boolean;
       readonly title: string;
       readonly createdAt: string;
       readonly playedDays: number;

@@ -82,5 +82,5 @@ export function historyPeriod(entry: HistoryEntry): string | null {
 }
 
 export function historyNetReturn(entry: HistoryEntry): number | null {
-  return isBlindUnfinished(entry) ? null : entry.netReturnPct;
+  return entry.status === 'running' ? null : entry.netReturnPct;
 }

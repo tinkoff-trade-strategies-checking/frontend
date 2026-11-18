@@ -34,7 +34,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
   - `features/workshop/` — экран «Мастерская» (`/workshop`, каталог алгоритмов и карточка с неизменяемыми версиями INV-5): `workshop-page.*`, `workshop.store.ts` (сортировка, фильтры, поиск, пагинация, выбор до 5 алгоритмов в сравнение, защита от гонки запросов), `workshop.format.ts`, `data/` (`WorkshopApi`, `StubWorkshopApi`, модели).
   - `features/report/` — экран отчёта (`/report/:id`, вкладки метрик, расхождений, обратной проверки и сделок): `report-page.*`, `report.store.ts`, `report.format.ts`, `data/` (`ReportApi`, `StubReportApi`, модели), `components/` (`report-equity-chart`, `report-underwater-chart` над `lightweight-charts`).
   - `features/history/` — экран «История» (`/history`): `history-page.*`, `history.store.ts` (фильтры, пагинация, защита от гонки запросов), `history.format.ts`, `data/` (`HistoryApi`, `StubHistoryApi` — данные согласованы с заглушками арены и отчёта). Незавершённая слепая запись — отдельная ветка union `HistoryEntry` без бумаг, периода, названия и итога (INV-7), стор дополнительно маскирует лишние поля.
-- `src/app/shared/` — общие компоненты и утилиты, когда понадобятся двум и более фичам.
+- `src/app/shared/` — общие компоненты и утилиты, когда понадобятся двум и более фичам (`stub-session-registry.ts` — реестр запущенных и завершённых сессий для согласования заглушек).
 - `src/app/api/` — TS-клиент API, генерирует `ng-openapi-gen` из `api/openapi.yaml` при сборке; **не коммитится, не правится руками**.
 - `api/openapi.yaml` — копия контракта из `backend`, обновляется только `npm run api:sync`.
 - `scripts/api.mjs` — синхронизация, сверка и генерация клиента.

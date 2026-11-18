@@ -124,7 +124,7 @@ test('запуск слепой сессии на «Новая сессия» �
 
   await page.getByRole('button', { name: 'Запустить' }).click();
 
-  await expect(page).toHaveURL(/\/arena$/);
+  await expect(page).toHaveURL(/\/arena\/S-\d+$/);
   await expect(page.getByRole('heading', { name: 'Арена' })).toBeVisible();
   await expect(page.getByText('Слепая сессия')).toBeVisible();
 });
@@ -198,7 +198,7 @@ test('INV-7: в DOM экрана запуска (слепой режим), ар�
   await assertNoBlindLeaks(page, { forbidRub: false });
 
   await page.getByRole('button', { name: 'Запустить' }).click();
-  await expect(page).toHaveURL(/\/arena$/);
+  await expect(page).toHaveURL(/\/arena\/S-\d+$/);
   await expect(page.getByText('Слепая сессия')).toBeVisible();
   // Ждём загрузки снимка арены перед проверкой DOM.
   await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
@@ -274,4 +274,39 @@ test.fixme('INV-8: восстановление состояния арены п
 
   await page.reload();
   await expect(page.locator('.day-counter')).toHaveText('День 2 из 60');
+});
+
+test('F1: Новая сессия → Запустить → /arena/:id → Завершить → Открыть отчёт этой сессии', async ({
+  page,
+}) => {
+  await page.goto('/new');
+  await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Запустить' }).click();
+  await expect(page).toHaveURL(/\/arena\/S-\d+$/);
+
+  const match = /\/arena\/(S-\d+)$/.exec(page.url());
+  expect(match).not.toBeNull();
+  const sessionId = match![1];
+
+  await expect(page.getByText(sessionId)).toBeVisible();
+  await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
+
+  await page.getByRole('button', { name: 'Следующая свеча' }).click();
+  await expect(page.locator('.day-counter')).toHaveText('День 2 из 60');
+
+  await page.getByRole('button', { name: 'Завершить сессию' }).click();
+  await page.locator('tui-dialog').getByRole('button', { name: 'Завершить сессию' }).click();
+
+  await expect(page.getByText('Завершена', { exact: true })).toBeVisible();
+  await expect(page.locator('nav').getByRole('link', { name: 'Отчёт' })).toHaveAttribute(
+    'href',
+    `/report/${sessionId}`,
+  );
+
+  await page.locator('main').getByRole('link', { name: 'Открыть отчёт' }).click();
+  await expect(page).toHaveURL(new RegExp(`/report/${sessionId}$`));
+  await expect(page.getByRole('heading', { name: `Отчёт сессии ${sessionId}` })).toBeVisible();
+  await expect(page.getByText('Период раскрыт')).toBeVisible();
 });

@@ -2,12 +2,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   input,
   OnInit,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiDialogService, TuiNotification } from '@taiga-ui/core';
 import { TUI_CONFIRM, TuiBadge } from '@taiga-ui/kit';
 import { formatPct, formatPrice } from './arena.format';
@@ -41,6 +43,8 @@ import { StubArenaApi } from './data/stub-arena.api';
 export class ArenaPage implements OnInit {
   protected readonly store = inject(ArenaStore);
   private readonly dialogs = inject(TuiDialogService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly readOnly = input(false);
   readonly headerTitle = input('Арена');
@@ -64,7 +68,16 @@ export class ArenaPage implements OnInit {
   });
 
   ngOnInit(): void {
-    void this.store.init(this.apiSource() ?? undefined);
+    const customApi = this.apiSource();
+    if (customApi || this.readOnly() || !this.route) {
+      void this.store.init(customApi ?? undefined);
+      return;
+    }
+
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id') ?? undefined;
+      void this.store.init(undefined, id);
+    });
   }
 
   protected confirmFinish(): void {

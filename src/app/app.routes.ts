@@ -13,6 +13,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
   },
   {
+    path: 'arena/:id',
+    title: 'Арена',
+    loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
+  },
+  {
     path: 'workshop',
     title: 'Мастерская',
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
