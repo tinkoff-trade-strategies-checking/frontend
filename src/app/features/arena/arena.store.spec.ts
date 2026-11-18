@@ -293,6 +293,46 @@ describe('ArenaStore', () => {
 
     expect(store.estimatedPct()).toBeNull();
   });
+
+  it('F2: частично исполненная лимитная заявка без причины снятия остаётся в activeOrders, а с причиной — в closedOrders', async () => {
+    const stub = new StubArenaApi();
+    const baseSnap = await stub.getSnapshot();
+    const partialActive = {
+      id: 'ORD-PART-ACTIVE',
+      paperId: 'A',
+      side: 'buy' as const,
+      type: 'limit' as const,
+      lots: 10,
+      filledLots: 4,
+      tif: 'gtc' as const,
+      status: 'partial' as const,
+      step: 0,
+      seenStep: 0,
+      limitPrice: 99,
+    };
+    const partialClosed = {
+      id: 'ORD-PART-CLOSED',
+      paperId: 'A',
+      side: 'buy' as const,
+      type: 'market' as const,
+      lots: 10,
+      filledLots: 6,
+      tif: 'day' as const,
+      status: 'partial' as const,
+      step: 0,
+      seenStep: 0,
+      rejectReason: 'LIQUIDITY_LIMIT' as const,
+    };
+    vi.spyOn(stub, 'getSnapshot').mockResolvedValueOnce({
+      ...baseSnap,
+      orders: [partialActive, partialClosed],
+    });
+    const { store } = setup(stub);
+    await store.init();
+
+    expect(store.activeOrders().map((o) => o.id)).toEqual(['ORD-PART-ACTIVE']);
+    expect(store.closedOrders().map((o) => o.id)).toEqual(['ORD-PART-CLOSED']);
+  });
 });
 
 function apiReplace(store: ArenaStore, orderId: string) {

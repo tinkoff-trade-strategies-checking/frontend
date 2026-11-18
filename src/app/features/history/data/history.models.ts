@@ -34,41 +34,56 @@ export interface HistoryEntryBlindUnfinished extends HistoryEntryBase {
   readonly status: 'running';
 }
 
-interface HistoryEntryRevealedFields extends HistoryEntryBase {
+/** INV-1: у незавершённой неслепой записи нет итоговой доходности до конца сессии. */
+export interface HistoryEntryOpenUnfinished extends HistoryEntryBase {
+  readonly blind: false;
+  readonly status: 'running';
+  readonly title: string;
+  readonly papers: readonly string[];
+  readonly periodLabel: string;
+}
+
+export interface HistoryEntryFinished extends HistoryEntryBase {
+  readonly blind: boolean;
+  readonly status: Exclude<HistoryItemStatus, 'running'>;
   readonly title: string;
   readonly papers: readonly string[];
   readonly periodLabel: string;
   readonly netReturnPct: number;
 }
 
-export type HistoryEntryRevealed = HistoryEntryRevealedFields &
-  (
-    | { readonly blind: false; readonly status: HistoryItemStatus }
-    | { readonly blind: true; readonly status: Exclude<HistoryItemStatus, 'running'> }
-  );
-
-export type HistoryEntry = HistoryEntryBlindUnfinished | HistoryEntryRevealed;
+export type HistoryEntry =
+  HistoryEntryBlindUnfinished | HistoryEntryOpenUnfinished | HistoryEntryFinished;
 
 export function isBlindUnfinished(entry: HistoryEntry): entry is HistoryEntryBlindUnfinished {
   return entry.blind && entry.status === 'running';
 }
 
-/** Защитная маскировка: оставляет у незавершённой слепой записи только разрешённые поля. */
+/** Защитная маскировка: убирает запрещённые поля у незавершённых записей (INV-1, INV-7). */
 export function maskHistoryEntry(entry: HistoryEntry): HistoryEntry {
-  if (!isBlindUnfinished(entry)) {
+  if (entry.status !== 'running') {
     return entry;
   }
-  return {
+  const base: HistoryEntryBase = {
     id: entry.id,
     kind: entry.kind,
     owner: entry.owner,
-    blind: true,
-    status: 'running',
     createdAt: entry.createdAt,
     regime: entry.regime,
     playedDays: entry.playedDays,
     totalDays: entry.totalDays,
     algoName: entry.algoName,
+  };
+  if (entry.blind) {
+    return { ...base, blind: true, status: 'running' };
+  }
+  return {
+    ...base,
+    blind: false,
+    status: 'running',
+    title: entry.title,
+    papers: entry.papers,
+    periodLabel: entry.periodLabel,
   };
 }
 

@@ -26,6 +26,11 @@
         <a tuiButton size="s" appearance="outline" [routerLink]="route">Открыть отчёт</a>
       }
     } @else {
+      @if (store.finished() && store.sessionId()) {
+        <a tuiButton size="s" appearance="primary" [routerLink]="['/report', store.sessionId()]">
+          Открыть отчёт
+        </a>
+      }
       <button
         tuiButton
         type="button"
@@ -39,10 +44,20 @@
     }
   </header>
 
+  @if (store.error()) {
+    <div tuiNotification appearance="negative" size="s" role="alert">
+      {{ store.error() }}
+    </div>
+  }
+
   @if (store.notice()) {
     <div tuiNotification appearance="info" size="s">
       {{ store.notice() }}
     </div>
+  }
+
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка сессии…</div>
   }
 
   <app-arena-player
@@ -146,7 +161,6 @@
           [finished]="store.finished()"
           [editingOrder]="store.editingOrder()"
           [estimatedPct]="store.estimatedPct()"
-          [error]="store.error()"
           (paperSelect)="store.selectPaper($event)"
           (estimateRequest)="store.estimateOrder($event.paperId, $event.lots)"
           (submitOrder)="store.placeOrder($event)"

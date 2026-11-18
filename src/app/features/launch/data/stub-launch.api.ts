@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { injectSessionRegistry } from '../../../shared/stub-session-registry';
 import {
   CandleTimeframe,
   LaunchApi,
@@ -33,7 +34,8 @@ const VALID_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 @Injectable()
 export class StubLaunchApi implements LaunchApi {
-  private nextSessionSeq = 105;
+  private readonly registry = injectSessionRegistry();
+  private nextSessionSeq = 106;
 
   async getLaunchOptions(): Promise<LaunchOptions> {
     // INV-7: в параметрах слепого запуска нет списка тикеров и названий бумаг.
@@ -152,7 +154,25 @@ export class StubLaunchApi implements LaunchApi {
       };
     }
 
-    const sessionId = `S-${String(this.nextSessionSeq++).padStart(4, '0')}`;
+    const sessionId =
+      this.registry?.allocateSessionId() ?? `S-${String(this.nextSessionSeq++).padStart(4, '0')}`;
+    const blind = command.startMode === 'random';
+    this.registry?.register({
+      sessionId,
+      blind,
+      regime: command.regime,
+      timeframe: command.timeframe,
+      totalDays: command.durationDays,
+      playedDays: 1,
+      finished: false,
+      finishedEarly: false,
+      createdAt: new Date().toISOString(),
+      initialCapitalRub: command.initialCapitalRub,
+      paperIds: blind ? null : (command.paperIds ?? null),
+      paperCount: papersCount,
+      customStartDate: blind ? null : (command.customStartDate ?? null),
+      netReturnPct: null,
+    });
     return { accepted: true, sessionId };
   }
 }

@@ -2,9 +2,10 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
-import { formatBlindAxisTick, formatBlindCandleLabel } from './arena.format';
+import { formatBlindAxisTick, formatBlindCandleLabel, formatRejectReason } from './arena.format';
 import { ArenaPage } from './arena-page';
 import { ArenaChart } from './components/arena-chart';
+import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
 import { StubArenaApi } from './data/stub-arena.api';
 
@@ -86,5 +87,60 @@ describe('ArenaPage', () => {
     expect(formatBlindAxisTick(-3, 0)).toBe('п−3');
     expect(formatBlindAxisTick(5, 6)).toBe('д6');
     expect(formatBlindCandleLabel(5, 1)).toBe('день 5, свеча 1');
+  });
+
+  it('F6: форматирует новые причины снятия заявок из proto', () => {
+    expect(formatRejectReason('REPLACED')).toBe('Заменена пользователем.');
+    expect(formatRejectReason('DAY_EXPIRED')).toBe('Истёк срок заявки (день).');
+    expect(formatRejectReason('OCO_SIBLING_FILLED')).toBe('Снята при исполнении второй ноги OCO.');
+    expect(formatRejectReason('SESSION_END')).toBe('Снята при завершении сессии.');
+  });
+
+  it('F3: нулевой капитал (equityRub === 0) при банкротстве отображается в рублях, а не уходит в ветку процентов', () => {
+    const fixture = TestBed.createComponent(ArenaPortfolioPanel);
+    fixture.componentRef.setInput('papers', []);
+    fixture.componentRef.setInput('portfolio', {
+      equityPct: 0,
+      cashPct: 0,
+      investedPct: 0,
+      pnlPct: -100,
+      costsPct: 0,
+      equityRub: 0,
+      cashRub: 0,
+      investedRub: 0,
+      pnlRub: -1_000_000,
+      costsRub: 0,
+      positions: {},
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const primaryEquity = root.querySelector('.equity-row .metric-item .tui-text_h5');
+    expect(primaryEquity?.textContent?.trim()).toBe('0 ₽');
+    expect(root.textContent ?? '').toContain('в ₽ и %');
+  });
+
+  it('F8: отображает индикатор загрузки и ошибку на уровне страницы, включая режим только чтения', async () => {
+    let rejectLoad!: (err: Error) => void;
+    vi.spyOn(stubApi, 'getSnapshot').mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectLoad = reject;
+        }),
+    );
+
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.componentRef.setInput('readOnly', true);
+    fixture.detectChanges();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('Загрузка сессии…');
+
+    rejectLoad(new Error('Сеть недоступна'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('Сеть недоступна');
   });
 });

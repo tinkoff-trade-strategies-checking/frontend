@@ -19,8 +19,9 @@ export type ReplaySessionResult =
       readonly snapshot: ArenaSnapshot;
     }
   | {
-      readonly status: 'BLIND_UNFINISHED';
+      readonly status: 'NOT_FINISHED';
       readonly sessionId: string;
+      readonly blind: boolean;
       readonly title: string;
       readonly createdAt: string;
       readonly playedDays: number;

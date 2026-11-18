@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import { StubSessionRegistry } from '../../../shared/stub-session-registry';
 import { StubReportApi } from '../../report/data/stub-report.api';
 import { StubReplayApi } from './stub-replay.api';
 
@@ -78,16 +80,25 @@ describe('StubReplayApi', () => {
     expect(currentPortfolio.costsRub).toBe(report.humanMetrics.costsRub.totalRub);
   });
 
-  it('INV-7: S-0104 и S-BLIND-ACTIVE недоступны для воспроизведения и не раскрывают данные', async () => {
+  it('INV-7/INV-1: S-0104, S-BLIND-ACTIVE и S-OPEN-ACTIVE возвращают NOT_FINISHED без раскрытия', async () => {
     const api = new StubReplayApi();
     for (const id of ['S-0104', 'S-BLIND-ACTIVE']) {
       const res = await api.loadSession(id);
-      expect(res.status).toBe('BLIND_UNFINISHED');
+      expect(res.status).toBe('NOT_FINISHED');
+      if (res.status === 'NOT_FINISHED') {
+        expect(res.blind).toBe(true);
+      }
       const serialized = JSON.stringify(res);
       expect(serialized).not.toMatch(
         /SBER|GAZP|YDEX|Сбербанк|Газпром|Яндекс|26\.02\.2020|21\.05\.2020/,
       );
       await expect(api.step(id)).rejects.toThrow();
+    }
+
+    const openRes = await api.loadSession('S-OPEN-ACTIVE');
+    expect(openRes.status).toBe('NOT_FINISHED');
+    if (openRes.status === 'NOT_FINISHED') {
+      expect(openRes.blind).toBe(false);
     }
 
     const notFound = await api.loadSession('S-9999');
@@ -113,5 +124,38 @@ describe('StubReplayApi', () => {
     const next = await api.step('S-0103');
     expect(next.step).toBe(19);
     expect(next.day).toBe(20);
+  });
+
+  it('для сессии из StubSessionRegistry возвращает NOT_FINISHED до завершения и READY после', async () => {
+    TestBed.configureTestingModule({ providers: [StubReplayApi] });
+    const registry = TestBed.inject(StubSessionRegistry);
+    const api = TestBed.inject(StubReplayApi);
+
+    registry.register({
+      sessionId: 'S-0106',
+      blind: true,
+      regime: 'calm',
+      timeframe: '1d',
+      totalDays: 20,
+      playedDays: 3,
+      finished: false,
+      finishedEarly: false,
+      createdAt: '2026-11-18T15:00:00+03:00',
+      initialCapitalRub: 1_000_000,
+      paperIds: null,
+      paperCount: 3,
+      customStartDate: null,
+      netReturnPct: null,
+    });
+
+    const unfinished = await api.loadSession('S-0106');
+    expect(unfinished.status).toBe('NOT_FINISHED');
+    await expect(api.step('S-0106')).rejects.toThrow();
+
+    registry.markFinished('S-0106', { playedDays: 3, finishedEarly: true, netReturnPct: 1.1 });
+    const ready = await api.loadSession('S-0106');
+    expect(ready.status).toBe('READY');
+    const stepRes = await api.step('S-0106');
+    expect(stepRes.step).toBe(1);
   });
 });

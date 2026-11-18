@@ -9,6 +9,8 @@ import {
   ArenaPaper,
   ArenaPortfolio,
   ArenaSpeed,
+  isOrderActive,
+  isOrderClosed,
   OrderSide,
   OrderType,
   TimeInForce,
@@ -34,13 +36,6 @@ const EMPTY_PORTFOLIO: ArenaPortfolio = {
   costsPct: 0,
   positions: {},
 };
-
-const CLOSED_STATUSES = new Set<ArenaOrder['status']>([
-  'cancelled',
-  'rejected',
-  'expired',
-  'partial',
-]);
 
 @Injectable()
 export class ArenaStore {
@@ -84,10 +79,8 @@ export class ArenaStore {
     return list.find((p) => p.id === id) ?? list[0] ?? null;
   });
 
-  readonly activeOrders = computed(() => this.orders().filter((o) => o.status === 'active'));
-  readonly closedOrders = computed(() =>
-    this.orders().filter((o) => CLOSED_STATUSES.has(o.status)),
-  );
+  readonly activeOrders = computed(() => this.orders().filter(isOrderActive));
+  readonly closedOrders = computed(() => this.orders().filter(isOrderClosed));
 
   readonly progressPct = computed(() => {
     const total = this.totalSteps();
@@ -103,16 +96,17 @@ export class ArenaStore {
     this.destroyRef.onDestroy(() => this.stopTimer());
   }
 
-  init(customApi?: ArenaApi): Promise<void> {
+  init(customApi?: ArenaApi, sessionId?: string): Promise<void> {
     this.customApi = customApi ?? null;
     return this.enqueue(async () => {
       this.loading.set(true);
       this.error.set(null);
+      this.notice.set(null);
       this.pause();
 
       try {
         // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
-        const snap = await this.api.getSnapshot();
+        const snap = await this.api.getSnapshot(sessionId);
         this.sessionId.set(snap.sessionId);
         this.blind.set(snap.blind);
         this.step.set(snap.step);
@@ -326,6 +320,9 @@ export class ArenaStore {
         const res = await this.api.finishSession();
         this.finished.set(true);
         this.portfolio.set(res.portfolio);
+        if (res.orders) {
+          this.orders.set(res.orders);
+        }
         this.editingOrder.set(null);
         this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
       } catch (err) {

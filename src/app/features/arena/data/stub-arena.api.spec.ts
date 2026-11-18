@@ -1,3 +1,5 @@
+import { TestBed } from '@angular/core/testing';
+import { StubSessionRegistry } from '../../../shared/stub-session-registry';
 import { StubArenaApi } from './stub-arena.api';
 
 function assertNoBlindLeaks(payload: unknown): void {
@@ -201,5 +203,33 @@ describe('StubArenaApi', () => {
     });
     expect(afterFinish.accepted).toBe(false);
     expect(afterFinish.reason).toBe('SESSION_NOT_ACTIVE');
+  });
+
+  it('восстанавливает playedDays из StubSessionRegistry при открытии /arena/:id', async () => {
+    TestBed.configureTestingModule({ providers: [StubArenaApi] });
+    const registry = TestBed.inject(StubSessionRegistry);
+    const api = TestBed.inject(StubArenaApi);
+
+    registry.register({
+      sessionId: 'S-0106',
+      blind: true,
+      regime: 'medium',
+      timeframe: '1d',
+      totalDays: 20,
+      playedDays: 5,
+      finished: false,
+      finishedEarly: false,
+      createdAt: '2026-11-18T15:00:00+03:00',
+      initialCapitalRub: 1_000_000,
+      paperIds: null,
+      paperCount: 3,
+      customStartDate: null,
+      netReturnPct: null,
+    });
+
+    const snap = await api.getSnapshot('S-0106');
+    expect(snap.day).toBe(5);
+    expect(snap.step).toBe(4);
+    expect(snap.totalDays).toBe(20);
   });
 });

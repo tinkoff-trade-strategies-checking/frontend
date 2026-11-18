@@ -148,6 +148,6 @@ describe('LaunchPage', () => {
     launchBtn!.click();
     await fixture.whenStable();
 
-    expect(navSpy).toHaveBeenCalledWith(['/arena']);
+    expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-0105']);
   });
 });

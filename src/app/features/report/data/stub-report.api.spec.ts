@@ -1,4 +1,7 @@
+import { TestBed } from '@angular/core/testing';
+import { StubSessionRegistry } from '../../../shared/stub-session-registry';
 import { StubReplayApi } from '../../replay/data/stub-replay.api';
+import { formatPct, formatRatio } from '../report.format';
 import { StubReportApi } from './stub-report.api';
 
 describe('StubReportApi', () => {
@@ -6,8 +9,9 @@ describe('StubReportApi', () => {
     const api = new StubReportApi();
     const res = await api.getReport('S-0104');
 
-    expect(res.status).toBe('BLIND_UNFINISHED');
+    expect(res.status).toBe('NOT_FINISHED');
     expect(Object.keys(res).sort()).toEqual([
+      'blind',
       'createdAt',
       'playedDays',
       'regime',
@@ -70,6 +74,12 @@ describe('StubReportApi', () => {
       expect(early.report.playedDays).toBe(28);
       expect(early.report.fills.every((f) => f.day <= 28)).toBe(true);
       expect(early.report.divergences.some((d) => d.paperTicker === 'YDEX')).toBe(false);
+    }
+
+    const openActive = await api.getReport('S-OPEN-ACTIVE');
+    expect(openActive.status).toBe('NOT_FINISHED');
+    if (openActive.status === 'NOT_FINISHED') {
+      expect(openActive.blind).toBe(false);
     }
 
     const building = await api.getReport('S-BUILDING');
@@ -201,5 +211,49 @@ describe('StubReportApi', () => {
 
     expect(rep.divergenceSummary.totalErrorCostRub).toBe(sumRub);
     expect(rep.divergenceSummary.totalErrorCostPct).toBe(sumPct);
+  });
+
+  it('F6: formatPct и formatRatio возвращают «—» при null метриках', () => {
+    expect(formatPct(null)).toBe('—');
+    expect(formatPct(null, true)).toBe('—');
+    expect(formatRatio(null)).toBe('—');
+  });
+
+  it('возвращает NOT_FINISHED для незавершённой сессии из реестра и READY после завершения', async () => {
+    TestBed.configureTestingModule({ providers: [StubReportApi] });
+    const registry = TestBed.inject(StubSessionRegistry);
+    const api = TestBed.inject(StubReportApi);
+
+    registry.register({
+      sessionId: 'S-0106',
+      blind: false,
+      regime: 'calm',
+      timeframe: '1d',
+      totalDays: 20,
+      playedDays: 4,
+      finished: false,
+      finishedEarly: false,
+      createdAt: '2026-11-18T15:00:00+03:00',
+      initialCapitalRub: 1_000_000,
+      paperIds: ['SBER'],
+      paperCount: 1,
+      customStartDate: '2020-02-26',
+      netReturnPct: null,
+    });
+
+    const unfinished = await api.getReport('S-0106');
+    expect(unfinished.status).toBe('NOT_FINISHED');
+    if (unfinished.status === 'NOT_FINISHED') {
+      expect(unfinished.blind).toBe(false);
+      expect(unfinished.playedDays).toBe(4);
+    }
+
+    registry.markFinished('S-0106', { playedDays: 4, finishedEarly: true, netReturnPct: 1.5 });
+    const ready = await api.getReport('S-0106');
+    expect(ready.status).toBe('READY');
+    if (ready.status === 'READY') {
+      expect(ready.report.sessionId).toBe('S-0106');
+      expect(ready.report.replayAvailable).toBe(true);
+    }
   });
 });

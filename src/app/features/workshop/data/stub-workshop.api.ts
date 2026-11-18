@@ -30,7 +30,7 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     id: 'A-0001',
     name: 'Эталон платформы',
     description:
-      'Базовый эталонный алгоритм для фонового сравнения в ручных сессиях: пересечение скользящих средних с ограничением доли позиции.',
+      'Пример заглушки (пока без привязки к DSL): условный базовый алгоритм для фонового сравнения в ручных сессиях.',
     author: WORKSHOP_SYSTEM_AUTHOR,
     isMine: false,
     isSystem: true,

@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { injectSessionRegistry } from '../../../shared/stub-session-registry';
 import {
   ArenaApi,
   ArenaCandle,
@@ -15,6 +16,7 @@ import {
   ArenaStepResult,
   CancelOrderCommand,
   EstimateOrderCommand,
+  isOrderActive,
   OrderEstimateResult,
   PlaceOrderCommand,
   ReplaceOrderCommand,
@@ -40,11 +42,55 @@ const PAPER_CONFIGS: readonly PaperConfig[] = [
   },
   { id: 'B', label: 'Бумага B', sector: 'Финансы', drift: 0.001, volatility: 0.022, phase: 1.7 },
   { id: 'C', label: 'Бумага C', sector: 'IT', drift: 0.0025, volatility: 0.026, phase: 2.9 },
+  {
+    id: 'D',
+    label: 'Бумага D',
+    sector: 'Металлы и добыча',
+    drift: 0.0014,
+    volatility: 0.02,
+    phase: 3.5,
+  },
+  {
+    id: 'E',
+    label: 'Бумага E',
+    sector: 'Потребсектор',
+    drift: 0.0012,
+    volatility: 0.016,
+    phase: 4.2,
+  },
+];
+
+const CUSTOM_PAPER_CONFIGS: readonly PaperConfig[] = [
+  { id: 'SBER', label: 'SBER', sector: 'Финансы', drift: 0.0015, volatility: 0.02, phase: 0.4 },
+  {
+    id: 'GAZP',
+    label: 'GAZP',
+    sector: 'Нефть и газ',
+    drift: 0.0012,
+    volatility: 0.019,
+    phase: 1.7,
+  },
+  { id: 'YDEX', label: 'YDEX', sector: 'IT', drift: 0.0022, volatility: 0.025, phase: 2.9 },
+  {
+    id: 'GMKN',
+    label: 'GMKN',
+    sector: 'Металлы и добыча',
+    drift: 0.0014,
+    volatility: 0.021,
+    phase: 3.5,
+  },
+  {
+    id: 'MGNT',
+    label: 'MGNT',
+    sector: 'Потребсектор',
+    drift: 0.0011,
+    volatility: 0.017,
+    phase: 4.2,
+  },
 ];
 
 const WARMUP_BARS = 20;
-const TOTAL_DAYS = 60;
-const LAST_STEP = TOTAL_DAYS - 1;
+const DEFAULT_TOTAL_DAYS = 60;
 const COMMISSION_RATE = 0.003;
 const LOT_CAPITAL_WEIGHT = 0.01;
 
@@ -52,7 +98,7 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function generateCandles(cfg: PaperConfig): ArenaCandle[] {
+function generateCandles(cfg: PaperConfig, totalDays: number): ArenaCandle[] {
   const raw: {
     step: number;
     day: number;
@@ -65,7 +111,7 @@ function generateCandles(cfg: PaperConfig): ArenaCandle[] {
   }[] = [];
 
   let price = 100;
-  for (let i = 0; i < WARMUP_BARS + TOTAL_DAYS; i++) {
+  for (let i = 0; i < WARMUP_BARS + totalDays; i++) {
     const step = i - WARMUP_BARS;
     const day = step < 0 ? 0 : step + 1;
     const candleInDay = step < 0 ? i + 1 : 1;
@@ -108,7 +154,14 @@ function generateCandles(cfg: PaperConfig): ArenaCandle[] {
 
 @Injectable()
 export class StubArenaApi implements ArenaApi {
-  private readonly sessionId = 'S-0104';
+  private readonly registry = injectSessionRegistry();
+
+  private sessionId = 'S-0104';
+  private initializedSession = false;
+  private blind = true;
+  private totalDays = DEFAULT_TOTAL_DAYS;
+  private lastStep = DEFAULT_TOTAL_DAYS - 1;
+  private paperConfigs: readonly PaperConfig[] = PAPER_CONFIGS.slice(0, 3);
   private readonly allCandles = new Map<string, readonly ArenaCandle[]>();
   private cursor = 0;
   private finished = false;
@@ -121,20 +174,62 @@ export class StubArenaApi implements ArenaApi {
   private nextFillSeq = 1;
 
   constructor() {
-    for (const cfg of PAPER_CONFIGS) {
-      this.allCandles.set(cfg.id, generateCandles(cfg));
+    this.initPapers(this.paperConfigs, this.totalDays);
+  }
+
+  private initPapers(configs: readonly PaperConfig[], totalDays: number): void {
+    this.allCandles.clear();
+    this.positions.clear();
+    for (const cfg of configs) {
+      this.allCandles.set(cfg.id, generateCandles(cfg, totalDays));
       this.positions.set(cfg.id, { lots: 0, totalCostPct: 0 });
     }
   }
 
-  async getSnapshot(): Promise<ArenaSnapshot> {
+  async getSnapshot(sessionId?: string): Promise<ArenaSnapshot> {
+    const targetId = sessionId ?? this.sessionId;
+    if (!this.initializedSession || targetId !== this.sessionId) {
+      this.initializedSession = true;
+      this.sessionId = targetId;
+      this.cashPct = 100;
+      this.costsPct = 0;
+      this.orders = [];
+      this.fills = [];
+      this.nextOrderSeq = 1;
+      this.nextFillSeq = 1;
+
+      const rec = this.registry?.get(targetId);
+      if (rec) {
+        this.blind = rec.blind;
+        this.totalDays = rec.totalDays;
+        this.lastStep = rec.totalDays - 1;
+        this.cursor = Math.max(0, Math.min(this.lastStep, rec.playedDays - 1));
+        this.finished = rec.finished;
+        if (rec.blind) {
+          this.paperConfigs = PAPER_CONFIGS.slice(0, rec.paperCount);
+        } else {
+          const ids = new Set(rec.paperIds ?? ['SBER', 'GAZP', 'YDEX']);
+          const matched = CUSTOM_PAPER_CONFIGS.filter((p) => ids.has(p.id));
+          this.paperConfigs = matched.length > 0 ? matched : CUSTOM_PAPER_CONFIGS.slice(0, 3);
+        }
+      } else {
+        this.blind = true;
+        this.totalDays = DEFAULT_TOTAL_DAYS;
+        this.lastStep = DEFAULT_TOTAL_DAYS - 1;
+        this.cursor = 0;
+        this.finished = false;
+        this.paperConfigs = PAPER_CONFIGS.slice(0, 3);
+      }
+      this.initPapers(this.paperConfigs, this.totalDays);
+    }
+
     return {
       sessionId: this.sessionId,
-      blind: true,
+      blind: this.blind,
       step: this.cursor,
-      totalSteps: LAST_STEP,
+      totalSteps: this.lastStep,
       day: this.cursor + 1,
-      totalDays: TOTAL_DAYS,
+      totalDays: this.totalDays,
       finished: this.finished,
       papers: this.buildVisiblePapers(),
       portfolio: this.buildPortfolio(),
@@ -144,17 +239,27 @@ export class StubArenaApi implements ArenaApi {
   }
 
   async step(): Promise<ArenaStepResult> {
-    if (!this.finished && this.cursor < LAST_STEP) {
+    this.initializedSession = true;
+    if (!this.finished && this.cursor < this.lastStep) {
       this.cursor += 1;
       this.executeMarketOrdersAtCursor();
-      if (this.cursor >= LAST_STEP) {
+      if (this.cursor >= this.lastStep) {
         this.finished = true;
+        this.cancelActiveOrdersOnSessionEnd();
+        const portfolio = this.buildPortfolio();
+        this.registry?.markFinished(this.sessionId, {
+          playedDays: this.cursor + 1,
+          finishedEarly: false,
+          netReturnPct: portfolio.pnlPct,
+        });
+      } else {
+        this.registry?.updateProgress(this.sessionId, this.cursor + 1);
       }
     }
 
     const bars: Record<string, ArenaCandle> = {};
     const paperStats: Record<string, ArenaPaperStat> = {};
-    for (const cfg of PAPER_CONFIGS) {
+    for (const cfg of this.paperConfigs) {
       bars[cfg.id] = this.candleAt(cfg.id, this.cursor);
       paperStats[cfg.id] = this.computePaperStat(cfg.id);
     }
@@ -246,12 +351,14 @@ export class StubArenaApi implements ArenaApi {
       return this.reject('INVALID_PARAMS', 'seenStep');
     }
     const existing = this.orders.find((o) => o.id === command.orderId);
-    if (!existing || existing.status !== 'active') {
+    if (!existing || !isOrderActive(existing)) {
       return this.reject('ORDER_NOT_ACTIVE');
     }
 
     this.orders = this.orders.map((o) =>
-      o.id === command.orderId ? { ...o, status: 'cancelled' as const } : o,
+      o.id === command.orderId
+        ? { ...o, status: 'cancelled' as const, rejectReason: 'CANCELLED_BY_USER' as const }
+        : o,
     );
 
     return {
@@ -277,7 +384,7 @@ export class StubArenaApi implements ArenaApi {
     }
 
     const existing = this.orders.find((o) => o.id === command.orderId);
-    if (!existing || existing.status !== 'active') {
+    if (!existing || !isOrderActive(existing)) {
       return this.reject('ORDER_NOT_ACTIVE');
     }
 
@@ -313,7 +420,9 @@ export class StubArenaApi implements ArenaApi {
     this.orders = [
       replaced,
       ...this.orders.map((o) =>
-        o.id === command.orderId ? { ...o, status: 'cancelled' as const } : o,
+        o.id === command.orderId
+          ? { ...o, status: 'cancelled' as const, rejectReason: 'REPLACED' as const }
+          : o,
       ),
     ];
 
@@ -327,12 +436,28 @@ export class StubArenaApi implements ArenaApi {
 
   async finishSession(): Promise<ArenaFinishResult> {
     this.finished = true;
+    this.cancelActiveOrdersOnSessionEnd();
+    const portfolio = this.buildPortfolio();
+    this.registry?.markFinished(this.sessionId, {
+      playedDays: this.cursor + 1,
+      finishedEarly: this.cursor < this.lastStep,
+      netReturnPct: portfolio.pnlPct,
+    });
     return {
       sessionId: this.sessionId,
       finishedAtStep: this.cursor,
       finishedAtDay: this.cursor + 1,
-      portfolio: this.buildPortfolio(),
+      portfolio,
+      orders: [...this.orders],
     };
+  }
+
+  private cancelActiveOrdersOnSessionEnd(): void {
+    this.orders = this.orders.map((o) =>
+      isOrderActive(o)
+        ? { ...o, status: 'cancelled' as const, rejectReason: 'SESSION_END' as const }
+        : o,
+    );
   }
 
   private reject(reason: ArenaRejectReason, field?: string): ArenaCommandResult {
@@ -529,7 +654,7 @@ export class StubArenaApi implements ArenaApi {
 
   private buildVisiblePapers(): ArenaPaper[] {
     const endIndex = WARMUP_BARS + this.cursor + 1;
-    return PAPER_CONFIGS.map((cfg) => {
+    return this.paperConfigs.map((cfg) => {
       const candles = this.allCandles.get(cfg.id)!.slice(0, endIndex);
       const stat = this.computePaperStat(cfg.id);
       return {
@@ -547,7 +672,7 @@ export class StubArenaApi implements ArenaApi {
     const positions: Record<string, ArenaPosition> = {};
     let investedPct = 0;
 
-    for (const cfg of PAPER_CONFIGS) {
+    for (const cfg of this.paperConfigs) {
       const pos = this.positions.get(cfg.id)!;
       const lastPrice = this.candleAt(cfg.id, this.cursor).close;
       const valuePct = round2(pos.lots * lastPrice * LOT_CAPITAL_WEIGHT);

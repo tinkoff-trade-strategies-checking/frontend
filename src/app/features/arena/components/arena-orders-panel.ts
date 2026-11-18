@@ -64,7 +64,12 @@ import {
                     </td>
                     <td>{{ typeLabel(order.type) }}</td>
                     <td class="num">{{ formatLots(order.lots - order.filledLots) }}</td>
-                    <td class="tui-text_body-xs">{{ describeOrder(order) }}</td>
+                    <td class="tui-text_body-xs">
+                      {{ describeOrder(order) }}
+                      @if (order.status === 'partial') {
+                        <span class="muted">· частично исполнена, остаток активен</span>
+                      }
+                    </td>
                     <td class="tui-text_body-xs">
                       {{ order.tif === 'gtc' ? 'до отмены' : 'день' }}
                     </td>
@@ -165,7 +170,7 @@ import {
                     </td>
                     <td>{{ typeLabel(order.type) }}</td>
                     <td class="num">{{ formatLots(order.lots) }}</td>
-                    <td>{{ statusLabel(order.status) }}</td>
+                    <td>{{ statusLabel(order) }}</td>
                     <td class="tui-text_body-xs">
                       {{
                         order.rejectReason
@@ -255,6 +260,10 @@ import {
       color: var(--tui-text-negative);
       font-weight: 600;
     }
+
+    .muted {
+      color: var(--tui-text-secondary);
+    }
   `,
 })
 export class ArenaOrdersPanel {
@@ -284,8 +293,11 @@ export class ArenaOrdersPanel {
     return ORDER_TYPE_LABELS[type];
   }
 
-  protected statusLabel(status: ArenaOrder['status']): string {
-    return ORDER_STATUS_LABELS[status];
+  protected statusLabel(order: ArenaOrder): string {
+    if (order.status === 'partial') {
+      return order.rejectReason ? 'Частично (остаток снят)' : 'Частично (остаток активен)';
+    }
+    return ORDER_STATUS_LABELS[order.status];
   }
 
   protected describeOrder(order: ArenaOrder): string {

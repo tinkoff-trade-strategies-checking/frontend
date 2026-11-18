@@ -152,7 +152,12 @@
                   <div class="row-actions">
                     @if (item.status === 'running') {
                       @if (item.kind === 'session') {
-                        <a tuiButton size="xs" appearance="primary" routerLink="/arena">
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="primary"
+                          [routerLink]="item.id === 'S-0104' ? '/arena' : ['/arena', item.id]"
+                        >
                           Продолжить
                         </a>
                       } @else {

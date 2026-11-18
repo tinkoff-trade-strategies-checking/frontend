@@ -2,7 +2,7 @@
   <header class="header">
     <span class="tui-text_body-l">Т-Инвестиции: тренажёр и лаборатория стратегий</span>
     <nav class="nav">
-      @for (section of sections; track section.path) {
+      @for (section of sections(); track section.title) {
         <a
           tuiButton
           size="s"

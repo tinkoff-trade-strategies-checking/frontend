@@ -18,7 +18,8 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
         <div class="equity-row">
           <div class="metric-item">
             <span class="tui-text_body-xs muted">Стоимость портфеля</span>
-            @if (portfolio().equityRub; as equityRub) {
+            @let equityRub = portfolio().equityRub;
+            @if (equityRub !== undefined && equityRub !== null) {
               <span class="tui-text_h5 num">{{ formatRub(equityRub) }}</span>
               <span class="tui-text_body-xs muted num">{{ formatPct(portfolio().equityPct) }}</span>
             } @else {

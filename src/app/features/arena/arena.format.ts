@@ -7,6 +7,11 @@ const REJECT_REASON_LABELS: Readonly<Record<ArenaRejectReason, string>> = {
   SESSION_NOT_ACTIVE: 'Сессия завершена',
   ORDER_NOT_ACTIVE: 'Заявка уже неактивна',
   LIQUIDITY_LIMIT: 'Остаток снят по лимиту ликвидности',
+  REPLACED: 'Заменена пользователем',
+  DAY_EXPIRED: 'Истёк срок заявки (день)',
+  OCO_SIBLING_FILLED: 'Снята при исполнении второй ноги OCO',
+  SESSION_END: 'Снята при завершении сессии',
+  CANCELLED_BY_USER: 'Отменена пользователем',
 };
 
 const FIELD_LABELS: Readonly<Record<string, string>> = {
