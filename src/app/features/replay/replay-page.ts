@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, convertToParamMap, RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge } from '@taiga-ui/kit';
-import { combineLatest, of } from 'rxjs';
+import { combineLatest } from 'rxjs';
 import { ArenaPage } from '../arena/arena-page';
 import { REPLAY_API, ReplayRegime } from './data/replay.models';
 import { StubReplayApi } from './data/stub-replay.api';
@@ -31,13 +31,12 @@ export class ReplayPage implements OnInit {
   protected readonly regimeLabels = REGIME_LABELS;
 
   ngOnInit(): void {
-    combineLatest([this.route.paramMap, this.route.queryParamMap ?? of(convertToParamMap({}))])
+    combineLatest([this.route.paramMap, this.route.queryParamMap])
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(([params, queryParams]) => {
         const id = params.get('id') ?? 'S-0103';
         const rawStep = queryParams.get('step');
-        const parsed = rawStep !== null ? Number(rawStep) : NaN;
-        const initialStep = Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
+        const initialStep = rawStep !== null && /^\d+$/.test(rawStep) ? Number(rawStep) : undefined;
         void this.store.load(id, initialStep);
       });
   }

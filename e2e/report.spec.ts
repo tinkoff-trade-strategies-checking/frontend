@@ -11,7 +11,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await page.getByRole('button', { name: 'Расхождения' }).click();
 
   const mainText = ((await page.locator('main').textContent()) ?? '').replace(/\u00a0/g, ' ');
-  expect(mainText).toContain('Расхождения обошлись вам в 27 875,00 ₽');
+  expect(mainText).toContain('Расхождения обошлись вам в 24 819,38 ₽');
   expect(mainText).toContain('самое дорогое — размер на дне 4');
   expect(mainText).toContain('алгоритм здесь не действовал бы');
   expect(mainText).toContain('Δt = +2 бар.');

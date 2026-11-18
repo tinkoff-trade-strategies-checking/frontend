@@ -156,6 +156,7 @@ export interface SessionReport {
   readonly sessionId: string;
   readonly blind: boolean;
   readonly finishedEarly: boolean;
+  readonly replayAvailable: boolean;
   readonly playedDays: number;
   readonly totalDays: number;
   readonly timeframe: ReportTimeframe;

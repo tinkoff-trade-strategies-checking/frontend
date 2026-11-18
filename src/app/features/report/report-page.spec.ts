@@ -311,4 +311,27 @@ describe('ReportPage', () => {
     );
     expect(ruleBtn?.disabled).toBe(true);
   });
+
+  it('для S-0105 кнопка «Посмотреть в воспроизведении» неактивна, а обратная проверка содержит SBER', async () => {
+    paramMap$.next(convertToParamMap({ id: 'S-0105' }));
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.setTab('divergences');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const replayBtns = Array.from(root.querySelectorAll('button')).filter((b) =>
+      b.textContent?.includes('Посмотреть в воспроизведении'),
+    );
+    expect(replayBtns.length).toBeGreaterThan(0);
+    expect(replayBtns.every((b) => b.disabled)).toBe(true);
+
+    store.setTab('reverse');
+    fixture.detectChanges();
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(text).toContain('SBER');
+    expect(text).toContain('+3 900,00 ₽');
+  });
 });

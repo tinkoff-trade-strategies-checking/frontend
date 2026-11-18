@@ -95,4 +95,28 @@ describe('ReplayPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('День 19 из 60');
   });
+
+  it('некорректный ?step (-5, abc) сбрасывается на шаг 0, а 999 клампится к последнему шагу', async () => {
+    for (const badStep of ['-5', 'abc']) {
+      queryParamMap$.next(convertToParamMap({ step: badStep }));
+      const fixture = TestBed.createComponent(ReplayPage);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('День 1 из 60');
+    }
+
+    queryParamMap$.next(convertToParamMap({ step: '999' }));
+    const fixture = TestBed.createComponent(ReplayPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('День 60 из 60');
+  });
 });

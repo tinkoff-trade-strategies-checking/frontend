@@ -424,7 +424,8 @@
                 @if (
                   summary.worstType &&
                   summary.worstDay !== null &&
-                  summary.worstErrorCostRub !== null
+                  summary.worstErrorCostRub !== null &&
+                  summary.worstErrorCostRub > 0
                 ) {
                   , самое дорогое — {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на
                   дне {{ summary.worstDay }} (<strong class="num">{{
@@ -436,9 +437,9 @@
               </div>
               <div class="tui-text_body-xs muted">
                 Цена ошибки = V_алгоритма − V_человека до следующего решения (горизонт e): &gt; 0 —
-                выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Сумма — ориентир,
-                а не точный итог (горизонты пересекаются). Защитные заявки и отмены в сравнении не
-                участвуют.
+                выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты, как
+                правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные заявки и
+                отмены в сравнении не участвуют.
               </div>
             </div>
 
@@ -534,15 +535,28 @@
                         </td>
                         <td>{{ item.because }}</td>
                         <td class="num">
-                          <a
-                            tuiButton
-                            size="xs"
-                            appearance="outline"
-                            [routerLink]="['/replay', rep.sessionId]"
-                            [queryParams]="{ step: item.step }"
-                          >
-                            Посмотреть в воспроизведении
-                          </a>
+                          @if (rep.replayAvailable) {
+                            <a
+                              tuiButton
+                              size="xs"
+                              appearance="outline"
+                              [routerLink]="['/replay', rep.sessionId]"
+                              [queryParams]="{ step: item.step }"
+                            >
+                              Посмотреть в воспроизведении
+                            </a>
+                          } @else {
+                            <button
+                              tuiButton
+                              type="button"
+                              size="xs"
+                              appearance="outline"
+                              [disabled]="true"
+                              title="Воспроизведение недоступно для этой заглушки"
+                            >
+                              Посмотреть в воспроизведении
+                            </button>
+                          }
                         </td>
                       </tr>
                     }

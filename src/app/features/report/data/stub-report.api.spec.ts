@@ -1,3 +1,4 @@
+import { StubReplayApi } from '../../replay/data/stub-replay.api';
 import { StubReportApi } from './stub-report.api';
 
 describe('StubReportApi', () => {
@@ -115,5 +116,90 @@ describe('StubReportApi', () => {
         expect(rep.comparison.maxDrawdown.algoPct).toBe(algoCalc.dd);
       }
     }
+  });
+
+  it('S-0103: цена ошибки и проценты расхождений совпадают с расчётом по формуле decisions.md', async () => {
+    const reportApi = new StubReportApi();
+    const replayApi = new StubReplayApi();
+
+    const reportRes = await reportApi.getReport('S-0103');
+    const replayRes = await replayApi.loadSession('S-0103', 59);
+    expect(reportRes.status).toBe('READY');
+    expect(replayRes.status).toBe('READY');
+    if (reportRes.status !== 'READY' || replayRes.status !== 'READY') {
+      return;
+    }
+
+    const rep = reportRes.report;
+    const candlesByPaper = new Map(
+      replayRes.snapshot.papers.map((p) => [p.id, p.candles] as const),
+    );
+    const lotByPaper = new Map(rep.papers.map((p) => [p.ticker, p.lotSize] as const));
+    const closeAt = (ticker: string, step: number): number => {
+      const candle = candlesByPaper.get(ticker)?.find((c) => c.step === step);
+      if (!candle) {
+        throw new Error(`Свеча ${ticker} на шаге ${step} не найдена`);
+      }
+      return candle.close;
+    };
+    const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+    // Параметры действий для S-0103 (согласованы с JOURNAL_FILLS и свечами StubReplayApi).
+    const actionSpecs: Record<
+      string,
+      {
+        human: { sign: 1 | -1; lots: number; price: number; cost: number } | null;
+        algo: { sign: 1 | -1; lots: number; price: number; cost: number } | null;
+      }
+    > = {
+      'DIV-1': {
+        human: { sign: 1, lots: 80, price: 234.4, cost: 2_120 },
+        algo: { sign: 1, lots: 120, price: 234.4, cost: 3_180 },
+      },
+      'DIV-2': {
+        human: { sign: 1, lots: 90, price: 186.1, cost: 1_890 },
+        algo: null,
+      },
+      'DIV-3': {
+        human: null,
+        algo: { sign: 1, lots: 45, price: closeAt('YDEX', 19), cost: 1_750 },
+      },
+      'DIV-4': {
+        human: { sign: 1, lots: 40, price: 3015, cost: 1_980 },
+        algo: { sign: 1, lots: 40, price: closeAt('YDEX', 45), cost: 1_981.52 },
+      },
+    };
+
+    let sumRub = 0;
+    let sumPct = 0;
+
+    for (const div of rep.divergences) {
+      const spec = actionSpecs[div.id];
+      expect(spec).toBeDefined();
+      const lotSize = lotByPaper.get(div.paperTicker)!;
+      const closeE = closeAt(div.paperTicker, div.horizonStep);
+
+      const valueOf = (
+        side: { sign: 1 | -1; lots: number; price: number; cost: number } | null,
+      ): number => {
+        if (!side) {
+          return 0;
+        }
+        return side.sign * side.lots * lotSize * (closeE - side.price) - side.cost;
+      };
+
+      const expectedRub = round2(valueOf(spec.algo) - valueOf(spec.human));
+      const equityAtT = rep.equityCurve[div.step].humanCapitalRub;
+      const expectedPct = round2((expectedRub / equityAtT) * 100);
+
+      expect(div.errorCostRub).toBe(expectedRub);
+      expect(div.errorCostPct).toBe(expectedPct);
+
+      sumRub = round2(sumRub + div.errorCostRub);
+      sumPct = round2(sumPct + div.errorCostPct);
+    }
+
+    expect(rep.divergenceSummary.totalErrorCostRub).toBe(sumRub);
+    expect(rep.divergenceSummary.totalErrorCostPct).toBe(sumPct);
   });
 });
