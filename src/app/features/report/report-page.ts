@@ -9,19 +9,22 @@ import { DivergenceType, REPORT_API } from './data/report.models';
 import { StubReportApi } from './data/stub-report.api';
 import {
   DIVERGENCE_TYPE_LABELS,
+  formatDeltaBars,
   formatPct,
   formatRatio,
   formatRub,
+  formatRubExact,
   REPORT_ORDER_TYPE_LABELS,
   REPORT_REGIME_LABELS,
   REPORT_TIMEFRAME_LABELS,
   WINNER_LABELS,
 } from './report.format';
-import { DivergenceFilter, ReportStore, ReportTab } from './report.store';
+import { DivergenceFilter, DivergenceSort, ReportStore, ReportTab } from './report.store';
 
 const REPORT_TABS: readonly { readonly id: ReportTab; readonly label: string }[] = [
   { id: 'metrics', label: 'Метрики и издержки' },
   { id: 'divergences', label: 'Расхождения' },
+  { id: 'reverse', label: 'Обратная проверка' },
   { id: 'fills', label: 'Сделки' },
 ];
 
@@ -31,6 +34,11 @@ const DIVERGENCE_FILTERS: readonly { readonly id: DivergenceFilter; readonly lab
   { id: 'missed', label: DIVERGENCE_TYPE_LABELS.missed },
   { id: 'size', label: DIVERGENCE_TYPE_LABELS.size },
   { id: 'timing', label: DIVERGENCE_TYPE_LABELS.timing },
+];
+
+const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: string }[] = [
+  { id: 'time', label: 'По времени' },
+  { id: 'errorCost', label: 'По цене ошибки' },
 ];
 
 @Component({
@@ -56,12 +64,15 @@ export class ReportPage implements OnInit {
 
   protected readonly tabs = REPORT_TABS;
   protected readonly divergenceFilters = DIVERGENCE_FILTERS;
+  protected readonly divergenceSorts = DIVERGENCE_SORTS;
   protected readonly regimeLabels = REPORT_REGIME_LABELS;
   protected readonly timeframeLabels = REPORT_TIMEFRAME_LABELS;
   protected readonly divergenceLabels = DIVERGENCE_TYPE_LABELS;
   protected readonly orderTypeLabels = REPORT_ORDER_TYPE_LABELS;
   protected readonly winnerLabels = WINNER_LABELS;
   protected readonly formatRub = formatRub;
+  protected readonly formatRubExact = formatRubExact;
+  protected readonly formatDeltaBars = formatDeltaBars;
   protected readonly formatPct = formatPct;
   protected readonly formatRatio = formatRatio;
 

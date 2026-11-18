@@ -96,16 +96,45 @@ export interface UnderwaterPoint {
 
 export interface ReportDivergence {
   readonly id: string;
+  readonly step: number;
   readonly day: number;
   readonly dateLabel: string;
   readonly paperTicker: string;
   readonly sector: string;
   readonly type: DivergenceType;
+  readonly deltaBars: number | null;
+  readonly horizonStep: number;
+  readonly horizonDay: number;
   readonly humanAction: string;
   readonly algoAction: string;
   readonly errorCostRub: number;
   readonly errorCostPct: number;
   readonly because: string;
+}
+
+export interface DivergenceSummary {
+  readonly totalErrorCostRub: number;
+  readonly totalErrorCostPct: number;
+  readonly worstDivergenceId: string | null;
+  readonly worstType: DivergenceType | null;
+  readonly worstDay: number | null;
+  readonly worstErrorCostRub: number | null;
+}
+
+export interface ReverseCheckTrade {
+  readonly id: string;
+  readonly paperTicker: string;
+  readonly entryStep: number;
+  readonly entryDay: number;
+  readonly entryDateLabel: string;
+  readonly exitStep: number;
+  readonly exitDay: number;
+  readonly exitDateLabel: string;
+  readonly lots: number;
+  readonly entryPriceRub: number;
+  readonly exitPriceRub: number;
+  readonly netProfitRub: number;
+  readonly entryDivergenceId: string;
 }
 
 export interface ReportFill {
@@ -141,7 +170,9 @@ export interface SessionReport {
   readonly comparison: ReportComparison;
   readonly equityCurve: readonly EquityCurvePoint[];
   readonly underwaterCurve: readonly UnderwaterPoint[];
+  readonly divergenceSummary: DivergenceSummary;
   readonly divergences: readonly ReportDivergence[];
+  readonly reverseCheckTrades: readonly ReverseCheckTrade[];
   readonly fills: readonly ReportFill[];
 }
 

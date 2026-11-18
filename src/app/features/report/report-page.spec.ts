@@ -189,4 +189,126 @@ describe('ReportPage', () => {
     expect(text).toContain('Отчёт строится');
     expect(text).toContain('Обновить');
   });
+
+  it('INV-6: вкладка «Расхождения» отображает сводку, типы и знак цены ошибки из источника без пересчёта', async () => {
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY') {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+
+    const sentinel: SessionReportResult = {
+      status: 'READY',
+      report: {
+        ...base.report,
+        divergenceSummary: {
+          totalErrorCostRub: 123_456.78,
+          totalErrorCostPct: 9.87,
+          worstDivergenceId: 'DIV-SENTINEL',
+          worstType: 'timing',
+          worstDay: 55,
+          worstErrorCostRub: 77_777.77,
+        },
+        divergences: [
+          {
+            id: 'DIV-S1',
+            step: 5,
+            day: 6,
+            dateLabel: '04.03',
+            paperTicker: 'SBER',
+            sector: 'Финансы',
+            type: 'extra',
+            deltaBars: null,
+            horizonStep: 12,
+            horizonDay: 13,
+            humanAction: 'Покупка 10 лот.',
+            algoAction: 'Нет заявки',
+            errorCostRub: -555.55,
+            errorCostPct: -0.05,
+            because: 'алгоритм здесь не действовал бы',
+          },
+          {
+            id: 'DIV-S2',
+            step: 9,
+            day: 10,
+            dateLabel: '10.03',
+            paperTicker: 'GAZP',
+            sector: 'Нефть и газ',
+            type: 'timing',
+            deltaBars: 3,
+            horizonStep: 20,
+            horizonDay: 21,
+            humanAction: 'Покупка 20 лот.',
+            algoAction: 'Покупка 20 лот.',
+            errorCostRub: 77_777.77,
+            errorCostPct: 7.77,
+            because: 'сентинел-причина',
+          },
+        ],
+      },
+    };
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce(sentinel);
+
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.setTab('divergences');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+
+    // Сводка взята из divergenceSummary без пересчёта на клиенте.
+    expect(text).toContain('123 456,78 ₽');
+    expect(text).toContain('9,87 %');
+    expect(text).toContain('момент на дне 55');
+    expect(text).toContain('+77 777,77 ₽');
+
+    // Знак цены ошибки: > 0 -> .neg (выгоднее алгоритм), < 0 -> .pos (вы поступили не хуже).
+    const rows = Array.from(root.querySelectorAll('tbody tr'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].querySelector('td.pos')?.textContent?.replace(/\u00a0/g, ' ')).toContain(
+      '−555,55 ₽',
+    );
+    expect(rows[1].querySelector('td.neg')?.textContent?.replace(/\u00a0/g, ' ')).toContain(
+      '+77 777,77 ₽',
+    );
+    expect(rows[1].textContent).toContain('Δt = +3 бар.');
+
+    // Сортировка по цене ошибки ставит +77 777,77 ₽ первым.
+    store.setDivergenceSort('errorCost');
+    fixture.detectChanges();
+    const sortedRows = Array.from(root.querySelectorAll('tbody tr'));
+    expect(sortedRows[0].textContent).toContain('сентинел-причина');
+
+    // Фильтрация по типу «Лишнее действие».
+    store.setDivergenceFilter('extra');
+    fixture.detectChanges();
+    const filteredRows = Array.from(root.querySelectorAll('tbody tr'));
+    expect(filteredRows).toHaveLength(1);
+    expect(filteredRows[0].textContent).toContain('алгоритм здесь не действовал бы');
+
+    // Ссылка на воспроизведение содержит ?step=5.
+    const replayLink = filteredRows[0].querySelector('a');
+    expect(replayLink?.getAttribute('href')).toContain('/replay/S-0103?step=5');
+  });
+
+  it('вкладка «Обратная проверка» показывает прибыльные сделки со входом «лишнее действие» и неактивную кнопку', async () => {
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.setTab('reverse');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(text).toContain('GAZP');
+    expect(text).toContain('+7 470,00 ₽');
+
+    const ruleBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Написать правило'),
+    );
+    expect(ruleBtn?.disabled).toBe(true);
+  });
 });

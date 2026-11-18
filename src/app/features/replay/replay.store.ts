@@ -47,6 +47,7 @@ class ReplayArenaApiAdapter implements ArenaApi {
 @Injectable()
 export class ReplayStore {
   private readonly api = inject(REPLAY_API);
+  private loadSeq = 0;
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -66,18 +67,27 @@ export class ReplayStore {
     return new ReplayArenaApiAdapter(res.snapshot, () => this.api.step(sessionId));
   });
 
-  async load(sessionId: string): Promise<void> {
+  async load(sessionId: string, initialStep?: number): Promise<void> {
+    const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
     this.result.set(null);
 
     try {
-      const res = await this.api.loadSession(sessionId);
+      const res = await this.api.loadSession(sessionId, initialStep);
+      if (seq !== this.loadSeq) {
+        return;
+      }
       this.result.set(res);
     } catch (err) {
+      if (seq !== this.loadSeq) {
+        return;
+      }
       this.error.set(err instanceof Error ? err.message : 'Не удалось загрузить воспроизведение.');
     } finally {
-      this.loading.set(false);
+      if (seq === this.loadSeq) {
+        this.loading.set(false);
+      }
     }
   }
 }

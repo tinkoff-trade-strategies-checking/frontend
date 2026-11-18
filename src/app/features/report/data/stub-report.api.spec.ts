@@ -43,6 +43,23 @@ describe('StubReportApi', () => {
       expect(ready.report.humanMetrics.maxDrawdownPct).toBeGreaterThanOrEqual(0);
       const c = ready.report.humanMetrics.costsRub;
       expect(c.commissionRub + c.exchangeFeeRub + c.spreadRub + c.slippageRub).toBe(c.totalRub);
+
+      const divTypes = new Set(ready.report.divergences.map((d) => d.type));
+      expect(divTypes).toEqual(new Set(['extra', 'missed', 'size', 'timing']));
+      for (const div of ready.report.divergences) {
+        if (div.type === 'extra') {
+          expect(div.because).toBe('алгоритм здесь не действовал бы');
+        }
+        if (div.type === 'timing') {
+          expect(div.deltaBars).not.toBeNull();
+        }
+      }
+      expect(ready.report.reverseCheckTrades.length).toBeGreaterThan(0);
+      for (const rev of ready.report.reverseCheckTrades) {
+        expect(rev.netProfitRub).toBeGreaterThan(0);
+        const entryDiv = ready.report.divergences.find((d) => d.id === rev.entryDivergenceId);
+        expect(entryDiv?.type).toBe('extra');
+      }
     }
 
     const early = await api.getReport('S-0105');

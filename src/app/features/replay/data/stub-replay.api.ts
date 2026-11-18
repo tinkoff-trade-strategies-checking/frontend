@@ -391,7 +391,7 @@ export class StubReplayApi implements ReplayApi {
   );
   private readonly cursors = new Map<string, number>();
 
-  async loadSession(sessionId: string): Promise<ReplaySessionResult> {
+  async loadSession(sessionId: string, initialStep?: number): Promise<ReplaySessionResult> {
     if (sessionId === 'S-0104' || sessionId === 'S-BLIND-ACTIVE') {
       // INV-7: активная слепая сессия не раскрывает тикеры, названия и реальные даты.
       return {
@@ -409,7 +409,9 @@ export class StubReplayApi implements ReplayApi {
       return { status: 'NOT_FOUND', sessionId };
     }
 
-    const cursor = 0;
+    const rawStep =
+      initialStep !== undefined && Number.isFinite(initialStep) ? Math.trunc(initialStep) : 0;
+    const cursor = Math.max(0, Math.min(LAST_STEP, rawStep));
     this.cursors.set(sessionId, cursor);
 
     return {
@@ -420,9 +422,9 @@ export class StubReplayApi implements ReplayApi {
         blind: true,
         step: cursor,
         totalSteps: LAST_STEP,
-        day: 1,
+        day: cursor + 1,
         totalDays: TOTAL_DAYS,
-        finished: false,
+        finished: cursor >= LAST_STEP,
         papers: this.buildPapersUpTo(cursor),
         portfolio: this.buildPortfolioAt(cursor),
         orders: this.buildOrdersAt(cursor),

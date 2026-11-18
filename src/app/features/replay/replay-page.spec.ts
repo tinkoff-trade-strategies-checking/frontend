@@ -24,9 +24,11 @@ class StubArenaChart {
 
 describe('ReplayPage', () => {
   let paramMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let queryParamMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
   beforeEach(async () => {
     paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'S-0103' }));
+    queryParamMap$ = new BehaviorSubject(convertToParamMap({}));
 
     await TestBed.configureTestingModule({
       imports: [ReplayPage],
@@ -35,7 +37,10 @@ describe('ReplayPage', () => {
         provideRouter([]),
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: paramMap$.asObservable() },
+          useValue: {
+            paramMap: paramMap$.asObservable(),
+            queryParamMap: queryParamMap$.asObservable(),
+          },
         },
       ],
     })
@@ -77,5 +82,17 @@ describe('ReplayPage', () => {
     expect(text).toContain('Воспроизведение недоступно до завершения слепой сессии');
     expect(text).toContain('Вернуться на арену');
     expect(text).not.toMatch(/SBER|GAZP|YDEX|26\.02\.2020|21\.05\.2020/);
+  });
+
+  it('переход по query-параметру ?step=18 открывает воспроизведение на дне 19', async () => {
+    queryParamMap$.next(convertToParamMap({ step: '18' }));
+    const fixture = TestBed.createComponent(ReplayPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('День 19 из 60');
   });
 });

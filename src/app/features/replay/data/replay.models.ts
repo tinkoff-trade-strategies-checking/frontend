@@ -33,7 +33,7 @@ export type ReplaySessionResult =
     };
 
 export interface ReplayApi {
-  loadSession(sessionId: string): Promise<ReplaySessionResult>;
+  loadSession(sessionId: string, initialStep?: number): Promise<ReplaySessionResult>;
   step(sessionId: string): Promise<ArenaStepResult>;
 }
 
