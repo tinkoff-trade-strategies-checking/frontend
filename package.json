@@ -30,6 +30,7 @@
     "@taiga-ui/icons": "^5.33.0",
     "@taiga-ui/kit": "^5.33.0",
     "@taiga-ui/styles": "^5.33.0",
+    "lightweight-charts": "^5.3.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

@@ -1,0 +1,138 @@
+<div class="arena-page">
+  <header class="arena-header">
+    <div class="title-group">
+      <h1 class="tui-text_h3">Арена</h1>
+      @if (store.blind()) {
+        <span tuiBadge appearance="neutral" size="m">Слепая сессия</span>
+      }
+      @if (store.sessionId()) {
+        <span class="tui-text_body-s muted">{{ store.sessionId() }}</span>
+      }
+      @if (store.finished()) {
+        <span tuiBadge appearance="positive" size="m">Завершена</span>
+      }
+    </div>
+
+    <button
+      tuiButton
+      type="button"
+      size="s"
+      appearance="outline"
+      [disabled]="store.finished()"
+      (click)="confirmFinish()"
+    >
+      Завершить сессию
+    </button>
+  </header>
+
+  @if (store.notice()) {
+    <div tuiNotification appearance="info" size="s">
+      {{ store.notice() }}
+    </div>
+  }
+
+  <app-arena-player
+    [playing]="store.playing()"
+    [canStep]="store.canStep()"
+    [speed]="store.speed()"
+    [day]="store.day()"
+    [totalDays]="store.totalDays()"
+    [progressPct]="store.progressPct()"
+    (togglePlay)="store.togglePlay()"
+    (stepOnce)="store.stepOnce()"
+    (speedChange)="store.setSpeed($event)"
+  />
+
+  <div class="arena-grid">
+    <div class="main-col">
+      <section class="panel">
+        <div class="papers-bar" role="tablist" aria-label="Бумаги сессии">
+          @for (paper of store.papers(); track paper.id) {
+            <button
+              type="button"
+              role="tab"
+              class="paper-tab"
+              [class.active]="paper.id === store.selectedPaperId()"
+              [attr.aria-selected]="paper.id === store.selectedPaperId()"
+              (click)="store.selectPaper(paper.id)"
+            >
+              <div class="paper-top">
+                <span class="paper-name">{{ paper.label }}</span>
+                <span
+                  class="tui-text_body-xs num"
+                  [class.pos]="paper.changePct > 0"
+                  [class.neg]="paper.changePct < 0"
+                >
+                  {{ formatPct(paper.changePct, true) }}
+                </span>
+              </div>
+              <div class="paper-bottom">
+                <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
+                <span class="paper-price num">{{ formatPrice(paper.lastPrice) }}</span>
+              </div>
+            </button>
+          }
+        </div>
+
+        <div class="chart-toolbar">
+          <span class="tui-text_body-xs muted">Индикаторы</span>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            [appearance]="showSma20() ? 'accent' : 'outline'"
+            (click)="showSma20.set(!showSma20())"
+          >
+            SMA 20
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            [appearance]="showSma50() ? 'accent' : 'outline'"
+            (click)="showSma50.set(!showSma50())"
+          >
+            SMA 50
+          </button>
+        </div>
+
+        @if (store.selectedPaper(); as paper) {
+          <div class="chart-box">
+            <app-arena-chart
+              [candles]="paper.candles"
+              [orders]="selectedPaperOrders()"
+              [fills]="selectedPaperFills()"
+              [showSma20]="showSma20()"
+              [showSma50]="showSma50()"
+            />
+          </div>
+        }
+      </section>
+
+      <app-arena-orders-panel
+        [activeOrders]="store.activeOrders()"
+        [fills]="store.fills()"
+        [finished]="store.finished()"
+        (cancelOrder)="store.cancelOrder($event)"
+        (replaceOrder)="store.startEditOrder($event)"
+      />
+    </div>
+
+    <aside class="side-col">
+      <app-arena-order-ticket
+        [papers]="store.papers()"
+        [selectedPaperId]="store.selectedPaperId()"
+        [portfolio]="store.portfolio()"
+        [finished]="store.finished()"
+        [editingOrder]="store.editingOrder()"
+        [error]="store.error()"
+        (paperSelect)="store.selectPaper($event)"
+        (submitOrder)="store.placeOrder($event)"
+        (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
+        (cancelEdit)="store.cancelEditOrder()"
+      />
+
+      <app-arena-portfolio-panel [papers]="store.papers()" [portfolio]="store.portfolio()" />
+    </aside>
+  </div>
+</div>
