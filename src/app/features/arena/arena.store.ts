@@ -2,6 +2,7 @@ import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core'
 import { formatRejectReason } from './arena.format';
 import {
   ARENA_API,
+  ArenaApi,
   ArenaCommandResult,
   ArenaFill,
   ArenaOrder,
@@ -43,8 +44,13 @@ const CLOSED_STATUSES = new Set<ArenaOrder['status']>([
 
 @Injectable()
 export class ArenaStore {
-  private readonly api = inject(ARENA_API);
+  private readonly defaultApi = inject(ARENA_API);
   private readonly destroyRef = inject(DestroyRef);
+  private customApi: ArenaApi | null = null;
+
+  private get api(): ArenaApi {
+    return this.customApi ?? this.defaultApi;
+  }
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private queue: Promise<void> = Promise.resolve();
@@ -97,7 +103,8 @@ export class ArenaStore {
     this.destroyRef.onDestroy(() => this.stopTimer());
   }
 
-  init(): Promise<void> {
+  init(customApi?: ArenaApi): Promise<void> {
+    this.customApi = customApi ?? null;
     return this.enqueue(async () => {
       this.loading.set(true);
       this.error.set(null);

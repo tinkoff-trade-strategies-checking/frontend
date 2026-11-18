@@ -1,0 +1,49 @@
+<section class="replay-page">
+  @if (store.error()) {
+    <div tuiNotification appearance="negative" size="s">{{ store.error() }}</div>
+  }
+
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка воспроизведения…</div>
+  } @else if (store.result(); as res) {
+    @if (res.status === 'BLIND_UNFINISHED') {
+      <header class="replay-header">
+        <div class="title-group">
+          <h1 class="tui-text_h3">{{ res.title }}</h1>
+          <span tuiBadge size="s" appearance="info">Слепая сессия</span>
+          <span tuiBadge size="s" appearance="neutral">{{ regimeLabels[res.regime] }}</span>
+        </div>
+      </header>
+
+      <div tuiNotification appearance="warning" size="s">
+        <strong>Воспроизведение недоступно до завершения слепой сессии</strong>
+        <div class="tui-text_body-s">
+          Сыграно дней: {{ res.playedDays }} из {{ res.totalDays }}. Реальные даты, названия и
+          тикеры бумаг раскроются только после завершения сессии.
+        </div>
+      </div>
+
+      <div>
+        <a tuiButton size="m" appearance="primary" routerLink="/arena">Вернуться на арену</a>
+      </div>
+    } @else if (res.status === 'NOT_FOUND') {
+      <header class="replay-header">
+        <h1 class="tui-text_h3">Сессия не найдена</h1>
+      </header>
+      <div tuiNotification appearance="info" size="s">
+        Сессия {{ res.sessionId }} для воспроизведения не найдена.
+      </div>
+      <div>
+        <a tuiButton size="m" appearance="primary" routerLink="/new">Новая сессия</a>
+      </div>
+    } @else if (store.arenaApi(); as api) {
+      <app-arena-page
+        [readOnly]="true"
+        [headerTitle]="'Воспроизведение ' + res.session.sessionId"
+        [periodLabel]="res.session.periodLabel"
+        [reportRoute]="'/report/' + res.session.sessionId"
+        [apiSource]="api"
+      />
+    }
+  }
+</section>

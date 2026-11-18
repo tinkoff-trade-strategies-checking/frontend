@@ -128,6 +128,9 @@ export class ArenaChart {
       if (!candle) {
         return '';
       }
+      if (candle.fullDateLabel ?? candle.dateLabel) {
+        return candle.fullDateLabel ?? candle.dateLabel ?? '';
+      }
       return formatBlindCandleLabel(candle.day, candle.candleInDay);
     };
 
@@ -135,6 +138,9 @@ export class ArenaChart {
       const candle = typeof time === 'number' ? this.candleByTime.get(time) : undefined;
       if (!candle) {
         return '';
+      }
+      if (candle.dateLabel) {
+        return candle.dateLabel;
       }
       return formatBlindAxisTick(candle.step, candle.day);
     };
