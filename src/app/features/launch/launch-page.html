@@ -10,7 +10,14 @@
   </header>
 
   @if (store.error()) {
-    <div tuiNotification appearance="negative" size="s">{{ store.error() }}</div>
+    <div tuiNotification appearance="negative" size="s" class="error-row">
+      <span>{{ store.error() }}</span>
+      @if (!store.options()) {
+        <button tuiButton type="button" size="xs" appearance="outline" (click)="store.init()">
+          Повторить
+        </button>
+      }
+    </div>
   }
 
   @if (store.rejection(); as rej) {
@@ -138,38 +145,60 @@
         <section class="panel">
           <div class="panel-header">
             <h2 class="tui-text_h6">Бумаги</h2>
-            <span class="tui-text_body-xs muted">
-              выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
-            </span>
+            @if (store.isBlind()) {
+              <span class="tui-text_body-xs muted">
+                {{ store.paperCount() }} из {{ opts.maxPapers }}
+              </span>
+            } @else {
+              <span class="tui-text_body-xs muted">
+                выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
+              </span>
+            }
           </div>
           <div class="panel-body">
-            <div class="papers-list">
-              @for (paper of opts.papers; track paper.id) {
-                @let selected = store.selectedPaperIds().includes(paper.id);
-                <button
-                  tuiButton
-                  type="button"
+            @if (store.isBlind()) {
+              <div class="field-group">
+                <span class="tui-text_body-s field-label">Количество бумаг в сессии</span>
+                <tui-segmented
                   size="s"
-                  [appearance]="selected ? 'primary' : 'outline'"
-                  (click)="store.togglePaper(paper.id)"
+                  [activeItemIndex]="paperCountIndex(store.paperCountOptions(), store.paperCount())"
+                  (activeItemIndexChange)="
+                    onPaperCountIndexChange(store.paperCountOptions(), $event)
+                  "
                 >
-                  @if (store.isBlind()) {
-                    {{ paper.blindLabel }} · {{ paper.sector }}
-                  } @else {
-                    {{ paper.ticker }} ({{ paper.name }}) · {{ paper.sector }}
+                  @for (count of store.paperCountOptions(); track count) {
+                    <button type="button">{{ count }}</button>
                   }
-                </button>
-              }
-            </div>
-            <p class="tui-text_body-s muted hint">
-              @if (store.isBlind()) {
-                В слепом режиме отображаются только обезличенные метки и сектор экономики. Выберите
-                от {{ opts.minPapers }} до {{ opts.maxPapers }} бумаг.
+                </tui-segmented>
+              </div>
+              <p class="tui-text_body-s muted hint">
+                В слепом режиме система случайно выбирает от {{ opts.minPapers }} до
+                {{ opts.maxPapers }} бумаг из пула IMOEX. Названия и тикеры не раскрываются до конца
+                сессии.
+              </p>
+            } @else {
+              @if (store.loadingCustomPapers()) {
+                <p class="tui-text_body-s muted hint">Загрузка списка бумаг…</p>
               } @else {
-                Для своей даты доступны реальные тикеры и названия бумаг (от
-                {{ opts.minPapers }} до {{ opts.maxPapers }}).
+                <div class="papers-list">
+                  @for (paper of store.customPapers(); track paper.id) {
+                    @let selected = store.selectedPaperIds().includes(paper.id);
+                    <button
+                      tuiButton
+                      type="button"
+                      size="s"
+                      [appearance]="selected ? 'primary' : 'outline'"
+                      (click)="store.togglePaper(paper.id)"
+                    >
+                      {{ paper.ticker }} ({{ paper.name }}) · {{ paper.sector }}
+                    </button>
+                  }
+                </div>
               }
-            </p>
+              <p class="tui-text_body-s muted hint">
+                Для своей даты выберите от {{ opts.minPapers }} до {{ opts.maxPapers }} бумаг.
+              </p>
+            }
           </div>
         </section>
 
@@ -230,16 +259,22 @@
               <span>
                 @if (store.isBlind()) {
                   Случайная закрытая дата
+                } @else if (store.customStartDate().trim()) {
+                  {{ formatDisplayDate(store.customStartDate()) }} (неслепая)
                 } @else {
-                  {{ store.customStartDate() }} (неслепая)
+                  не указана (неслепая)
                 }
               </span>
             </div>
             <div class="kv">
               <span class="muted">Бумаги</span>
               <span>
-                @for (paper of store.selectedPapers(); track paper.id; let last = $last) {
-                  {{ store.isBlind() ? paper.blindLabel : paper.ticker }}{{ last ? '' : ', ' }}
+                @if (store.isBlind()) {
+                  {{ store.paperCount() }} случайных из пула IMOEX
+                } @else {
+                  @for (paper of store.selectedCustomPapers(); track paper.id; let last = $last) {
+                    {{ paper.ticker }}{{ last ? '' : ', ' }}
+                  }
                 }
               </span>
             </div>
@@ -264,8 +299,8 @@
             <div class="kv">
               <span class="muted">Спред и проскальзывание</span>
               <span class="num">
-                {{ formatExecutionPct(opts.executionRules.spreadPct) }} +
-                {{ formatExecutionPct(opts.executionRules.slippagePct) }}
+                {{ formatExecutionPct(opts.executionRules.spreadPct) }}, κ =
+                {{ formatDecimalRu(opts.executionRules.slippageKappa) }}
               </span>
             </div>
             <div class="kv">
@@ -277,13 +312,17 @@
               <span>по open следующей свечи</span>
             </div>
 
+            @if (store.submitBlockHint(); as blockHint) {
+              <p class="tui-text_body-xs muted hint">{{ blockHint }}</p>
+            }
+
             <button
               tuiButton
               type="button"
               size="l"
               appearance="primary"
               class="launch-btn"
-              [disabled]="store.submitting()"
+              [disabled]="store.submitting() || !store.canSubmit()"
               (click)="store.launch()"
             >
               Запустить

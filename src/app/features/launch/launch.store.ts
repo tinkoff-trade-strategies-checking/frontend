@@ -1,26 +1,30 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 import {
   CandleTimeframe,
   LAUNCH_API,
+  LaunchCustomPaper,
   LaunchOptions,
   MarketRegime,
   SessionDurationDays,
   StartMode,
   TraderKind,
 } from './data/launch.models';
+import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 
 @Injectable()
 export class LaunchStore {
   private readonly api = inject(LAUNCH_API);
   private readonly router = inject(Router);
+  private customPapersLoadSeq = 0;
 
   readonly loading = signal(false);
+  readonly loadingCustomPapers = signal(false);
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly rejection = signal<LaunchRejectMessage | null>(null);
   readonly options = signal<LaunchOptions | null>(null);
+  readonly customPapers = signal<readonly LaunchCustomPaper[]>([]);
 
   readonly traderKind = signal<TraderKind>('human');
   readonly durationDays = signal<SessionDurationDays>(60);
@@ -28,18 +32,52 @@ export class LaunchStore {
   readonly regime = signal<MarketRegime>('medium');
   readonly startMode = signal<StartMode>('random');
   readonly customStartDate = signal('2020-02-26');
-  readonly selectedPaperIds = signal<readonly string[]>(['A', 'B', 'C']);
+  readonly paperCount = signal(3);
+  readonly selectedPaperIds = signal<readonly string[]>([]);
   readonly initialCapitalRub = signal(1_000_000);
 
   readonly isBlind = computed(() => this.startMode() === 'random');
 
-  readonly selectedPapers = computed(() => {
+  readonly paperCountOptions = computed<readonly number[]>(() => {
     const opts = this.options();
     if (!opts) {
       return [];
     }
+    const counts: number[] = [];
+    for (let n = opts.minPapers; n <= opts.maxPapers; n++) {
+      counts.push(n);
+    }
+    return counts;
+  });
+
+  readonly selectedCustomPapers = computed(() => {
     const selected = new Set(this.selectedPaperIds());
-    return opts.papers.filter((p) => selected.has(p.id));
+    return this.customPapers().filter((p) => selected.has(p.id));
+  });
+
+  readonly submitBlockHint = computed<string | null>(() => {
+    const opts = this.options();
+    if (!opts || this.isBlind()) {
+      return null;
+    }
+    if (!this.customStartDate().trim()) {
+      return 'Укажите дату начала периода.';
+    }
+    if (this.selectedPaperIds().length < opts.minPapers) {
+      return `Выберите от ${opts.minPapers} до ${opts.maxPapers} бумаг.`;
+    }
+    return null;
+  });
+
+  readonly canSubmit = computed(() => {
+    const opts = this.options();
+    if (!opts) {
+      return false;
+    }
+    if (this.isBlind()) {
+      return this.paperCount() >= opts.minPapers && this.paperCount() <= opts.maxPapers;
+    }
+    return this.submitBlockHint() === null;
   });
 
   async init(): Promise<void> {
@@ -52,7 +90,7 @@ export class LaunchStore {
       this.timeframe.set(opts.defaultTimeframe);
       this.regime.set(opts.defaultRegime);
       this.initialCapitalRub.set(opts.defaultCapitalRub);
-      this.selectedPaperIds.set(opts.papers.slice(0, 3).map((p) => p.id));
+      this.paperCount.set(opts.defaultPaperCount);
     } catch {
       this.error.set('Не удалось загрузить параметры запуска.');
     } finally {
@@ -75,13 +113,47 @@ export class LaunchStore {
     this.rejection.set(null);
   }
 
-  setStartMode(mode: StartMode): void {
+  async setStartMode(mode: StartMode): Promise<void> {
     this.startMode.set(mode);
     this.rejection.set(null);
+
+    if (mode === 'random') {
+      this.customPapersLoadSeq++;
+      this.loadingCustomPapers.set(false);
+      this.selectedPaperIds.set([]);
+      this.customPapers.set([]);
+      return;
+    }
+
+    const seq = ++this.customPapersLoadSeq;
+    this.loadingCustomPapers.set(true);
+    try {
+      const papers = await this.api.getAvailablePapers();
+      if (seq !== this.customPapersLoadSeq || this.startMode() !== 'custom') {
+        return;
+      }
+      this.customPapers.set(papers);
+      const minCount = this.options()?.minPapers ?? 1;
+      const defaultSelection = Math.max(minCount, Math.min(this.paperCount(), papers.length));
+      this.selectedPaperIds.set(papers.slice(0, defaultSelection).map((p) => p.id));
+    } catch {
+      if (seq === this.customPapersLoadSeq) {
+        this.error.set('Не удалось загрузить список бумаг.');
+      }
+    } finally {
+      if (seq === this.customPapersLoadSeq) {
+        this.loadingCustomPapers.set(false);
+      }
+    }
   }
 
   setCustomStartDate(date: string): void {
     this.customStartDate.set(date);
+    this.rejection.set(null);
+  }
+
+  setPaperCount(count: number): void {
+    this.paperCount.set(count);
     this.rejection.set(null);
   }
 
@@ -111,7 +183,7 @@ export class LaunchStore {
   }
 
   async launch(): Promise<boolean> {
-    if (this.submitting()) {
+    if (this.submitting() || !this.canSubmit()) {
       return false;
     }
 
@@ -120,14 +192,16 @@ export class LaunchStore {
     this.rejection.set(null);
 
     try {
+      const blind = this.isBlind();
       const result = await this.api.startSession({
         traderKind: this.traderKind(),
         durationDays: this.durationDays(),
         timeframe: this.timeframe(),
         regime: this.regime(),
         startMode: this.startMode(),
-        customStartDate: this.startMode() === 'custom' ? this.customStartDate() : undefined,
-        paperIds: this.selectedPaperIds(),
+        customStartDate: blind ? null : this.customStartDate(),
+        paperCount: blind ? this.paperCount() : null,
+        paperIds: blind ? null : this.selectedPaperIds(),
         initialCapitalRub: this.initialCapitalRub(),
       });
 

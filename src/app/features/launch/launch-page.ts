@@ -4,7 +4,7 @@ import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { LAUNCH_API, REGIME_HINTS, REGIME_LABELS, TIMEFRAME_LABELS } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
-import { formatExecutionPct, formatRub } from './launch.format';
+import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
 
 @Component({
@@ -23,6 +23,8 @@ export class LaunchPage implements OnInit {
   protected readonly regimeHints = REGIME_HINTS;
   protected readonly formatRub = formatRub;
   protected readonly formatExecutionPct = formatExecutionPct;
+  protected readonly formatDecimalRu = formatDecimalRu;
+  protected readonly formatDisplayDate = formatDisplayDate;
 
   ngOnInit(): void {
     void this.store.init();
@@ -71,7 +73,18 @@ export class LaunchPage implements OnInit {
   }
 
   protected onStartModeIndexChange(index: number): void {
-    this.store.setStartMode(index === 1 ? 'custom' : 'random');
+    void this.store.setStartMode(index === 1 ? 'custom' : 'random');
+  }
+
+  protected paperCountIndex(counts: readonly number[], current: number): number {
+    return Math.max(0, counts.indexOf(current));
+  }
+
+  protected onPaperCountIndexChange(counts: readonly number[], index: number): void {
+    const next = counts[index];
+    if (next !== undefined) {
+      this.store.setPaperCount(next);
+    }
   }
 
   protected capitalIndex(presets: readonly number[], current: number): number {

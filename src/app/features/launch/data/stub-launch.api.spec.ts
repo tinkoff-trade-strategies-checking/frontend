@@ -1,7 +1,7 @@
 import { StubLaunchApi } from './stub-launch.api';
 
 describe('StubLaunchApi', () => {
-  it('возвращает доступные параметры запуска и значения по умолчанию', async () => {
+  it('INV-7: getLaunchOptions возвращает параметры по умолчанию без тикеров и названий бумаг', async () => {
     const api = new StubLaunchApi();
     const opts = await api.getLaunchOptions();
 
@@ -12,8 +12,16 @@ describe('StubLaunchApi', () => {
     expect(opts.regimes).toEqual(['calm', 'medium', 'stress']);
     expect(opts.capitalPresetsRub.length).toBeGreaterThan(0);
     expect(opts.backgroundAlgorithmName).toBe('Эталон платформы');
-    expect(opts.papers.length).toBe(5);
+    expect(opts.minPapers).toBe(1);
+    expect(opts.maxPapers).toBe(5);
+    expect(opts.defaultPaperCount).toBe(3);
     expect(opts.executionRules.maxBars).toBe(5000);
+    expect(opts.executionRules.slippageKappa).toBe(0.1);
+
+    const serialized = JSON.stringify(opts);
+    for (const forbidden of ['SBER', 'GAZP', 'YDEX', 'GMKN', 'MGNT', 'Сбербанк', 'Газпром']) {
+      expect(serialized).not.toContain(forbidden);
+    }
   });
 
   it('принимает корректные параметры в слепом и неслепом режиме', async () => {
@@ -25,10 +33,15 @@ describe('StubLaunchApi', () => {
       timeframe: '1d',
       regime: 'medium',
       startMode: 'random',
-      paperIds: ['A', 'B', 'C'],
+      customStartDate: null,
+      paperCount: 3,
+      paperIds: null,
       initialCapitalRub: 1_000_000,
     });
     expect(blindRes.accepted).toBe(true);
+
+    const papers = await api.getAvailablePapers();
+    expect(papers.length).toBe(5);
 
     const customRes = await api.startSession({
       traderKind: 'human',
@@ -37,7 +50,8 @@ describe('StubLaunchApi', () => {
       regime: 'calm',
       startMode: 'custom',
       customStartDate: '2020-02-26',
-      paperIds: ['A'],
+      paperCount: null,
+      paperIds: ['SBER'],
       initialCapitalRub: 500_000,
     });
     expect(customRes.accepted).toBe(true);
@@ -51,7 +65,9 @@ describe('StubLaunchApi', () => {
       timeframe: '5m',
       regime: 'medium',
       startMode: 'random',
-      paperIds: ['A', 'B'],
+      customStartDate: null,
+      paperCount: 2,
+      paperIds: null,
       initialCapitalRub: 1_000_000,
     });
 
@@ -72,10 +88,18 @@ describe('StubLaunchApi', () => {
       timeframe: '1d',
       regime: 'stress',
       startMode: 'random',
-      paperIds: ['A', 'B', 'C', 'D'],
+      customStartDate: null,
+      paperCount: 4,
+      paperIds: null,
       initialCapitalRub: 1_000_000,
     });
-    expect(noPeriod).toEqual({ accepted: false, reason: 'NO_MATCHING_PERIOD' });
+    expect(noPeriod).toEqual({
+      accepted: false,
+      reason: 'NO_MATCHING_PERIOD',
+      field: null,
+      barsCount: null,
+      maxBars: null,
+    });
 
     const corpAction = await api.startSession({
       traderKind: 'human',
@@ -84,28 +108,35 @@ describe('StubLaunchApi', () => {
       regime: 'medium',
       startMode: 'custom',
       customStartDate: '2020-07-10',
-      paperIds: ['A'],
+      paperCount: null,
+      paperIds: ['SBER'],
       initialCapitalRub: 1_000_000,
     });
     expect(corpAction).toEqual({
       accepted: false,
       reason: 'CORPORATE_ACTION_ON_PERIOD',
       field: 'customStartDate',
+      barsCount: null,
+      maxBars: null,
     });
 
-    const emptyPapers = await api.startSession({
+    const badCount = await api.startSession({
       traderKind: 'human',
       durationDays: 60,
       timeframe: '1d',
       regime: 'medium',
       startMode: 'random',
-      paperIds: [],
+      customStartDate: null,
+      paperCount: 0,
+      paperIds: null,
       initialCapitalRub: 1_000_000,
     });
-    expect(emptyPapers).toEqual({
+    expect(badCount).toEqual({
       accepted: false,
       reason: 'INVALID_PARAMS',
-      field: 'paperIds',
+      field: 'paperCount',
+      barsCount: null,
+      maxBars: null,
     });
   });
 });

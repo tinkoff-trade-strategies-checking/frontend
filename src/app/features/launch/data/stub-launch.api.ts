@@ -3,12 +3,14 @@ import {
   CandleTimeframe,
   LaunchApi,
   LaunchCommandResult,
+  LaunchCustomPaper,
   LaunchOptions,
-  LaunchPaperOption,
   StartSessionCommand,
 } from './launch.models';
 
 const MAX_MANUAL_BARS = 5000;
+const MIN_PAPERS = 1;
+const MAX_PAPERS = 5;
 
 const BARS_PER_DAY: Readonly<Record<CandleTimeframe, number>> = {
   '1m': 520,
@@ -19,18 +21,12 @@ const BARS_PER_DAY: Readonly<Record<CandleTimeframe, number>> = {
   '1d': 1,
 };
 
-const LAUNCH_PAPERS: readonly LaunchPaperOption[] = [
-  { id: 'A', blindLabel: 'Бумага A', sector: 'Финансы', ticker: 'SBER', name: 'Сбербанк' },
-  { id: 'B', blindLabel: 'Бумага B', sector: 'Нефть и газ', ticker: 'GAZP', name: 'Газпром' },
-  { id: 'C', blindLabel: 'Бумага C', sector: 'IT', ticker: 'YDEX', name: 'Яндекс' },
-  {
-    id: 'D',
-    blindLabel: 'Бумага D',
-    sector: 'Металлы и добыча',
-    ticker: 'GMKN',
-    name: 'Норникель',
-  },
-  { id: 'E', blindLabel: 'Бумага E', sector: 'Потребсектор', ticker: 'MGNT', name: 'Магнит' },
+const CUSTOM_PAPERS: readonly LaunchCustomPaper[] = [
+  { id: 'SBER', sector: 'Финансы', ticker: 'SBER', name: 'Сбербанк' },
+  { id: 'GAZP', sector: 'Нефть и газ', ticker: 'GAZP', name: 'Газпром' },
+  { id: 'YDEX', sector: 'IT', ticker: 'YDEX', name: 'Яндекс' },
+  { id: 'GMKN', sector: 'Металлы и добыча', ticker: 'GMKN', name: 'Норникель' },
+  { id: 'MGNT', sector: 'Потребсектор', ticker: 'MGNT', name: 'Магнит' },
 ];
 
 const VALID_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -40,6 +36,7 @@ export class StubLaunchApi implements LaunchApi {
   private nextSessionSeq = 105;
 
   async getLaunchOptions(): Promise<LaunchOptions> {
+    // INV-7: в параметрах слепого запуска нет списка тикеров и названий бумаг.
     return {
       durations: [20, 60, 120, 250],
       defaultDuration: 60,
@@ -50,42 +47,84 @@ export class StubLaunchApi implements LaunchApi {
       capitalPresetsRub: [100_000, 500_000, 1_000_000, 5_000_000],
       defaultCapitalRub: 1_000_000,
       backgroundAlgorithmName: 'Эталон платформы',
-      papers: LAUNCH_PAPERS,
-      minPapers: 1,
-      maxPapers: 5,
+      minPapers: MIN_PAPERS,
+      maxPapers: MAX_PAPERS,
+      defaultPaperCount: 3,
       executionRules: {
         commissionPct: 0.3,
         exchangeFeePct: 0.01,
         spreadPct: 0.1,
-        slippagePct: 0.1,
+        slippageKappa: 0.1,
         liquidityLimitPct: 10,
         maxBars: MAX_MANUAL_BARS,
       },
     };
   }
 
+  async getAvailablePapers(): Promise<readonly LaunchCustomPaper[]> {
+    return CUSTOM_PAPERS;
+  }
+
   async startSession(command: StartSessionCommand): Promise<LaunchCommandResult> {
-    if (command.paperIds.length < 1 || command.paperIds.length > 5) {
-      return { accepted: false, reason: 'INVALID_PARAMS', field: 'paperIds' };
-    }
-
-    const validIds = new Set(LAUNCH_PAPERS.map((p) => p.id));
-    if (command.paperIds.some((id) => !validIds.has(id))) {
-      return { accepted: false, reason: 'INVALID_PARAMS', field: 'paperIds' };
-    }
-
     if (command.initialCapitalRub <= 0) {
-      return { accepted: false, reason: 'INVALID_PARAMS', field: 'initialCapitalRub' };
+      return {
+        accepted: false,
+        reason: 'INVALID_PARAMS',
+        field: 'initialCapitalRub',
+        barsCount: null,
+        maxBars: null,
+      };
     }
 
-    if (command.startMode === 'custom') {
+    let papersCount: number;
+    if (command.startMode === 'random') {
+      const count = command.paperCount ?? 0;
+      if (!Number.isInteger(count) || count < MIN_PAPERS || count > MAX_PAPERS) {
+        return {
+          accepted: false,
+          reason: 'INVALID_PARAMS',
+          field: 'paperCount',
+          barsCount: null,
+          maxBars: null,
+        };
+      }
+      papersCount = count;
+    } else {
+      const ids = command.paperIds ?? [];
+      const validIds = new Set(CUSTOM_PAPERS.map((p) => p.id));
+      if (
+        ids.length < MIN_PAPERS ||
+        ids.length > MAX_PAPERS ||
+        ids.some((id) => !validIds.has(id))
+      ) {
+        return {
+          accepted: false,
+          reason: 'INVALID_PARAMS',
+          field: 'paperIds',
+          barsCount: null,
+          maxBars: null,
+        };
+      }
       const date = command.customStartDate?.trim() ?? '';
       if (!VALID_DATE_PATTERN.test(date)) {
-        return { accepted: false, reason: 'INVALID_PARAMS', field: 'customStartDate' };
+        return {
+          accepted: false,
+          reason: 'INVALID_PARAMS',
+          field: 'customStartDate',
+          barsCount: null,
+          maxBars: null,
+        };
       }
       if (date === '2020-07-10') {
-        return { accepted: false, reason: 'CORPORATE_ACTION_ON_PERIOD', field: 'customStartDate' };
+        return {
+          accepted: false,
+          reason: 'CORPORATE_ACTION_ON_PERIOD',
+          field: 'customStartDate',
+          barsCount: null,
+          maxBars: null,
+        };
       }
+      papersCount = ids.length;
     }
 
     const barsCount = command.durationDays * BARS_PER_DAY[command.timeframe];
@@ -93,18 +132,24 @@ export class StubLaunchApi implements LaunchApi {
       return {
         accepted: false,
         reason: 'TOO_MANY_BARS',
+        field: null,
         barsCount,
         maxBars: MAX_MANUAL_BARS,
       };
     }
 
-    // Длинный стрессовый или спокойный период на большом наборе бумаг в архиве не найден (заглушка).
     if (
       command.durationDays === 250 &&
-      command.paperIds.length >= 4 &&
+      papersCount >= 4 &&
       (command.regime === 'stress' || command.regime === 'calm')
     ) {
-      return { accepted: false, reason: 'NO_MATCHING_PERIOD' };
+      return {
+        accepted: false,
+        reason: 'NO_MATCHING_PERIOD',
+        field: null,
+        barsCount: null,
+        maxBars: null,
+      };
     }
 
     const sessionId = `S-${String(this.nextSessionSeq++).padStart(4, '0')}`;

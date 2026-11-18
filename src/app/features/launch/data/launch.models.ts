@@ -13,9 +13,8 @@ export type StartMode = 'random' | 'custom';
 export type LaunchRejectReason =
   'NO_MATCHING_PERIOD' | 'TOO_MANY_BARS' | 'INVALID_PARAMS' | 'CORPORATE_ACTION_ON_PERIOD';
 
-export interface LaunchPaperOption {
+export interface LaunchCustomPaper {
   readonly id: string;
-  readonly blindLabel: string;
   readonly sector: string;
   readonly ticker: string;
   readonly name: string;
@@ -25,7 +24,7 @@ export interface ExecutionRulesSummary {
   readonly commissionPct: number;
   readonly exchangeFeePct: number;
   readonly spreadPct: number;
-  readonly slippagePct: number;
+  readonly slippageKappa: number;
   readonly liquidityLimitPct: number;
   readonly maxBars: number;
 }
@@ -40,9 +39,9 @@ export interface LaunchOptions {
   readonly capitalPresetsRub: readonly number[];
   readonly defaultCapitalRub: number;
   readonly backgroundAlgorithmName: string;
-  readonly papers: readonly LaunchPaperOption[];
   readonly minPapers: number;
   readonly maxPapers: number;
+  readonly defaultPaperCount: number;
   readonly executionRules: ExecutionRulesSummary;
 }
 
@@ -52,8 +51,9 @@ export interface StartSessionCommand {
   readonly timeframe: CandleTimeframe;
   readonly regime: MarketRegime;
   readonly startMode: StartMode;
-  readonly customStartDate?: string;
-  readonly paperIds: readonly string[];
+  readonly customStartDate: string | null;
+  readonly paperCount: number | null;
+  readonly paperIds: readonly string[] | null;
   readonly initialCapitalRub: number;
 }
 
@@ -65,13 +65,14 @@ export type LaunchCommandResult =
   | {
       readonly accepted: false;
       readonly reason: LaunchRejectReason;
-      readonly field?: string;
-      readonly barsCount?: number;
-      readonly maxBars?: number;
+      readonly field: string | null;
+      readonly barsCount: number | null;
+      readonly maxBars: number | null;
     };
 
 export interface LaunchApi {
   getLaunchOptions(): Promise<LaunchOptions>;
+  getAvailablePapers(): Promise<readonly LaunchCustomPaper[]>;
   startSession(command: StartSessionCommand): Promise<LaunchCommandResult>;
 }
 
