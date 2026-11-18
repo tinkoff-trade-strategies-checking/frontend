@@ -45,3 +45,7 @@ Thumbs.db
 
 # Сгенерированный клиент API (ng-openapi-gen) — генерируется при сборке
 /src/app/api/
+
+# Playwright
+/test-results/
+/playwright-report/

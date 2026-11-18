@@ -14,6 +14,7 @@ npm start                    # генерация клиента API + dev-се�
 npm run lint                 # ESLint (angular-eslint)
 npm run format               # Prettier — исправить формат; format:check — проверить
 npm test                     # генерация клиента API + юнит-тесты (Vitest через @angular/build:unit-test), один прогон
+npm run e2e                  # сквозные тесты Playwright (локально — системный Chrome, в CI — chromium)
 npm run build                # генерация клиента API + сборка в dist/
 npm run check                # всё, что проверяет CI: формат, линтер, сверка OpenAPI, тесты, сборка
 npm run api:sync             # скопировать контракт в api/openapi.yaml: из ../backend, если он рядом, иначе с GitHub (main)
