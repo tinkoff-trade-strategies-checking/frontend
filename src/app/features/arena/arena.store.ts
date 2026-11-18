@@ -34,7 +34,12 @@ const EMPTY_PORTFOLIO: ArenaPortfolio = {
   positions: {},
 };
 
-const CLOSED_STATUSES = new Set<ArenaOrder['status']>(['cancelled', 'rejected', 'expired']);
+const CLOSED_STATUSES = new Set<ArenaOrder['status']>([
+  'cancelled',
+  'rejected',
+  'expired',
+  'partial',
+]);
 
 @Injectable()
 export class ArenaStore {
@@ -44,6 +49,7 @@ export class ArenaStore {
   private timerId: ReturnType<typeof setInterval> | null = null;
   private queue: Promise<void> = Promise.resolve();
   private estimateSeq = 0;
+  private stepping = false;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
@@ -148,11 +154,11 @@ export class ArenaStore {
   }
 
   async estimateOrder(paperId: string, lots: number | null): Promise<void> {
+    const seq = ++this.estimateSeq;
     if (lots === null || !Number.isInteger(lots) || lots < 1) {
       this.estimatedPct.set(null);
       return;
     }
-    const seq = ++this.estimateSeq;
     try {
       const res = await this.api.estimateOrder({ paperId, lots });
       if (seq === this.estimateSeq) {
@@ -165,11 +171,12 @@ export class ArenaStore {
     }
   }
 
-  stepOnce(): Promise<void> {
+  stepOnce(fromTimer = false): Promise<void> {
     return this.enqueue(async () => {
-      if (!this.canStep()) {
+      if ((fromTimer && !this.playing()) || !this.canStep()) {
         return;
       }
+      this.stepping = true;
       this.error.set(null);
       this.notice.set(null);
 
@@ -207,18 +214,21 @@ export class ArenaStore {
         this.error.set(
           err instanceof Error ? err.message : 'Ошибка при переходе к следующей свече.',
         );
+      } finally {
+        this.stepping = false;
       }
     });
   }
 
   placeOrder(draft: OrderDraft): Promise<ArenaCommandResult | null> {
+    // INV-2: фиксируем seenStep синхронно в момент клика до постановки в очередь.
+    const seenStep = this.step();
     return this.enqueue(async () => {
       this.error.set(null);
       this.notice.set(null);
       try {
-        // INV-2: заявка всегда уходит с номером последней свечи, которую видел пользователь.
         const result = await this.api.placeOrder({
-          seenStep: this.step(),
+          seenStep,
           paperId: draft.paperId,
           side: draft.side,
           type: draft.type,
@@ -239,13 +249,14 @@ export class ArenaStore {
   }
 
   cancelOrder(orderId: string): Promise<ArenaCommandResult | null> {
+    // INV-2: фиксируем seenStep синхронно в момент клика до постановки в очередь.
+    const seenStep = this.step();
     return this.enqueue(async () => {
       this.error.set(null);
       this.notice.set(null);
       try {
-        // INV-2: отмена всегда уходит с seenStep.
         const result = await this.api.cancelOrder({
-          seenStep: this.step(),
+          seenStep,
           orderId,
         });
         if (this.editingOrder()?.id === orderId) {
@@ -273,13 +284,14 @@ export class ArenaStore {
     orderId: string,
     draft: Omit<OrderDraft, 'paperId' | 'side' | 'type'>,
   ): Promise<ArenaCommandResult | null> {
+    // INV-2: фиксируем seenStep синхронно в момент клика до постановки в очередь.
+    const seenStep = this.step();
     return this.enqueue(async () => {
       this.error.set(null);
       this.notice.set(null);
       try {
-        // INV-2: замена всегда уходит с seenStep.
         const result = await this.api.replaceOrder({
-          seenStep: this.step(),
+          seenStep,
           orderId,
           lots: draft.lots,
           tif: draft.tif,
@@ -338,7 +350,10 @@ export class ArenaStore {
     this.stopTimer();
     const intervalMs = Math.max(10, Math.round(1000 / this.speed()));
     this.timerId = setInterval(() => {
-      void this.stepOnce();
+      if (!this.playing() || this.stepping) {
+        return;
+      }
+      void this.stepOnce(true);
     }, intervalMs);
   }
 

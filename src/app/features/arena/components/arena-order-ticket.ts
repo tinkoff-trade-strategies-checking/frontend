@@ -207,7 +207,7 @@ function round2(value: number): number {
         </tui-textfield>
 
         <div class="hint-row tui-text_body-xs">
-          <span>Цена: {{ formatPrice(lastPrice()) }}</span>
+          <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>
           <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
         </div>
 
@@ -302,6 +302,7 @@ function round2(value: number): number {
 export class ArenaOrderTicket {
   readonly papers = input.required<readonly ArenaPaper[]>();
   readonly selectedPaperId = input.required<string>();
+  readonly step = input<number>(0);
   readonly portfolio = input.required<ArenaPortfolio>();
   readonly finished = input.required<boolean>();
   readonly editingOrder = input<ArenaOrder | null>(null);
@@ -335,12 +336,13 @@ export class ArenaOrderTicket {
   protected readonly trailingPct = signal(5);
 
   private lastPaperId: string | null = null;
+  private lastEstimatedLots: number | null | undefined;
 
   protected readonly paperIds = computed(() => this.papers().map((p) => p.id));
   protected readonly isSellOnly = computed(() => SELL_ONLY_TYPES.has(this.orderType()));
-  protected readonly lastPrice = computed(() => {
+  protected readonly lastPrice = computed<number | null>(() => {
     const found = this.papers().find((p) => p.id === this.selectedPaperId());
-    return found?.lastPrice ?? 100;
+    return found ? found.lastPrice : null;
   });
 
   protected readonly validationError = computed<string | null>(() => {
@@ -401,12 +403,23 @@ export class ArenaOrderTicket {
       }
     });
 
-    effect(() => {
+    effect((onCleanup) => {
       // INV-6: оценка суммы запрашивается у источника, клиент не считает.
-      this.estimateRequest.emit({
-        paperId: this.selectedPaperId(),
-        lots: this.lots(),
-      });
+      const paperId = this.selectedPaperId();
+      const lots = this.lots();
+      this.step();
+      const lotsChanged = this.lastEstimatedLots !== undefined && this.lastEstimatedLots !== lots;
+      this.lastEstimatedLots = lots;
+
+      if (!lotsChanged) {
+        this.estimateRequest.emit({ paperId, lots });
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        this.estimateRequest.emit({ paperId, lots });
+      }, 200);
+      onCleanup(() => clearTimeout(timer));
     });
   }
 
@@ -467,6 +480,9 @@ export class ArenaOrderTicket {
 
   private syncDefaultPrices(type: OrderType, side: OrderSide): void {
     const px = this.lastPrice();
+    if (px === null) {
+      return;
+    }
     if (type === 'limit') {
       this.limitPrice.set(round2(px * (side === 'buy' ? 0.97 : 1.03)));
     } else if (type === 'stop') {

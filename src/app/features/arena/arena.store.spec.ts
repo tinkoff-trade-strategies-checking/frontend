@@ -191,6 +191,108 @@ describe('ArenaStore', () => {
     expect(store.finished()).toBe(true);
     expect(store.canStep()).toBe(false);
   });
+
+  it('INV-2: фиксирует seenStep синхронно в момент клика, даже если шаг уже в очереди', async () => {
+    const stub = new StubArenaApi();
+    const { store } = setup(stub);
+    await store.init();
+    expect(store.step()).toBe(0);
+
+    let resolveStep!: (value: Awaited<ReturnType<StubArenaApi['step']>>) => void;
+    const origStep = stub.step.bind(stub);
+    vi.spyOn(stub, 'step').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStep = resolve;
+        }),
+    );
+    const placeSpy = vi.spyOn(stub, 'placeOrder');
+
+    const stepPromise = store.stepOnce();
+    const placePromise = store.placeOrder({
+      paperId: 'A',
+      side: 'buy',
+      type: 'limit',
+      lots: 5,
+      tif: 'day',
+      limitPrice: 95,
+    });
+
+    const realStepResult = await origStep();
+    resolveStep(realStepResult);
+    await Promise.all([stepPromise, placePromise]);
+
+    expect(store.step()).toBe(1);
+    expect(placeSpy).toHaveBeenCalledWith(expect.objectContaining({ seenStep: 0 }));
+  });
+
+  it('таймер пропускает тики, пока шаг в работе, и останавливается после pause()', async () => {
+    vi.useFakeTimers();
+    try {
+      const stub = new StubArenaApi();
+      let resolveStep!: (value: Awaited<ReturnType<StubArenaApi['step']>>) => void;
+      const stepSpy = vi.spyOn(stub, 'step').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveStep = resolve;
+          }),
+      );
+      const { store } = setup(stub);
+      await store.init();
+
+      store.setSpeed(10); // 100 мс
+      store.togglePlay();
+
+      // Первый тик запускает шаг.
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+      expect(stepSpy).toHaveBeenCalledTimes(1);
+
+      // Следующие 5 тиков при незавершённом шаге не ставят новые шаги в очередь.
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+      expect(stepSpy).toHaveBeenCalledTimes(1);
+
+      store.pause();
+      resolveStep({
+        step: 1,
+        day: 2,
+        finished: false,
+        bars: {},
+        paperStats: {},
+        portfolio: store.portfolio(),
+        orders: [],
+        fills: [],
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      vi.advanceTimersByTime(500);
+      expect(stepSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('estimateOrder отбрасывает запоздавший ответ после очистки поля лотов', async () => {
+    const stub = new StubArenaApi();
+    let resolveEstimate!: (value: { amountPct: number }) => void;
+    vi.spyOn(stub, 'estimateOrder').mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveEstimate = resolve;
+        }),
+    );
+    const { store } = setup(stub);
+    await store.init();
+
+    const pending = store.estimateOrder('A', 5);
+    await store.estimateOrder('A', null);
+    resolveEstimate({ amountPct: 55.55 });
+    await pending;
+
+    expect(store.estimatedPct()).toBeNull();
+  });
 });
 
 function apiReplace(store: ArenaStore, orderId: string) {
