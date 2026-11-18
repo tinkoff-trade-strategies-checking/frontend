@@ -24,7 +24,7 @@ import {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
-import { formatBlindCandleLabel } from '../arena.format';
+import { formatBlindAxisTick, formatBlindCandleLabel } from '../arena.format';
 import { ArenaCandle, ArenaFill, ArenaOrder } from '../data/arena.models';
 
 function toChartTime(step: number): UTCTimestamp {
@@ -103,12 +103,20 @@ export class ArenaChart {
 
   private initChart(): void {
     const el = this.container().nativeElement;
-    const formatTime = (time: Time): string => {
+    const formatTooltipTime = (time: Time): string => {
       const candle = typeof time === 'number' ? this.candleByTime.get(time) : undefined;
       if (!candle) {
         return '';
       }
       return formatBlindCandleLabel(candle.day, candle.candleInDay);
+    };
+
+    const formatTick = (time: Time): string => {
+      const candle = typeof time === 'number' ? this.candleByTime.get(time) : undefined;
+      if (!candle) {
+        return '';
+      }
+      return formatBlindAxisTick(candle.step, candle.day);
     };
 
     const chart = createChart(el, {
@@ -127,10 +135,11 @@ export class ArenaChart {
       },
       timeScale: {
         borderColor: 'rgba(128, 128, 128, 0.25)',
-        tickMarkFormatter: (time: Time) => formatTime(time),
+        minBarSpacing: 8,
+        tickMarkFormatter: (time: Time) => formatTick(time),
       },
       localization: {
-        timeFormatter: (time: Time) => formatTime(time),
+        timeFormatter: (time: Time) => formatTooltipTime(time),
       },
     });
 

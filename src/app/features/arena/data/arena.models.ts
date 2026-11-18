@@ -174,7 +174,7 @@ export const ORDER_TYPE_LABELS: Readonly<Record<OrderType, string>> = {
   stop_limit: 'Стоп-лимитная',
   take_profit: 'Тейк-профит',
   trailing: 'Трейлинг-стоп',
-  oco: 'OCO (стоп + тейк)',
+  oco: 'OCO: стоп + тейк',
 };
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {

@@ -59,7 +59,7 @@ function round2(value: number): number {
       </div>
 
       <div class="ticket-body">
-        <tui-textfield tuiTextfieldSize="s">
+        <tui-textfield tuiTextfieldSize="s" [stringify]="paperStringify">
           <label tuiLabel for="arena-paper">Бумага</label>
           <select
             id="arena-paper"
@@ -81,13 +81,12 @@ function round2(value: number): number {
           <button type="button">Продать</button>
         </tui-segmented>
 
-        <tui-textfield tuiTextfieldSize="s">
+        <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
           <label tuiLabel for="arena-order-type">Тип заявки</label>
           <select
             id="arena-order-type"
             tuiSelect
             [items]="orderTypes"
-            [labels]="orderTypeLabels"
             [disabled]="Boolean(editingOrder())"
             [ngModel]="orderType()"
             (ngModelChange)="onOrderTypeChange($event)"
@@ -318,7 +317,9 @@ export class ArenaOrderTicket {
   readonly cancelEdit = output<void>();
 
   protected readonly orderTypes = ORDER_TYPES;
-  protected readonly orderTypeLabels = ORDER_TYPES.map((t) => ORDER_TYPE_LABELS[t]);
+  protected readonly orderTypeStringify = (type: OrderType): string => ORDER_TYPE_LABELS[type];
+  protected readonly paperStringify = (id: string): string =>
+    this.papers().find((p) => p.id === id)?.label ?? `Бумага ${id}`;
   protected readonly Boolean = Boolean;
   protected readonly formatPrice = formatPrice;
 

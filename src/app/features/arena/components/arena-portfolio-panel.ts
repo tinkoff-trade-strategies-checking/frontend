@@ -14,14 +14,20 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
 
       <div class="summary">
         <div class="equity-row">
-          <span class="tui-text_h4 num">{{ formatPct(portfolio().equityPct) }}</span>
-          <span
-            class="tui-text_body-m num"
-            [class.pos]="portfolio().pnlPct > 0"
-            [class.neg]="portfolio().pnlPct < 0"
-          >
-            {{ formatPct(portfolio().pnlPct, true) }}
-          </span>
+          <div class="metric-item">
+            <span class="tui-text_body-xs muted">Стоимость портфеля</span>
+            <span class="tui-text_h5 num">{{ formatPct(portfolio().equityPct) }}</span>
+          </div>
+          <div class="metric-item">
+            <span class="tui-text_body-xs muted">P&amp;L</span>
+            <span
+              class="tui-text_h5 num"
+              [class.pos]="portfolio().pnlPct > 0"
+              [class.neg]="portfolio().pnlPct < 0"
+            >
+              {{ formatPct(portfolio().pnlPct, true) }}
+            </span>
+          </div>
         </div>
 
         <div class="kv">
@@ -97,10 +103,16 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
     }
 
     .equity-row {
-      display: flex;
-      align-items: baseline;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
       gap: 0.75rem;
       margin-bottom: 0.5rem;
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
     }
 
     .kv {

@@ -32,3 +32,10 @@ export function formatBlindCandleLabel(day: number, candleInDay: number): string
   }
   return `день ${day}, свеча ${candleInDay}`;
 }
+
+export function formatBlindAxisTick(step: number, day: number): string {
+  if (day <= 0) {
+    return `п−${1 - step}`;
+  }
+  return `д${day}`;
+}
