@@ -15,5 +15,6 @@ export class App {
     { path: '/arena', title: 'Арена' },
     { path: '/workshop', title: 'Мастерская' },
     { path: '/report', title: 'Отчёт' },
+    { path: '/history', title: 'История' },
   ] as const;
 }

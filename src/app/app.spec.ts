@@ -14,13 +14,13 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  it('показывает разделы новой сессии, арены, мастерской и отчёта', () => {
+  it('показывает разделы новой сессии, арены, мастерской, отчёта и истории', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map(
       (a) => a.textContent?.trim(),
     );
-    expect(links).toEqual(['Новая сессия', 'Арена', 'Мастерская', 'Отчёт']);
+    expect(links).toEqual(['Новая сессия', 'Арена', 'Мастерская', 'Отчёт', 'История']);
   });
 
   describe('маршруты', () => {
@@ -56,6 +56,13 @@ describe('App', () => {
     it('/report без id ведёт на завершённую демо-сессию S-0103', async () => {
       const res = await open('/report');
       expect(res.path).toBe('/report/S-0103');
+    });
+
+    it('/history открывает историю сессий и прогонов', async () => {
+      expect(await open('/history')).toEqual({
+        path: '/history',
+        heading: 'История сессий и прогонов',
+      });
     });
 
     it('неизвестный путь ведёт на арену', async () => {

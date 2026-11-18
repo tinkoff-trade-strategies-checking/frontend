@@ -24,6 +24,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/report/report-page').then((m) => m.ReportPage),
   },
   {
+    path: 'history',
+    title: 'История',
+    loadComponent: () => import('./features/history/history-page').then((m) => m.HistoryPage),
+  },
+  {
     path: 'replay/:id',
     title: 'Воспроизведение',
     loadComponent: () => import('./features/replay/replay-page').then((m) => m.ReplayPage),
