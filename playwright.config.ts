@@ -8,7 +8,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   forbidOnly: IS_CI,
-  retries: IS_CI ? 1 : 0,
+  retries: 0,
   reporter: IS_CI
     ? [['github'], ['html', { open: 'never' }]]
     : [['list'], ['html', { open: 'never' }]],
@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: `npm start -- --port ${PORT}`,
     url: BASE_URL,
-    reuseExistingServer: !IS_CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

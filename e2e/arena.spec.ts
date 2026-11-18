@@ -1,14 +1,25 @@
 import { expect, Page, test } from '@playwright/test';
 
 const TICKERS_RE = /\b(SBER|GAZP|YDEX|GMKN|MGNT)\b/;
-const RU_DATE_RE = /\b\d{2}\.\d{2}\.\d{4}\b/;
+const COMPANY_NAMES_RE = /(Сбербанк|Газпром|Яндекс|Норникель|Магнит)/i;
+const SHORT_OR_FULL_DATE_RE = /\b\d{2}\.\d{2}\.\d{2,4}\b/;
 const ISO_DATE_RE = /\b\d{4}-\d{2}-\d{2}\b/;
+const RU_MONTH_DATE_RE =
+  /\b\d{1,2}\s+(января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+\d{4}\b/i;
+const TIME_OF_DAY_RE = /\b\d{1,2}:\d{2}\b/;
+
+// Синтетический ключ времени графика из src/app/features/arena/components/arena-chart.ts (toChartTime).
+function expectedChartTime(step: number): number {
+  return step + 1000;
+}
 
 interface ArenaChartState {
   readonly storeStep: number;
   readonly candlesCount: number;
   readonly maxCandleStep: number;
   readonly seriesPointsCount: number;
+  readonly lastSeriesTime: number | null;
+  readonly formattedAxisLabels: readonly string[];
 }
 
 interface NgDebugApi {
@@ -24,7 +35,19 @@ interface ArenaPageDebug {
 interface ArenaChartDebug {
   candles(): readonly { readonly step: number }[];
   candleSeries?: {
-    data(): readonly unknown[];
+    data(): readonly { readonly time: number }[];
+  };
+  chart?: {
+    timeScale(): {
+      options(): {
+        tickMarkFormatter?: (time: number, tickMarkType: number, locale: string) => string;
+      };
+    };
+    options(): {
+      localization?: {
+        timeFormatter?: (time: number) => string;
+      };
+    };
   };
 }
 
@@ -44,14 +67,41 @@ async function readArenaChartState(page: Page): Promise<ArenaChartState> {
     const candles = arenaChart.candles();
     const seriesData = arenaChart.candleSeries?.data() ?? [];
     const maxCandleStep = candles.reduce((max, c) => Math.max(max, c.step), -Infinity);
+    const lastSeriesTime = seriesData.length > 0 ? seriesData[seriesData.length - 1].time : null;
+
+    const tickFormatter = arenaChart.chart?.timeScale().options().tickMarkFormatter;
+    const tooltipFormatter = arenaChart.chart?.options().localization?.timeFormatter;
+    const formattedAxisLabels: string[] = [];
+    for (const point of seriesData) {
+      if (tickFormatter) {
+        formattedAxisLabels.push(tickFormatter(point.time, 0, 'ru-RU'));
+      }
+      if (tooltipFormatter) {
+        formattedAxisLabels.push(tooltipFormatter(point.time));
+      }
+    }
 
     return {
       storeStep: arenaPage.store.step(),
       candlesCount: candles.length,
       maxCandleStep,
       seriesPointsCount: seriesData.length,
+      lastSeriesTime,
+      formattedAxisLabels,
     };
   });
+}
+
+function assertTextHasNoBlindLeaks(text: string, forbidRub: boolean): void {
+  expect(text).not.toMatch(TICKERS_RE);
+  expect(text).not.toMatch(COMPANY_NAMES_RE);
+  expect(text).not.toMatch(SHORT_OR_FULL_DATE_RE);
+  expect(text).not.toMatch(ISO_DATE_RE);
+  expect(text).not.toMatch(RU_MONTH_DATE_RE);
+  expect(text).not.toMatch(TIME_OF_DAY_RE);
+  if (forbidRub) {
+    expect(text).not.toContain('₽');
+  }
 }
 
 async function assertNoBlindLeaks(
@@ -60,15 +110,10 @@ async function assertNoBlindLeaks(
 ): Promise<void> {
   let text = await page.evaluate(() => document.body.innerText);
   if (options.ignoreSessionCreatedTitle) {
-    // Заголовок активной сессии содержит дату запуска самой сессии, а не исторического периода.
+    // invariants.md (INV-7): в заголовке допустима дата создания самой сессии, исторический период запрещён.
     text = text.replace(/Слепая сессия от \d{2}\.\d{2}\.\d{4}/g, 'Слепая сессия');
   }
-  expect(text).not.toMatch(TICKERS_RE);
-  expect(text).not.toMatch(RU_DATE_RE);
-  expect(text).not.toMatch(ISO_DATE_RE);
-  if (options.forbidRub) {
-    expect(text).not.toContain('₽');
-  }
+  assertTextHasNoBlindLeaks(text, options.forbidRub);
 }
 
 test('запуск слепой сессии на «Новая сессия» → «Запустить» → арена', async ({ page }) => {
@@ -117,17 +162,19 @@ test('рыночная заявка → после следующей свечи
   const ordersPanel = page.locator('app-arena-orders-panel');
   const activeTab = ordersPanel.locator('button', { hasText: 'Активные заявки' });
   const fillsTab = ordersPanel.locator('button', { hasText: 'Сделки' });
+  const activeBadge = activeTab.locator('.tab-badge');
+  const fillsBadge = fillsTab.locator('.tab-badge');
 
-  await expect(activeTab).toContainText('0');
-  await expect(fillsTab).toContainText('0');
+  await expect(activeBadge).toHaveText('0');
+  await expect(fillsBadge).toHaveText('0');
 
   await page.getByRole('button', { name: 'Выставить заявку' }).click();
-  await expect(activeTab).toContainText('1');
+  await expect(activeBadge).toHaveText('1');
 
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
 
-  await expect(activeTab).toContainText('0');
-  await expect(fillsTab).toContainText('1');
+  await expect(activeBadge).toHaveText('0');
+  await expect(fillsBadge).toHaveText('1');
 
   await fillsTab.click();
   await expect(ordersPanel.locator('tbody tr')).toHaveCount(1);
@@ -139,17 +186,29 @@ test('рыночная заявка → после следующей свечи
   await expect(portfolio.locator('tbody tr').first()).toContainText('5 лот.');
 });
 
-test('INV-7: в DOM экрана запуска (слепой режим) и арены нет тикеров, дат и «₽»', async ({
+test('INV-7: в DOM экрана запуска (слепой режим), арены и оси графика нет тикеров, названий, дат и «₽»', async ({
   page,
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  // Ждём загрузки опций формы запуска перед проверкой DOM.
+  await expect(page.getByText('Случайная закрытая дата').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
+  // На /new символ «₽» разрешён (пользователь выбирает начальный капитал сессии).
   await assertNoBlindLeaks(page, { forbidRub: false });
 
   await page.getByRole('button', { name: 'Запустить' }).click();
   await expect(page).toHaveURL(/\/arena$/);
   await expect(page.getByText('Слепая сессия')).toBeVisible();
+  // Ждём загрузки снимка арены перед проверкой DOM.
+  await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
   await assertNoBlindLeaks(page, { forbidRub: true });
+
+  const chartAtStart = await readArenaChartState(page);
+  expect(chartAtStart.formattedAxisLabels.length).toBeGreaterThan(0);
+  for (const label of chartAtStart.formattedAxisLabels) {
+    assertTextHasNoBlindLeaks(label, true);
+  }
 
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
   await expect(page.locator('.day-counter')).toHaveText('День 2 из 60');
@@ -175,7 +234,9 @@ test('отчёт /report/S-0103 раскрывает период и тикер�
   await expect(page.getByText('YDEX', { exact: true })).toBeVisible();
 });
 
-test('INV-1: график не содержит свечей дальше текущего шага', async ({ page }) => {
+test('INV-1: график не содержит свечей дальше текущего шага (включая переключение бумаги)', async ({
+  page,
+}) => {
   await page.goto('/arena');
   await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
 
@@ -183,6 +244,7 @@ test('INV-1: график не содержит свечей дальше тек
   expect(initial.storeStep).toBe(0);
   expect(initial.maxCandleStep).toBe(initial.storeStep);
   expect(initial.seriesPointsCount).toBe(initial.candlesCount);
+  expect(initial.lastSeriesTime).toBe(expectedChartTime(initial.storeStep));
 
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
@@ -193,6 +255,14 @@ test('INV-1: график не содержит свечей дальше тек
   expect(stepped.maxCandleStep).toBe(stepped.storeStep);
   expect(stepped.candlesCount).toBe(initial.candlesCount + 2);
   expect(stepped.seriesPointsCount).toBe(stepped.candlesCount);
+  expect(stepped.lastSeriesTime).toBe(expectedChartTime(stepped.storeStep));
+
+  await page.getByRole('tab', { name: /Бумага B/ }).click();
+  const switched = await readArenaChartState(page);
+  expect(switched.storeStep).toBe(2);
+  expect(switched.maxCandleStep).toBe(switched.storeStep);
+  expect(switched.seriesPointsCount).toBe(switched.candlesCount);
+  expect(switched.lastSeriesTime).toBe(expectedChartTime(switched.storeStep));
 });
 
 test.fixme('INV-8: восстановление состояния арены после F5 — заглушка живёт в памяти, требуется API (frontend#8)', async ({
