@@ -27,6 +27,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
 - `src/app/app.ts`, `app.html` — оболочка: `tui-root`, навигация, `router-outlet`.
 - `src/app/app.routes.ts` — ленивые маршруты разделов.
 - `src/app/features/<раздел>/` — фичи: `arena`, `workshop`, `report`. Всё, что относится к разделу, — в его папке.
+  - `features/arena/` — экран арены: `arena-page.*` (композиция и подтверждение завершения), `arena.store.ts` (Signals-состояние и таймер плеера), `arena.format.ts` (форматирование слепого режима), `data/` (`ArenaApi`, `StubArenaApi`, модели), `components/` (`arena-player`, `arena-chart` над `lightweight-charts`, `arena-order-ticket`, `arena-orders-panel`, `arena-portfolio-panel`).
 - `src/app/shared/` — общие компоненты и утилиты, когда понадобятся двум и более фичам.
 - `src/app/api/` — TS-клиент API, генерирует `ng-openapi-gen` из `api/openapi.yaml` при сборке; **не коммитится, не правится руками**.
 - `api/openapi.yaml` — копия контракта из `backend`, обновляется только `npm run api:sync`.
