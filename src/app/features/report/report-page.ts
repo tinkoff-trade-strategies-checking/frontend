@@ -67,7 +67,7 @@ export class ReportPage implements OnInit {
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const id = params.get('id') ?? 'S-0104';
+      const id = params.get('id') ?? 'S-0103';
       void this.store.load(id);
     });
   }

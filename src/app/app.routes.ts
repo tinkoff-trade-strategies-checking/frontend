@@ -17,7 +17,7 @@ export const routes: Routes = [
     title: 'Мастерская',
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
-  { path: 'report', pathMatch: 'full', redirectTo: 'report/S-0104' },
+  { path: 'report', pathMatch: 'full', redirectTo: 'report/S-0103' },
   {
     path: 'report/:id',
     title: 'Отчёт',

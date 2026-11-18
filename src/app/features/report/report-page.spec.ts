@@ -39,7 +39,7 @@ describe('ReportPage', () => {
 
   beforeEach(async () => {
     stubApi = new StubReportApi();
-    paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'S-0104' }));
+    paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'S-0103' }));
 
     await TestBed.configureTestingModule({
       imports: [ReportPage],
@@ -63,9 +63,9 @@ describe('ReportPage', () => {
   });
 
   it('INV-6: отображает метрики и сравнение «кто лучше и на сколько» из источника без пересчёта', async () => {
-    const base = await stubApi.getReport('S-0104');
+    const base = await stubApi.getReport('S-0103');
     if (base.status !== 'READY') {
-      throw new Error('Ожидался готовый отчёт S-0104');
+      throw new Error('Ожидался готовый отчёт S-0103');
     }
 
     const sentinel: SessionReportResult = {
@@ -114,8 +114,8 @@ describe('ReportPage', () => {
     expect(csvBtn?.disabled).toBe(true);
   });
 
-  it('INV-7: отчёт незавершённой слепой сессии не открывается и не раскрывает период и тикеры', async () => {
-    paramMap$.next(convertToParamMap({ id: 'S-BLIND-ACTIVE' }));
+  it('INV-7: отчёт незавершённой слепой сессии S-0104 не открывается и не раскрывает период и тикеры', async () => {
+    paramMap$.next(convertToParamMap({ id: 'S-0104' }));
 
     const fixture = TestBed.createComponent(ReportPage);
     fixture.detectChanges();

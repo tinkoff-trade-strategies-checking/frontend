@@ -1,9 +1,9 @@
 import { StubReportApi } from './stub-report.api';
 
 describe('StubReportApi', () => {
-  it('INV-7: отчёт незавершённой слепой сессии не раскрывает период, тикеры и названия бумаг', async () => {
+  it('INV-7: отчёт незавершённой слепой сессии S-0104 не раскрывает период, тикеры и названия бумаг', async () => {
     const api = new StubReportApi();
-    const res = await api.getReport('S-BLIND-ACTIVE');
+    const res = await api.getReport('S-0104');
 
     expect(res.status).toBe('BLIND_UNFINISHED');
     const serialized = JSON.stringify(res);
@@ -23,9 +23,9 @@ describe('StubReportApi', () => {
     }
   });
 
-  it('возвращает готовый отчёт для завершённой сессии S-0104 и NOT_FOUND для неизвестной', async () => {
+  it('возвращает готовый отчёт для завершённой сессии S-0103 и NOT_FOUND для неизвестной', async () => {
     const api = new StubReportApi();
-    const ready = await api.getReport('S-0104');
+    const ready = await api.getReport('S-0103');
     expect(ready.status).toBe('READY');
     if (ready.status === 'READY') {
       expect(ready.report.papers.length).toBe(3);

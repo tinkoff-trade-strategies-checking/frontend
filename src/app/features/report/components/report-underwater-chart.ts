@@ -97,6 +97,8 @@ export class ReportUnderwaterChart {
       },
       localization: {
         timeFormatter: (time: Time) => this.labelByTime.get(Number(time)) ?? '',
+        priceFormatter: (price: number) =>
+          `${price.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} %`,
       },
     });
 

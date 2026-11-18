@@ -49,8 +49,13 @@ describe('App', () => {
     });
 
     it('/report/:id открывает отчёт по маршруту', async () => {
-      const res = await open('/report/S-0104');
-      expect(res.path).toBe('/report/S-0104');
+      const res = await open('/report/S-0103');
+      expect(res.path).toBe('/report/S-0103');
+    });
+
+    it('/report без id ведёт на завершённую демо-сессию S-0103', async () => {
+      const res = await open('/report');
+      expect(res.path).toBe('/report/S-0103');
     });
 
     it('неизвестный путь ведёт на арену', async () => {

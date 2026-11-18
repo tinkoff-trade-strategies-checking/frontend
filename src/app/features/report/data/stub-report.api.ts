@@ -75,10 +75,10 @@ function buildEquityAndUnderwater(
   return { equityCurve, underwaterCurve };
 }
 
-const REPORT_S0104_CURVES = buildEquityAndUnderwater(60, 1_000_000, 1_064_250, 1_091_800, 3.15);
+const REPORT_S0103_CURVES = buildEquityAndUnderwater(60, 1_000_000, 1_064_250, 1_091_800, 3.15);
 
-const REPORT_S0104: SessionReport = {
-  sessionId: 'S-0104',
+const REPORT_S0103: SessionReport = {
+  sessionId: 'S-0103',
   blind: true,
   finishedEarly: false,
   playedDays: 60,
@@ -203,8 +203,8 @@ const REPORT_S0104: SessionReport = {
       diffLabel: 'У алгоритма просадка меньше на 3,15 п.п.',
     },
   },
-  equityCurve: REPORT_S0104_CURVES.equityCurve,
-  underwaterCurve: REPORT_S0104_CURVES.underwaterCurve,
+  equityCurve: REPORT_S0103_CURVES.equityCurve,
+  underwaterCurve: REPORT_S0103_CURVES.underwaterCurve,
   divergences: [
     {
       id: 'DIV-1',
@@ -302,7 +302,7 @@ const REPORT_S0104: SessionReport = {
 const REPORT_S0105_CURVES = buildEquityAndUnderwater(28, 500_000, 524_100, 515_400, 2.4);
 
 const REPORT_S0105: SessionReport = {
-  ...REPORT_S0104,
+  ...REPORT_S0103,
   sessionId: 'S-0105',
   blind: false,
   finishedEarly: true,
@@ -310,7 +310,7 @@ const REPORT_S0105: SessionReport = {
   totalDays: 60,
   regime: 'medium',
   humanMetrics: {
-    ...REPORT_S0104.humanMetrics,
+    ...REPORT_S0103.humanMetrics,
     initialCapitalRub: 500_000,
     finalCapitalRub: 524_100,
     totalReturnPct: 4.82,
@@ -320,7 +320,7 @@ const REPORT_S0105: SessionReport = {
     benchmarkImoexPct: 2.4,
   },
   algoMetrics: {
-    ...REPORT_S0104.algoMetrics,
+    ...REPORT_S0103.algoMetrics,
     initialCapitalRub: 500_000,
     finalCapitalRub: 515_400,
     totalReturnPct: 3.08,
@@ -359,11 +359,11 @@ const REPORT_S0105: SessionReport = {
 @Injectable()
 export class StubReportApi implements ReportApi {
   async getReport(sessionId: string): Promise<SessionReportResult> {
-    if (sessionId === 'S-BLIND-ACTIVE') {
-      // INV-7: незавершённая слепая сессия не раскрывает тикеры, названия и реальный период.
+    if (sessionId === 'S-0104' || sessionId === 'S-BLIND-ACTIVE') {
+      // INV-7: активная слепая сессия арены (S-0104) не раскрывает тикеры, названия и реальный период.
       return {
         status: 'BLIND_UNFINISHED',
-        sessionId: 'S-BLIND-ACTIVE',
+        sessionId,
         title: 'Слепая сессия от 18.11.2026',
         createdAt: '18.11.2026 14:20',
         playedDays: 14,
@@ -372,8 +372,8 @@ export class StubReportApi implements ReportApi {
       };
     }
 
-    if (sessionId === 'S-0104') {
-      return { status: 'READY', report: REPORT_S0104 };
+    if (sessionId === 'S-0103') {
+      return { status: 'READY', report: REPORT_S0103 };
     }
 
     if (sessionId === 'S-0105') {

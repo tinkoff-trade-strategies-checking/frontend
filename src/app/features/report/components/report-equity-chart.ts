@@ -97,6 +97,7 @@ export class ReportEquityChart {
       },
       localization: {
         timeFormatter: (time: Time) => this.labelByTime.get(Number(time)) ?? '',
+        priceFormatter: (price: number) => `${Math.round(price).toLocaleString('ru-RU')} ₽`,
       },
     });
 
