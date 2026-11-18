@@ -11,6 +11,7 @@ import { TuiButton, TuiRoot } from '@taiga-ui/core';
 })
 export class App {
   protected readonly sections = [
+    { path: '/new', title: 'Новая сессия' },
     { path: '/arena', title: 'Арена' },
     { path: '/workshop', title: 'Мастерская' },
     { path: '/report', title: 'Отчёт' },

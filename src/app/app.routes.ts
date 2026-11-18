@@ -3,6 +3,11 @@ import { Routes } from '@angular/router';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'arena' },
   {
+    path: 'new',
+    title: 'Новая сессия',
+    loadComponent: () => import('./features/launch/launch-page').then((m) => m.LaunchPage),
+  },
+  {
     path: 'arena',
     title: 'Арена',
     loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
@@ -12,8 +17,9 @@ export const routes: Routes = [
     title: 'Мастерская',
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
+  { path: 'report', pathMatch: 'full', redirectTo: 'report/S-0103' },
   {
-    path: 'report',
+    path: 'report/:id',
     title: 'Отчёт',
     loadComponent: () => import('./features/report/report-page').then((m) => m.ReportPage),
   },

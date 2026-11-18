@@ -14,13 +14,13 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  it('показывает разделы арены, мастерской и отчёта', () => {
+  it('показывает разделы новой сессии, арены, мастерской и отчёта', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map(
       (a) => a.textContent?.trim(),
     );
-    expect(links).toEqual(['Арена', 'Мастерская', 'Отчёт']);
+    expect(links).toEqual(['Новая сессия', 'Арена', 'Мастерская', 'Отчёт']);
   });
 
   describe('маршруты', () => {
@@ -42,6 +42,20 @@ describe('App', () => {
 
     it('/workshop открывает мастерскую', async () => {
       expect(await open('/workshop')).toEqual({ path: '/workshop', heading: 'Мастерская' });
+    });
+
+    it('/new открывает экран новой сессии', async () => {
+      expect(await open('/new')).toEqual({ path: '/new', heading: 'Новая сессия' });
+    });
+
+    it('/report/:id открывает отчёт по маршруту', async () => {
+      const res = await open('/report/S-0103');
+      expect(res.path).toBe('/report/S-0103');
+    });
+
+    it('/report без id ведёт на завершённую демо-сессию S-0103', async () => {
+      const res = await open('/report');
+      expect(res.path).toBe('/report/S-0103');
     });
 
     it('неизвестный путь ведёт на арену', async () => {
