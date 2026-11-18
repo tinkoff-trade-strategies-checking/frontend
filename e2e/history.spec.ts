@@ -20,7 +20,7 @@ test('навигация в историю: незавершённая слеп�
   expect(rowText).toContain('—');
   expect(rowText).not.toMatch(TICKERS_RE);
   expect(rowText).not.toContain('26.02.2020');
-  expect(rowText).not.toMatch(/[+-]\d+,\d{2}\s*%/);
+  expect(rowText).not.toMatch(/[+\-\u2212]\d+,\d{2}\s*%/);
 
   await expect(rowS0104.getByRole('link', { name: 'Продолжить' })).toHaveAttribute(
     'href',

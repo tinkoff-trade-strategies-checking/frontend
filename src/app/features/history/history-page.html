@@ -77,7 +77,7 @@
 
     @if (store.loading() && store.items().length === 0) {
       <div class="empty-state tui-text_body-m muted">Загрузка истории…</div>
-    } @else if (store.items().length === 0) {
+    } @else if (store.items().length === 0 && !store.error()) {
       <div class="empty-state">
         <span class="tui-text_body-m muted">Сессий и прогонов под выбранные фильтры нет.</span>
         <button
@@ -117,17 +117,11 @@
                         <span tuiBadge size="s" appearance="warning">Неслепая</span>
                       }
                     </div>
-                    @if (!(item.blind && item.status === 'running')) {
-                      @if (item.papers || item.periodLabel) {
-                        <div class="tui-text_body-xs muted meta-line">
-                          @if (item.papers; as papers) {
-                            <span>{{ papers.join(', ') }}</span>
-                          }
-                          @if (item.periodLabel; as periodLabel) {
-                            <span>{{ periodLabel }}</span>
-                          }
-                        </div>
-                      }
+                    @if (papersOf(item); as papers) {
+                      <div class="tui-text_body-xs muted meta-line">
+                        <span>{{ papers.join(', ') }}</span>
+                        <span>{{ periodOf(item) }}</span>
+                      </div>
                     }
                   </div>
                 </td>
@@ -149,10 +143,10 @@
                 <td>{{ regimeLabels[item.regime] }}</td>
                 <td
                   class="num"
-                  [class.pos]="item.netReturnPct !== null && item.netReturnPct > 0"
-                  [class.neg]="item.netReturnPct !== null && item.netReturnPct < 0"
+                  [class.pos]="(netReturnOf(item) ?? 0) > 0"
+                  [class.neg]="(netReturnOf(item) ?? 0) < 0"
                 >
-                  {{ formatSignedPct(item.netReturnPct) }}
+                  {{ formatSignedPct(netReturnOf(item)) }}
                 </td>
                 <td class="actions-col">
                   <div class="row-actions">

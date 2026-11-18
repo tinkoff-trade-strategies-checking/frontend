@@ -14,6 +14,9 @@ import {
   formatHistoryTitle,
   formatMoscowDateTime,
   formatSignedPct,
+  historyNetReturn,
+  historyPapers,
+  historyPeriod,
   HISTORY_KIND_LABELS,
   HISTORY_REGIME_LABELS,
   HISTORY_STATUS_LABELS,
@@ -63,6 +66,9 @@ export class HistoryPage implements OnInit {
   protected readonly formatDateTime = formatMoscowDateTime;
   protected readonly formatSignedPct = formatSignedPct;
   protected readonly formatTitle = formatHistoryTitle;
+  protected readonly papersOf = historyPapers;
+  protected readonly periodOf = historyPeriod;
+  protected readonly netReturnOf = historyNetReturn;
 
   ngOnInit(): void {
     void this.store.load();

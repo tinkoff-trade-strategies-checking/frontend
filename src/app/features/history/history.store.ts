@@ -6,6 +6,7 @@ import {
   HistoryPage as HistoryPageData,
   HistoryRegimeFilter,
   HistoryStatusFilter,
+  maskHistoryEntry,
 } from './data/history.models';
 
 @Injectable()
@@ -47,12 +48,13 @@ export class HistoryStore {
       if (seq !== this.loadSeq) {
         return;
       }
-      this.pageData.set(data);
+      this.pageData.set({ ...data, items: data.items.map(maskHistoryEntry) });
       this.page.set(data.page);
     } catch {
       if (seq !== this.loadSeq) {
         return;
       }
+      this.pageData.set(null);
       this.error.set('Не удалось загрузить историю сессий.');
     } finally {
       if (seq === this.loadSeq) {

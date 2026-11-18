@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import {
   HISTORY_DEFAULT_PAGE_SIZE,
-  HISTORY_MAX_ITEMS,
+  HISTORY_MAX_PAGE_SIZE,
   HistoryApi,
   HistoryEntry,
   HistoryPage,
@@ -35,11 +35,7 @@ const ALL_STUB_RECORDS: readonly HistoryEntry[] = [
     status: 'running',
     createdAt: '2026-11-18T14:20:00+03:00',
     regime: 'stress',
-    // INV-7: незавершённая слепая сессия не раскрывает бумаги, период и итоговую доходность.
-    title: 'Слепая сессия от 18.11.2026',
-    papers: null,
-    periodLabel: null,
-    netReturnPct: null,
+    // INV-7: у незавершённой слепой записи нет полей papers, periodLabel, title и netReturnPct.
     playedDays: 14,
     totalDays: 60,
     algoName: null,
@@ -132,10 +128,6 @@ const ALL_STUB_RECORDS: readonly HistoryEntry[] = [
     status: 'running',
     createdAt: '2026-11-17T14:10:00+03:00',
     regime: 'calm',
-    title: 'Слепой прогон от 17.11.2026',
-    papers: null,
-    periodLabel: null,
-    netReturnPct: null,
     playedDays: 22,
     totalDays: 60,
     algoName: 'Breakout ATR v3',
@@ -450,7 +442,7 @@ const ALL_STUB_RECORDS: readonly HistoryEntry[] = [
 export class StubHistoryApi implements HistoryApi {
   async list(query: HistoryQuery = {}): Promise<HistoryPage> {
     const pageSize = Math.min(
-      HISTORY_MAX_ITEMS,
+      HISTORY_MAX_PAGE_SIZE,
       Math.max(1, Math.floor(query.pageSize ?? HISTORY_DEFAULT_PAGE_SIZE)),
     );
 
@@ -473,8 +465,7 @@ export class StubHistoryApi implements HistoryApi {
       return true;
     })
       .slice()
-      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
-      .slice(0, HISTORY_MAX_ITEMS);
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 
     const total = filtered.length;
     const totalPages = Math.max(1, Math.ceil(total / pageSize));

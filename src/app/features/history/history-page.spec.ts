@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
-import { HISTORY_API, HistoryApi, HistoryPage as HistoryPageData } from './data/history.models';
+import {
+  HISTORY_API,
+  HistoryApi,
+  HistoryEntry,
+  HistoryPage as HistoryPageData,
+  HistoryQuery,
+} from './data/history.models';
 import { StubHistoryApi } from './data/stub-history.api';
 import { HistoryPage } from './history-page';
 import { HistoryStore } from './history.store';
@@ -156,5 +162,171 @@ describe('HistoryStore', () => {
 
     expect(store.items().every((item) => item.blind)).toBe(true);
     expect(store.loading()).toBe(false);
+  });
+});
+
+function emptyPage(page = 1, totalPages = 1): HistoryPageData {
+  return { items: [], total: 0, page, pageSize: 20, totalPages };
+}
+
+function storeWith(api: HistoryApi): HistoryStore {
+  TestBed.configureTestingModule({
+    providers: [{ provide: HISTORY_API, useValue: api }, HistoryStore],
+  });
+  return TestBed.inject(HistoryStore);
+}
+
+describe('HistoryStore: фильтры, ошибки, пагинация', () => {
+  it('сбрасывает страницу на первую при смене фильтра', async () => {
+    const queries: HistoryQuery[] = [];
+    const store = storeWith({
+      async list(query = {}) {
+        queries.push(query);
+        return new StubHistoryApi().list(query);
+      },
+    });
+
+    await store.load();
+    store.setPage(2);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.page()).toBe(2);
+
+    store.setRegime('calm');
+    expect(store.page()).toBe(1);
+    expect(queries[queries.length - 1]).toMatchObject({ regime: 'calm', page: 1 });
+  });
+
+  it('при ошибке источника сбрасывает данные и выставляет error', async () => {
+    let fail = false;
+    const stub = new StubHistoryApi();
+    const store = storeWith({
+      list: (query) => (fail ? Promise.reject(new Error('boom')) : stub.list(query)),
+    });
+
+    await store.load();
+    expect(store.items().length).toBeGreaterThan(0);
+
+    fail = true;
+    await store.load();
+    expect(store.error()).not.toBeNull();
+    expect(store.pageData()).toBeNull();
+    expect(store.items()).toEqual([]);
+    expect(store.loading()).toBe(false);
+  });
+
+  it('пустой результат: нет записей, одна страница, без ошибки', async () => {
+    const store = storeWith({ list: async () => emptyPage() });
+    await store.load();
+    expect(store.items()).toEqual([]);
+    expect(store.total()).toBe(0);
+    expect(store.error()).toBeNull();
+    expect(store.hasPrevPage()).toBe(false);
+    expect(store.hasNextPage()).toBe(false);
+  });
+
+  it('последняя страница: hasNextPage = false, hasPrevPage = true', async () => {
+    const stub = new StubHistoryApi();
+    const store = storeWith(stub);
+    await store.load();
+    expect(store.hasNextPage()).toBe(true);
+    store.setPage(2);
+    await vi.waitFor(() => expect(store.currentPage()).toBe(2));
+    expect(store.hasNextPage()).toBe(false);
+    expect(store.hasPrevPage()).toBe(true);
+  });
+
+  it('INV-7: «утекающая» запись маскируется в сторе', async () => {
+    const leaky = {
+      id: 'S-LEAK',
+      kind: 'session',
+      owner: 'USER',
+      blind: true,
+      status: 'running',
+      createdAt: '2026-11-18T14:20:00+03:00',
+      regime: 'stress',
+      title: 'Секретный кризис',
+      papers: ['SBER', 'GAZP'],
+      periodLabel: '26.02.2020 — 21.05.2020',
+      netReturnPct: 6.43,
+      playedDays: 14,
+      totalDays: 60,
+      algoName: null,
+    } as unknown as HistoryEntry;
+    const store = storeWith({
+      list: async () => ({ ...emptyPage(), items: [leaky], total: 1 }),
+    });
+    await store.load();
+    const [item] = store.items();
+    expect(item).not.toHaveProperty('title');
+    expect(item).not.toHaveProperty('papers');
+    expect(item).not.toHaveProperty('periodLabel');
+    expect(item).not.toHaveProperty('netReturnPct');
+  });
+});
+
+describe('HistoryPage: ошибка и утечки', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [HistoryPage],
+      providers: [provideRouter([]), provideTaiga()],
+    }).compileComponents();
+  });
+
+  it('INV-7: «утекающая» запись не попадает на страницу', async () => {
+    const leaky = {
+      id: 'S-LEAK',
+      kind: 'session',
+      owner: 'USER',
+      blind: true,
+      status: 'running',
+      createdAt: '2026-11-18T14:20:00+03:00',
+      regime: 'stress',
+      title: 'Секретный кризис',
+      papers: ['SBER', 'GAZP'],
+      periodLabel: '26.02.2020 — 21.05.2020',
+      netReturnPct: 6.43,
+      playedDays: 14,
+      totalDays: 60,
+      algoName: null,
+    } as unknown as HistoryEntry;
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          {
+            provide: HISTORY_API,
+            useValue: { list: async () => ({ ...emptyPage(), items: [leaky], total: 1 }) },
+          },
+          HistoryStore,
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).querySelector('tbody')?.textContent ?? '';
+    expect(text).toContain('Слепая сессия от 18.11.2026');
+    expect(text).not.toMatch(/SBER|GAZP|2020|Секретный|6,43/);
+  });
+
+  it('при ошибке показывает баннер, но не «под фильтры ничего нет»', async () => {
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          { provide: HISTORY_API, useValue: { list: () => Promise.reject(new Error('x')) } },
+          HistoryStore,
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Не удалось загрузить историю сессий.');
+    expect(text).not.toContain('под выбранные фильтры нет');
   });
 });

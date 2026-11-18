@@ -3,6 +3,7 @@ import {
   HistoryItemKind,
   HistoryItemStatus,
   HistoryRegime,
+  isBlindUnfinished,
 } from './data/history.models';
 
 export const HISTORY_KIND_LABELS: Readonly<Record<HistoryItemKind, string>> = {
@@ -65,8 +66,21 @@ export function formatSignedPct(value: number | null): string {
 }
 
 export function formatHistoryTitle(entry: HistoryEntry): string {
-  if (entry.blind && entry.status === 'running') {
-    return entry.title ?? `Слепая сессия от ${formatMoscowDate(entry.createdAt)}`;
+  if (isBlindUnfinished(entry)) {
+    const prefix = entry.kind === 'session' ? 'Слепая сессия' : 'Слепой прогон';
+    return `${prefix} от ${formatMoscowDate(entry.createdAt)}`;
   }
-  return entry.title ?? entry.algoName ?? entry.id;
+  return entry.title;
+}
+
+export function historyPapers(entry: HistoryEntry): readonly string[] | null {
+  return isBlindUnfinished(entry) ? null : entry.papers;
+}
+
+export function historyPeriod(entry: HistoryEntry): string | null {
+  return isBlindUnfinished(entry) ? null : entry.periodLabel;
+}
+
+export function historyNetReturn(entry: HistoryEntry): number | null {
+  return isBlindUnfinished(entry) ? null : entry.netReturnPct;
 }
