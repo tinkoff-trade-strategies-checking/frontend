@@ -47,7 +47,7 @@ export function formatLaunchRejection(
       const fieldLabel = options?.field ? (FIELD_LABELS[options.field] ?? options.field) : '';
       return {
         title: fieldLabel ? `Проверьте параметр: ${fieldLabel}` : 'Некорректные параметры запуска',
-        suggestion: 'Исправьте выделенные настройки и попробуйте запустить снова.',
+        suggestion: 'Исправьте настройки и попробуйте запустить снова.',
       };
     }
   }

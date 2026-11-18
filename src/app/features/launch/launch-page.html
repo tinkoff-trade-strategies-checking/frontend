@@ -12,8 +12,8 @@
   @if (store.error()) {
     <div tuiNotification appearance="negative" size="s" class="error-row">
       <span>{{ store.error() }}</span>
-      @if (!store.options()) {
-        <button tuiButton type="button" size="xs" appearance="outline" (click)="store.init()">
+      @if (!store.options() || (!store.isBlind() && store.customPapers().length === 0)) {
+        <button tuiButton type="button" size="xs" appearance="outline" (click)="store.retry()">
           Повторить
         </button>
       }

@@ -51,6 +51,7 @@ describe('StubReportApi', () => {
       expect(early.report.finishedEarly).toBe(true);
       expect(early.report.playedDays).toBe(28);
       expect(early.report.fills.every((f) => f.day <= 28)).toBe(true);
+      expect(early.report.divergences.some((d) => d.paperTicker === 'YDEX')).toBe(false);
     }
 
     const building = await api.getReport('S-BUILDING');
@@ -58,5 +59,44 @@ describe('StubReportApi', () => {
 
     const missing = await api.getReport('S-UNKNOWN');
     expect(missing).toEqual({ status: 'NOT_FOUND', sessionId: 'S-UNKNOWN' });
+  });
+
+  it('maxDrawdownPct и длительность просадки согласованы с кривой equityCurve', async () => {
+    const api = new StubReportApi();
+
+    const calcFromCurve = (series: readonly number[]) => {
+      let peak = series[0];
+      let maxDd = 0;
+      let streak = 0;
+      let maxStreak = 0;
+      for (const val of series) {
+        if (val >= peak) {
+          peak = val;
+          streak = 0;
+        } else {
+          streak += 1;
+          maxStreak = Math.max(maxStreak, streak);
+          maxDd = Math.max(maxDd, ((peak - val) / peak) * 100);
+        }
+      }
+      return { dd: Math.round(maxDd * 100) / 100, steps: maxStreak };
+    };
+
+    for (const id of ['S-0103', 'S-0105']) {
+      const res = await api.getReport(id);
+      expect(res.status).toBe('READY');
+      if (res.status === 'READY') {
+        const rep = res.report;
+        const humanCalc = calcFromCurve(rep.equityCurve.map((p) => p.humanCapitalRub));
+        const algoCalc = calcFromCurve(rep.equityCurve.map((p) => p.algoCapitalRub));
+
+        expect(rep.humanMetrics.maxDrawdownPct).toBe(humanCalc.dd);
+        expect(rep.humanMetrics.maxDrawdownDurationSteps).toBe(humanCalc.steps);
+        expect(rep.algoMetrics.maxDrawdownPct).toBe(algoCalc.dd);
+        expect(rep.algoMetrics.maxDrawdownDurationSteps).toBe(algoCalc.steps);
+        expect(rep.comparison.maxDrawdown.humanPct).toBe(humanCalc.dd);
+        expect(rep.comparison.maxDrawdown.algoPct).toBe(algoCalc.dd);
+      }
+    }
   });
 });

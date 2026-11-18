@@ -7,13 +7,90 @@ import {
   UnderwaterPoint,
 } from './report.models';
 
+interface DrawdownStats {
+  readonly maxDrawdownPct: number;
+  readonly durationSteps: number;
+}
+
+function computeDrawdownFromSeries(values: readonly number[]): DrawdownStats {
+  if (values.length === 0) {
+    return { maxDrawdownPct: 0, durationSteps: 0 };
+  }
+  let peak = values[0];
+  let maxDd = 0;
+  let currentStreak = 0;
+  let maxStreak = 0;
+
+  for (const val of values) {
+    if (val >= peak) {
+      peak = val;
+      currentStreak = 0;
+    } else {
+      currentStreak += 1;
+      maxStreak = Math.max(maxStreak, currentStreak);
+      const dd = ((peak - val) / peak) * 100;
+      if (dd > maxDd) {
+        maxDd = dd;
+      }
+    }
+  }
+
+  return {
+    maxDrawdownPct: Math.round(maxDd * 100) / 100,
+    durationSteps: maxStreak,
+  };
+}
+
+function buildMaxDrawdownComparison(
+  humanPct: number,
+  algoPct: number,
+): SessionReport['comparison']['maxDrawdown'] {
+  const diffPctPoints = Math.round(Math.abs(humanPct - algoPct) * 100) / 100;
+  const formatted = diffPctPoints.toLocaleString('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  if (humanPct < algoPct) {
+    return {
+      humanPct,
+      algoPct,
+      winner: 'human',
+      diffPctPoints,
+      diffLabel: `У вас просадка меньше на ${formatted} п.п.`,
+    };
+  }
+  if (algoPct < humanPct) {
+    return {
+      humanPct,
+      algoPct,
+      winner: 'algo',
+      diffPctPoints,
+      diffLabel: `У алгоритма просадка меньше на ${formatted} п.п.`,
+    };
+  }
+  return {
+    humanPct,
+    algoPct,
+    winner: 'tie',
+    diffPctPoints: 0,
+    diffLabel: 'Просадки равны',
+  };
+}
+
 function buildEquityAndUnderwater(
   days: number,
   initialRub: number,
   humanFinalRub: number,
   algoFinalRub: number,
   benchPct: number,
-): { equityCurve: EquityCurvePoint[]; underwaterCurve: UnderwaterPoint[] } {
+  humanAmp = 28_000,
+  algoAmp = 21_000,
+): {
+  equityCurve: EquityCurvePoint[];
+  underwaterCurve: UnderwaterPoint[];
+  humanDrawdown: DrawdownStats;
+  algoDrawdown: DrawdownStats;
+} {
   const equityCurve: EquityCurvePoint[] = [];
   const underwaterCurve: UnderwaterPoint[] = [];
   const start = new Date(Date.UTC(2020, 1, 26));
@@ -28,8 +105,8 @@ function buildEquityAndUnderwater(
     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dateLabel = `${dd}.${mm}`;
 
-    const humanWave = Math.sin(i * 0.27) * 28_000 - Math.sin(i * 0.11) * 18_000;
-    const algoWave = Math.sin(i * 0.21 + 0.8) * 21_000 - Math.cos(i * 0.09) * 14_000;
+    const humanWave = Math.sin(i * 0.27) * humanAmp - Math.sin(i * 0.11) * (humanAmp * 0.64);
+    const algoWave = Math.sin(i * 0.21 + 0.8) * algoAmp - Math.cos(i * 0.09) * (algoAmp * 0.67);
     const benchWave = Math.sin(i * 0.18 + 0.3) * 24_000;
 
     const humanCapitalRub =
@@ -72,10 +149,23 @@ function buildEquityAndUnderwater(
     });
   }
 
-  return { equityCurve, underwaterCurve };
+  return {
+    equityCurve,
+    underwaterCurve,
+    humanDrawdown: computeDrawdownFromSeries(equityCurve.map((p) => p.humanCapitalRub)),
+    algoDrawdown: computeDrawdownFromSeries(equityCurve.map((p) => p.algoCapitalRub)),
+  };
 }
 
-const REPORT_S0103_CURVES = buildEquityAndUnderwater(60, 1_000_000, 1_064_250, 1_091_800, 3.15);
+const REPORT_S0103_CURVES = buildEquityAndUnderwater(
+  60,
+  1_000_000,
+  1_064_250,
+  1_091_800,
+  3.15,
+  55_000,
+  21_000,
+);
 
 const REPORT_S0103: SessionReport = {
   sessionId: 'S-0103',
@@ -130,9 +220,9 @@ const REPORT_S0103: SessionReport = {
     // decisions.md: gross = total + (комиссия + сбор) / E_0 = 6.425 + (4920 + 164) / 1_000_000 = 6.93 %.
     grossReturnPct: 6.93,
     netReturnPct: 6.43,
-    maxDrawdownPct: 11.4,
-    maxDrawdownDurationDays: 18,
-    maxDrawdownDurationSteps: 18,
+    maxDrawdownPct: REPORT_S0103_CURVES.humanDrawdown.maxDrawdownPct,
+    maxDrawdownDurationDays: REPORT_S0103_CURVES.humanDrawdown.durationSteps,
+    maxDrawdownDurationSteps: REPORT_S0103_CURVES.humanDrawdown.durationSteps,
     volatilityPct: 22.15,
     sharpe: 1.12,
     sortino: 1.54,
@@ -161,9 +251,9 @@ const REPORT_S0103: SessionReport = {
     // decisions.md: gross = total + (комиссия + сбор) / E_0 = 9.18 + (4180 + 139) / 1_000_000 = 9.61 %.
     grossReturnPct: 9.61,
     netReturnPct: 9.18,
-    maxDrawdownPct: 8.25,
-    maxDrawdownDurationDays: 12,
-    maxDrawdownDurationSteps: 12,
+    maxDrawdownPct: REPORT_S0103_CURVES.algoDrawdown.maxDrawdownPct,
+    maxDrawdownDurationDays: REPORT_S0103_CURVES.algoDrawdown.durationSteps,
+    maxDrawdownDurationSteps: REPORT_S0103_CURVES.algoDrawdown.durationSteps,
     volatilityPct: 18.4,
     sharpe: 1.61,
     sortino: 2.18,
@@ -199,13 +289,10 @@ const REPORT_S0103: SessionReport = {
       diffPctPoints: 2.75,
       diffLabel: 'Алгоритм лучше на 2,75 п.п.',
     },
-    maxDrawdown: {
-      humanPct: 11.4,
-      algoPct: 8.25,
-      winner: 'algo',
-      diffPctPoints: 3.15,
-      diffLabel: 'У алгоритма просадка меньше на 3,15 п.п.',
-    },
+    maxDrawdown: buildMaxDrawdownComparison(
+      REPORT_S0103_CURVES.humanDrawdown.maxDrawdownPct,
+      REPORT_S0103_CURVES.algoDrawdown.maxDrawdownPct,
+    ),
   },
   equityCurve: REPORT_S0103_CURVES.equityCurve,
   underwaterCurve: REPORT_S0103_CURVES.underwaterCurve,
@@ -306,7 +393,15 @@ const REPORT_S0103: SessionReport = {
   ],
 };
 
-const REPORT_S0105_CURVES = buildEquityAndUnderwater(28, 500_000, 524_100, 515_400, 2.4);
+const REPORT_S0105_CURVES = buildEquityAndUnderwater(
+  28,
+  500_000,
+  524_100,
+  515_400,
+  2.4,
+  12_000,
+  24_000,
+);
 
 const REPORT_S0105: SessionReport = {
   sessionId: 'S-0105',
@@ -324,7 +419,7 @@ const REPORT_S0105: SessionReport = {
     endDate: '03.04.2020',
     label: 'Март 2020: острая фаза (досрочно)',
   },
-  papers: REPORT_S0103.papers,
+  papers: REPORT_S0103.papers.slice(0, 2),
   humanMetrics: {
     initialCapitalRub: 500_000,
     finalCapitalRub: 524_100,
@@ -332,15 +427,15 @@ const REPORT_S0105: SessionReport = {
     cagrPct: 52.8,
     grossReturnPct: 5.15,
     netReturnPct: 4.82,
-    maxDrawdownPct: 4.15,
-    maxDrawdownDurationDays: 7,
-    maxDrawdownDurationSteps: 7,
+    maxDrawdownPct: REPORT_S0105_CURVES.humanDrawdown.maxDrawdownPct,
+    maxDrawdownDurationDays: REPORT_S0105_CURVES.humanDrawdown.durationSteps,
+    maxDrawdownDurationSteps: REPORT_S0105_CURVES.humanDrawdown.durationSteps,
     volatilityPct: 19.2,
     sharpe: 1.48,
     sortino: 2.05,
     turnover: 1.12,
     tradesCount: 3,
-    winRatePct: 66.67,
+    winRatePct: 100.0,
     rejectedOrdersCount: 0,
     partialFillsCount: 0,
     hhi: 0.45,
@@ -362,15 +457,15 @@ const REPORT_S0105: SessionReport = {
     cagrPct: 31.4,
     grossReturnPct: 3.36,
     netReturnPct: 3.08,
-    maxDrawdownPct: 5.6,
-    maxDrawdownDurationDays: 10,
-    maxDrawdownDurationSteps: 10,
+    maxDrawdownPct: REPORT_S0105_CURVES.algoDrawdown.maxDrawdownPct,
+    maxDrawdownDurationDays: REPORT_S0105_CURVES.algoDrawdown.durationSteps,
+    maxDrawdownDurationSteps: REPORT_S0105_CURVES.algoDrawdown.durationSteps,
     volatilityPct: 20.1,
     sharpe: 0.98,
     sortino: 1.32,
     turnover: 0.94,
     tradesCount: 3,
-    winRatePct: 66.67,
+    winRatePct: 100.0,
     rejectedOrdersCount: 0,
     partialFillsCount: 0,
     hhi: 0.39,
@@ -400,17 +495,41 @@ const REPORT_S0105: SessionReport = {
       diffPctPoints: 1.74,
       diffLabel: 'Вы лучше на 1,74 п.п.',
     },
-    maxDrawdown: {
-      humanPct: 4.15,
-      algoPct: 5.6,
-      winner: 'human',
-      diffPctPoints: 1.45,
-      diffLabel: 'У вас просадка меньше на 1,45 п.п.',
-    },
+    maxDrawdown: buildMaxDrawdownComparison(
+      REPORT_S0105_CURVES.humanDrawdown.maxDrawdownPct,
+      REPORT_S0105_CURVES.algoDrawdown.maxDrawdownPct,
+    ),
   },
   equityCurve: REPORT_S0105_CURVES.equityCurve,
   underwaterCurve: REPORT_S0105_CURVES.underwaterCurve,
-  divergences: REPORT_S0103.divergences.filter((d) => d.day <= 28),
+  divergences: [
+    {
+      id: 'DIV-105-1',
+      day: 8,
+      dateLabel: '06.03',
+      paperTicker: 'SBER',
+      sector: 'Финансы',
+      type: 'extra',
+      humanAction: 'Покупка 40 лот. по рынку',
+      algoAction: 'Нет заявки',
+      errorCostRub: 3_100,
+      errorCostPct: 0.62,
+      because: 'тренд вниз: цена ниже SMA(20)',
+    },
+    {
+      id: 'DIV-105-2',
+      day: 14,
+      dateLabel: '16.03',
+      paperTicker: 'GAZP',
+      sector: 'Нефть и газ',
+      type: 'size',
+      humanAction: 'Покупка 50 лот. лимитной заявкой',
+      algoAction: 'Покупка 25 лот. лимитной заявкой',
+      errorCostRub: -1_450,
+      errorCostPct: -0.29,
+      because: 'ограничение риска на сектор 20 %',
+    },
+  ],
   fills: [
     {
       id: 'F-105-1',

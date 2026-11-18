@@ -98,6 +98,16 @@ export class LaunchStore {
     }
   }
 
+  async retry(): Promise<void> {
+    if (!this.options()) {
+      await this.init();
+      return;
+    }
+    if (!this.isBlind() && this.customPapers().length === 0) {
+      await this.setStartMode('custom');
+    }
+  }
+
   setDuration(days: SessionDurationDays): void {
     this.durationDays.set(days);
     this.rejection.set(null);
