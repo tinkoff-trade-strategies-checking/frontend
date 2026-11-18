@@ -12,6 +12,8 @@ import {
   WorkshopSortField,
 } from './workshop.models';
 
+// Коды предупреждений линтера (MAGIC_CONST, UNUSED_PARAM, LOOKAHEAD_GUARD) —
+// коды условные до решения по DSL (documentation#34).
 const STUB_ALGORITHMS: readonly WorkshopAlgorithmDetail[] = [
   {
     id: 'A-0001',

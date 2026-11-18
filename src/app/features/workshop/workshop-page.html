@@ -62,30 +62,33 @@
           </tui-segmented>
         </div>
 
-        <div class="filter-group">
-          <label class="tui-text_body-xs muted" for="workshop-author-filter">Автор</label>
-          <select
-            id="workshop-author-filter"
-            class="author-select"
-            [ngModel]="store.author()"
-            (ngModelChange)="store.setAuthor($event)"
+        <div class="filter-group author-group">
+          <tui-textfield
+            tuiTextfieldSize="s"
+            [tuiTextfieldCleaner]="false"
+            [stringify]="authorStringify"
           >
-            <option value="all">Все авторы</option>
-            @for (authorName of store.authors(); track authorName) {
-              <option [value]="authorName">{{ authorName }}</option>
-            }
-          </select>
+            <label tuiLabel for="workshop-author-filter">Автор</label>
+            <select
+              id="workshop-author-filter"
+              tuiSelect
+              [items]="authorOptions()"
+              [ngModel]="store.author()"
+              (ngModelChange)="store.setAuthor($event)"
+            ></select>
+          </tui-textfield>
         </div>
 
         <div class="filter-group search-group">
-          <tui-textfield tuiTextfieldSize="s" class="search-field">
-            <label tuiLabel for="workshop-search">Поиск по названию и описанию</label>
+          <tui-textfield tuiTextfieldSize="s" [tuiTextfieldCleaner]="true" class="search-field">
             <input
               id="workshop-search"
-              tuiTextfield
-              type="search"
+              tuiInput
+              type="text"
+              aria-label="Поиск по названию и описанию"
+              placeholder="Поиск по названию и описанию"
               [ngModel]="store.search()"
-              (ngModelChange)="store.setSearch($event)"
+              (ngModelChange)="store.setSearch($event ?? '')"
             />
           </tui-textfield>
         </div>
@@ -336,6 +339,9 @@
               @if (algo.linterWarnings.length === 0) {
                 <p class="tui-text_body-s muted">Предупреждений линтера нет.</p>
               } @else {
+                <p class="tui-text_body-xs muted">
+                  Коды предупреждений приведены как пример до решения по DSL.
+                </p>
                 <ul class="warnings-list">
                   @for (warn of algo.linterWarnings; track warn.code + '-' + warn.line) {
                     <li class="warning-item">

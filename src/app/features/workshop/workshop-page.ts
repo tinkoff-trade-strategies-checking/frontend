@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
 import {
@@ -19,7 +19,16 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
 
 @Component({
   selector: 'app-workshop-page',
-  imports: [FormsModule, TuiButton, TuiBadge, TuiNotification, TuiSegmented, TuiTextfield],
+  imports: [
+    FormsModule,
+    TuiButton,
+    TuiBadge,
+    TuiInput,
+    TuiNotification,
+    TuiSegmented,
+    TuiSelect,
+    TuiTextfield,
+  ],
   providers: [{ provide: WORKSHOP_API, useClass: StubWorkshopApi }, WorkshopStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workshop-page.html',
@@ -31,6 +40,9 @@ export class WorkshopPage implements OnInit {
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
   protected readonly dslPendingHint = 'Доступно после решения по DSL';
+  protected readonly authorOptions = computed(() => ['all', ...this.store.authors()]);
+  protected readonly authorStringify = (value: string): string =>
+    value === 'all' ? 'Все авторы' : value;
 
   protected readonly formatDateTime = formatWorkshopDateTime;
   protected readonly formatLinter = formatLinterSummary;
