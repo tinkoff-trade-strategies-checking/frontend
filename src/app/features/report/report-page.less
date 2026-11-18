@@ -129,10 +129,27 @@
   gap: 0.75rem;
 }
 
-.filters-row {
+.controls-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filters-row,
+.sorts-row {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.empty-state {
+  padding: 1rem;
+  text-align: center;
+  background: var(--tui-background-neutral-1);
+  border-radius: var(--tui-radius-m);
 }
 
 .table-scroll {

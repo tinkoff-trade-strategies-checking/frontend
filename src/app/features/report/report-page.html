@@ -396,61 +396,238 @@
             </div>
           </div>
         } @else if (store.activeTab() === 'divergences') {
+          @let summary = rep.divergenceSummary;
+          @let counts = store.divergenceCounts();
           <div class="tab-body">
-            <div class="filters-row">
-              @for (f of divergenceFilters; track f.id) {
-                <button
-                  tuiButton
-                  type="button"
-                  size="xs"
-                  [appearance]="store.divergenceFilter() === f.id ? 'primary' : 'outline'"
-                  (click)="store.setDivergenceFilter(f.id)"
-                >
-                  {{ f.label }}
-                </button>
-              }
+            @if (rep.finishedEarly) {
+              <div tuiNotification appearance="warning" size="s">
+                Сессия завершена досрочно ({{ rep.playedDays }} из {{ rep.totalDays }} дн.): разбор
+                расхождений построен по пройденному отрезку.
+              </div>
+            }
+
+            <div tuiNotification appearance="info" size="s">
+              <div>
+                @if (summary.totalErrorCostRub > 0) {
+                  Расхождения обошлись вам в
+                  <strong class="num neg">{{ formatRubExact(summary.totalErrorCostRub) }}</strong>
+                  (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
+                  >)
+                } @else {
+                  Расхождения сложились в вашу пользу на
+                  <strong class="num pos">{{
+                    formatRubExact(summary.totalErrorCostRub, true)
+                  }}</strong>
+                  (<strong class="num">{{ formatPct(summary.totalErrorCostPct, true) }}</strong
+                  >)
+                }
+                @if (
+                  summary.worstType &&
+                  summary.worstDay !== null &&
+                  summary.worstErrorCostRub !== null &&
+                  summary.worstErrorCostRub > 0
+                ) {
+                  , самое дорогое — {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на
+                  дне {{ summary.worstDay }} (<strong class="num">{{
+                    formatRubExact(summary.worstErrorCostRub, true)
+                  }}</strong
+                  >)
+                }
+                .
+              </div>
+              <div class="tui-text_body-xs muted">
+                Цена ошибки = V_алгоритма − V_человека до следующего решения (горизонт e): &gt; 0 —
+                выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты, как
+                правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные заявки и
+                отмены в сравнении не участвуют.
+              </div>
             </div>
 
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>День</th>
-                    <th>Бумага</th>
-                    <th>Тип</th>
-                    <th>Вы</th>
-                    <th>Алгоритм</th>
-                    <th class="num">Цена ошибки</th>
-                    <th>Причина (because)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (item of store.filteredDivergences(); track item.id) {
-                    <tr>
-                      <td>День {{ item.day }} ({{ item.dateLabel }})</td>
-                      <td>{{ item.paperTicker }} · {{ item.sector }}</td>
-                      <td>
-                        <span tuiBadge size="s" appearance="neutral">
-                          {{ divergenceTypeLabel(item.type) }}
-                        </span>
-                      </td>
-                      <td>{{ item.humanAction }}</td>
-                      <td>{{ item.algoAction }}</td>
-                      <td
-                        class="num"
-                        [class.neg]="item.errorCostRub > 0"
-                        [class.pos]="item.errorCostRub < 0"
-                      >
-                        {{ formatRub(item.errorCostRub, true) }} ({{
-                          formatPct(item.errorCostPct, true)
-                        }})
-                      </td>
-                      <td>{{ item.because }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
+            <div class="controls-bar">
+              <div class="filters-row">
+                @for (f of divergenceFilters; track f.id) {
+                  <button
+                    tuiButton
+                    type="button"
+                    size="xs"
+                    [appearance]="store.divergenceFilter() === f.id ? 'primary' : 'outline'"
+                    (click)="store.setDivergenceFilter(f.id)"
+                  >
+                    {{ f.label }} ({{ counts[f.id] }})
+                  </button>
+                }
+              </div>
+
+              <div class="sorts-row">
+                <span class="tui-text_body-xs muted">Сортировка:</span>
+                @for (s of divergenceSorts; track s.id) {
+                  <button
+                    tuiButton
+                    type="button"
+                    size="xs"
+                    [appearance]="store.divergenceSort() === s.id ? 'primary' : 'outline'"
+                    (click)="store.setDivergenceSort(s.id)"
+                  >
+                    {{ s.label }}
+                  </button>
+                }
+              </div>
             </div>
+
+            @if (store.filteredDivergences().length === 0) {
+              <div class="empty-state tui-text_body-s muted">Расхождений выбранного типа нет.</div>
+            } @else {
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Шаг / день</th>
+                      <th>Бумага</th>
+                      <th>Тип</th>
+                      <th>Вы</th>
+                      <th>Алгоритм</th>
+                      <th class="num">Цена ошибки</th>
+                      <th>Горизонт e</th>
+                      <th>Причина (because)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of store.filteredDivergences(); track item.id) {
+                      <tr>
+                        <td class="num">
+                          <div>День {{ item.day }} ({{ item.dateLabel }})</div>
+                          <div class="tui-text_body-xs muted">шаг {{ item.step }}</div>
+                        </td>
+                        <td>{{ item.paperTicker }} · {{ item.sector }}</td>
+                        <td>
+                          <span tuiBadge size="s" appearance="neutral">
+                            {{ divergenceTypeLabel(item.type) }}
+                          </span>
+                          @if (item.deltaBars !== null) {
+                            <div class="tui-text_body-xs muted">
+                              {{ formatDeltaBars(item.deltaBars) }}
+                            </div>
+                          }
+                        </td>
+                        <td>{{ item.humanAction }}</td>
+                        <td>{{ item.algoAction }}</td>
+                        <td
+                          class="num"
+                          [class.neg]="item.errorCostRub > 0"
+                          [class.pos]="item.errorCostRub < 0"
+                        >
+                          <div>
+                            <strong>{{ formatRubExact(item.errorCostRub, true) }}</strong>
+                            ({{ formatPct(item.errorCostPct, true) }})
+                          </div>
+                          <div class="tui-text_body-xs muted">
+                            {{
+                              item.errorCostRub > 0
+                                ? 'выгоднее как алгоритм'
+                                : 'вы поступили не хуже'
+                            }}
+                          </div>
+                        </td>
+                        <td class="num">
+                          <div>День {{ item.horizonDay }}</div>
+                          <div class="tui-text_body-xs muted">шаг {{ item.horizonStep }}</div>
+                        </td>
+                        <td>{{ item.because }}</td>
+                        <td class="num">
+                          @if (rep.replayAvailable) {
+                            <a
+                              tuiButton
+                              size="xs"
+                              appearance="outline"
+                              [routerLink]="['/replay', rep.sessionId]"
+                              [queryParams]="{ step: item.step }"
+                            >
+                              Посмотреть в воспроизведении
+                            </a>
+                          } @else {
+                            <button
+                              tuiButton
+                              type="button"
+                              size="xs"
+                              appearance="outline"
+                              [disabled]="true"
+                              title="Воспроизведение недоступно для этой заглушки"
+                            >
+                              Посмотреть в воспроизведении
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        } @else if (store.activeTab() === 'reverse') {
+          <div class="tab-body">
+            <div tuiNotification appearance="info" size="s">
+              Закрытые прибыльные сделки человека (FIFO, прибыль после издержек &gt; 0), вход в
+              которые — «лишнее действие» для алгоритма «{{ rep.backgroundAlgorithmName }}». Если за
+              ними стоит правило, его можно будет оформить на DSL в мастерской.
+            </div>
+
+            @if (rep.reverseCheckTrades.length === 0) {
+              <div class="empty-state tui-text_body-s muted">
+                Закрытых прибыльных сделок со входом «лишнее действие» в этой сессии нет.
+              </div>
+            } @else {
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Бумага</th>
+                      <th>Вход</th>
+                      <th>Выход</th>
+                      <th class="num">Лоты</th>
+                      <th class="num">Цена входа</th>
+                      <th class="num">Цена выхода</th>
+                      <th class="num">Прибыль (после издержек)</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (trade of rep.reverseCheckTrades; track trade.id) {
+                      <tr>
+                        <td>{{ trade.paperTicker }}</td>
+                        <td class="num">
+                          День {{ trade.entryDay }} ({{ trade.entryDateLabel }})
+                          <div class="tui-text_body-xs muted">шаг {{ trade.entryStep }}</div>
+                        </td>
+                        <td class="num">
+                          День {{ trade.exitDay }} ({{ trade.exitDateLabel }})
+                          <div class="tui-text_body-xs muted">шаг {{ trade.exitStep }}</div>
+                        </td>
+                        <td class="num">{{ trade.lots }}</td>
+                        <td class="num">{{ formatRubExact(trade.entryPriceRub) }}</td>
+                        <td class="num">{{ formatRubExact(trade.exitPriceRub) }}</td>
+                        <td class="num pos">
+                          <strong>{{ formatRubExact(trade.netProfitRub, true) }}</strong>
+                        </td>
+                        <td class="num">
+                          <button
+                            tuiButton
+                            type="button"
+                            size="xs"
+                            appearance="outline"
+                            [disabled]="true"
+                            title="Недоступно: DSL правил в разработке"
+                          >
+                            Написать правило
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
           </div>
         } @else {
           <div class="tab-body">

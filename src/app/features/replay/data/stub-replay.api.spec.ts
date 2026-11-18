@@ -93,4 +93,25 @@ describe('StubReplayApi', () => {
     const notFound = await api.loadSession('S-9999');
     expect(notFound.status).toBe('NOT_FOUND');
   });
+
+  it('открывает воспроизведение на указанном шаге initialStep с ограничением [0, LAST_STEP] и без утечки будущего (INV-1)', async () => {
+    const api = new StubReplayApi();
+    const res = await api.loadSession('S-0103', 18);
+    expect(res.status).toBe('READY');
+    if (res.status !== 'READY') {
+      return;
+    }
+
+    expect(res.snapshot.step).toBe(18);
+    expect(res.snapshot.day).toBe(19);
+    expect(res.snapshot.fills.map((f) => f.id)).toEqual(['F-1', 'F-2']);
+    for (const paper of res.snapshot.papers) {
+      const maxStep = paper.candles.reduce((max, c) => Math.max(max, c.step), -Infinity);
+      expect(maxStep).toBe(18);
+    }
+
+    const next = await api.step('S-0103');
+    expect(next.step).toBe(19);
+    expect(next.day).toBe(20);
+  });
 });

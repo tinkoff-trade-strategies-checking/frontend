@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge } from '@taiga-ui/kit';
+import { combineLatest } from 'rxjs';
 import { ArenaPage } from '../arena/arena-page';
 import { REPLAY_API, ReplayRegime } from './data/replay.models';
 import { StubReplayApi } from './data/stub-replay.api';
@@ -30,9 +31,13 @@ export class ReplayPage implements OnInit {
   protected readonly regimeLabels = REGIME_LABELS;
 
   ngOnInit(): void {
-    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const id = params.get('id') ?? 'S-0103';
-      void this.store.load(id);
-    });
+    combineLatest([this.route.paramMap, this.route.queryParamMap])
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(([params, queryParams]) => {
+        const id = params.get('id') ?? 'S-0103';
+        const rawStep = queryParams.get('step');
+        const initialStep = rawStep !== null && /^\d+$/.test(rawStep) ? Number(rawStep) : undefined;
+        void this.store.load(id, initialStep);
+      });
   }
 }
