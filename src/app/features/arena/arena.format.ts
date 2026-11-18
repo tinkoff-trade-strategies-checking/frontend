@@ -39,6 +39,23 @@ export function formatPrice(value: number): string {
   });
 }
 
+export function formatRub(value: number, signed = false): string {
+  const formatted = Math.abs(value).toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  if (signed) {
+    if (value > 0) {
+      return `+${formatted} ₽`;
+    }
+    if (value < 0) {
+      return `−${formatted} ₽`;
+    }
+    return `${formatted} ₽`;
+  }
+  return `${value < 0 ? '−' : ''}${formatted} ₽`;
+}
+
 export function formatPct(value: number, signed = false): string {
   const formatted = Math.abs(value).toLocaleString('ru-RU', {
     minimumFractionDigits: 2,

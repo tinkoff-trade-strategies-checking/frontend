@@ -28,6 +28,8 @@ export interface ArenaCandle {
   readonly low: number;
   readonly close: number;
   readonly volume: number;
+  readonly dateLabel?: string;
+  readonly fullDateLabel?: string;
 }
 
 export interface ArenaPaper {
@@ -72,6 +74,7 @@ export interface ArenaFill {
   readonly price: number;
   readonly amountPct: number;
   readonly costPct: number;
+  readonly dateLabel?: string;
   readonly note?: string;
 }
 
@@ -89,6 +92,11 @@ export interface ArenaPortfolio {
   readonly investedPct: number;
   readonly pnlPct: number;
   readonly costsPct: number;
+  readonly equityRub?: number;
+  readonly cashRub?: number;
+  readonly investedRub?: number;
+  readonly pnlRub?: number;
+  readonly costsRub?: number;
   readonly positions: Readonly<Record<string, ArenaPosition>>;
 }
 

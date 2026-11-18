@@ -1,28 +1,42 @@
 <div class="arena-page">
   <header class="arena-header">
     <div class="title-group">
-      <h1 class="tui-text_h3">Арена</h1>
+      <h1 class="tui-text_h3">{{ headerTitle() }}</h1>
       @if (store.blind()) {
-        <span tuiBadge appearance="neutral" size="m">Слепая сессия</span>
+        <span tuiBadge appearance="neutral" size="m">
+          {{ readOnly() ? 'Слепая (раскрыта)' : 'Слепая сессия' }}
+        </span>
+      }
+      @if (readOnly()) {
+        <span tuiBadge appearance="info" size="m">Только просмотр: заявки из журнала</span>
+      }
+      @if (periodLabel(); as period) {
+        <span class="tui-text_body-s muted">{{ period }}</span>
       }
       @if (store.sessionId()) {
         <span class="tui-text_body-s muted">{{ store.sessionId() }}</span>
       }
-      @if (store.finished()) {
+      @if (store.finished() && !readOnly()) {
         <span tuiBadge appearance="positive" size="m">Завершена</span>
       }
     </div>
 
-    <button
-      tuiButton
-      type="button"
-      size="s"
-      appearance="outline"
-      [disabled]="store.finished()"
-      (click)="confirmFinish()"
-    >
-      Завершить сессию
-    </button>
+    @if (readOnly()) {
+      @if (reportRoute(); as route) {
+        <a tuiButton size="s" appearance="outline" [routerLink]="route">Открыть отчёт</a>
+      }
+    } @else {
+      <button
+        tuiButton
+        type="button"
+        size="s"
+        appearance="outline"
+        [disabled]="store.finished()"
+        (click)="confirmFinish()"
+      >
+        Завершить сессию
+      </button>
+    }
   </header>
 
   @if (store.notice()) {
@@ -115,27 +129,31 @@
         [closedOrders]="store.closedOrders()"
         [fills]="store.fills()"
         [finished]="store.finished()"
+        [readOnly]="readOnly()"
+        [papers]="store.papers()"
         (cancelOrder)="store.cancelOrder($event)"
         (replaceOrder)="store.startEditOrder($event)"
       />
     </div>
 
     <aside class="side-col">
-      <app-arena-order-ticket
-        [papers]="store.papers()"
-        [selectedPaperId]="store.selectedPaperId()"
-        [step]="store.step()"
-        [portfolio]="store.portfolio()"
-        [finished]="store.finished()"
-        [editingOrder]="store.editingOrder()"
-        [estimatedPct]="store.estimatedPct()"
-        [error]="store.error()"
-        (paperSelect)="store.selectPaper($event)"
-        (estimateRequest)="store.estimateOrder($event.paperId, $event.lots)"
-        (submitOrder)="store.placeOrder($event)"
-        (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
-        (cancelEdit)="store.cancelEditOrder()"
-      />
+      @if (!readOnly()) {
+        <app-arena-order-ticket
+          [papers]="store.papers()"
+          [selectedPaperId]="store.selectedPaperId()"
+          [step]="store.step()"
+          [portfolio]="store.portfolio()"
+          [finished]="store.finished()"
+          [editingOrder]="store.editingOrder()"
+          [estimatedPct]="store.estimatedPct()"
+          [error]="store.error()"
+          (paperSelect)="store.selectPaper($event)"
+          (estimateRequest)="store.estimateOrder($event.paperId, $event.lots)"
+          (submitOrder)="store.placeOrder($event)"
+          (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
+          (cancelEdit)="store.cancelEditOrder()"
+        />
+      }
 
       <app-arena-portfolio-panel [papers]="store.papers()" [portfolio]="store.portfolio()" />
     </aside>

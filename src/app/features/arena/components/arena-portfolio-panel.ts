@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { formatLots, formatPct, formatPrice } from '../arena.format';
+import { formatLots, formatPct, formatPrice, formatRub } from '../arena.format';
 import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models';
 
 @Component({
@@ -9,38 +9,80 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
     <section class="panel">
       <div class="panel-header">
         <h2 class="tui-text_h6">Портфель</h2>
-        <span class="tui-text_body-xs muted">в % от капитала</span>
+        <span class="tui-text_body-xs muted">
+          {{ portfolio().equityRub !== undefined ? 'в ₽ и %' : 'в % от капитала' }}
+        </span>
       </div>
 
       <div class="summary">
         <div class="equity-row">
           <div class="metric-item">
             <span class="tui-text_body-xs muted">Стоимость портфеля</span>
-            <span class="tui-text_h5 num">{{ formatPct(portfolio().equityPct) }}</span>
+            @if (portfolio().equityRub; as equityRub) {
+              <span class="tui-text_h5 num">{{ formatRub(equityRub) }}</span>
+              <span class="tui-text_body-xs muted num">{{ formatPct(portfolio().equityPct) }}</span>
+            } @else {
+              <span class="tui-text_h5 num">{{ formatPct(portfolio().equityPct) }}</span>
+            }
           </div>
           <div class="metric-item">
             <span class="tui-text_body-xs muted">P&amp;L</span>
-            <span
-              class="tui-text_h5 num"
-              [class.pos]="portfolio().pnlPct > 0"
-              [class.neg]="portfolio().pnlPct < 0"
-            >
-              {{ formatPct(portfolio().pnlPct, true) }}
-            </span>
+            @if (portfolio().pnlRub !== undefined) {
+              <span
+                class="tui-text_h5 num"
+                [class.pos]="portfolio().pnlPct > 0"
+                [class.neg]="portfolio().pnlPct < 0"
+              >
+                {{ formatRub(portfolio().pnlRub!, true) }}
+              </span>
+              <span
+                class="tui-text_body-xs num"
+                [class.pos]="portfolio().pnlPct > 0"
+                [class.neg]="portfolio().pnlPct < 0"
+              >
+                {{ formatPct(portfolio().pnlPct, true) }}
+              </span>
+            } @else {
+              <span
+                class="tui-text_h5 num"
+                [class.pos]="portfolio().pnlPct > 0"
+                [class.neg]="portfolio().pnlPct < 0"
+              >
+                {{ formatPct(portfolio().pnlPct, true) }}
+              </span>
+            }
           </div>
         </div>
 
         <div class="kv">
           <span>Свободные деньги</span>
-          <span class="num">{{ formatPct(portfolio().cashPct) }}</span>
+          <span class="num">
+            {{
+              portfolio().cashRub !== undefined
+                ? formatRub(portfolio().cashRub!)
+                : formatPct(portfolio().cashPct)
+            }}
+          </span>
         </div>
         <div class="kv">
           <span>В бумагах</span>
-          <span class="num">{{ formatPct(portfolio().investedPct) }}</span>
+          <span class="num">
+            {{
+              portfolio().investedRub !== undefined
+                ? formatRub(portfolio().investedRub!)
+                : formatPct(portfolio().investedPct)
+            }}
+          </span>
         </div>
         <div class="kv">
           <span>Издержки</span>
-          <span class="num">{{ formatPct(portfolio().costsPct) }}</span>
+          <span class="num">
+            {{
+              portfolio().costsRub !== undefined
+                ? formatRub(portfolio().costsRub!)
+                : formatPct(portfolio().costsPct)
+            }}
+          </span>
         </div>
       </div>
 
@@ -176,6 +218,7 @@ export class ArenaPortfolioPanel {
   protected readonly formatLots = formatLots;
   protected readonly formatPrice = formatPrice;
   protected readonly formatPct = formatPct;
+  protected readonly formatRub = formatRub;
 
   protected positionOf(paperId: string): ArenaPosition | undefined {
     return this.portfolio().positions[paperId];
