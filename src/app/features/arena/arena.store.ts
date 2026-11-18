@@ -1,4 +1,5 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { formatRejectReason } from './arena.format';
 import {
   ARENA_API,
   ArenaCommandResult,
@@ -33,20 +34,23 @@ const EMPTY_PORTFOLIO: ArenaPortfolio = {
   positions: {},
 };
 
+const CLOSED_STATUSES = new Set<ArenaOrder['status']>(['cancelled', 'rejected', 'expired']);
+
 @Injectable()
 export class ArenaStore {
   private readonly api = inject(ARENA_API);
   private readonly destroyRef = inject(DestroyRef);
 
   private timerId: ReturnType<typeof setInterval> | null = null;
-  private stepInFlight = false;
+  private queue: Promise<void> = Promise.resolve();
+  private estimateSeq = 0;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
   readonly blind = signal(true);
   readonly step = signal(0);
   readonly totalSteps = signal(0);
-  readonly day = signal(0);
+  readonly day = signal(1);
   readonly totalDays = signal(0);
   readonly finished = signal(false);
   readonly papers = signal<readonly ArenaPaper[]>([]);
@@ -60,6 +64,7 @@ export class ArenaStore {
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
   readonly editingOrder = signal<ArenaOrder | null>(null);
+  readonly estimatedPct = signal<number | null>(null);
 
   readonly selectedPaper = computed<ArenaPaper | null>(() => {
     const id = this.selectedPaperId();
@@ -68,6 +73,9 @@ export class ArenaStore {
   });
 
   readonly activeOrders = computed(() => this.orders().filter((o) => o.status === 'active'));
+  readonly closedOrders = computed(() =>
+    this.orders().filter((o) => CLOSED_STATUSES.has(o.status)),
+  );
 
   readonly progressPct = computed(() => {
     const total = this.totalSteps();
@@ -83,33 +91,35 @@ export class ArenaStore {
     this.destroyRef.onDestroy(() => this.stopTimer());
   }
 
-  async init(): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-    this.pause();
+  init(): Promise<void> {
+    return this.enqueue(async () => {
+      this.loading.set(true);
+      this.error.set(null);
+      this.pause();
 
-    try {
-      // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
-      const snap = await this.api.getSnapshot();
-      this.sessionId.set(snap.sessionId);
-      this.blind.set(snap.blind);
-      this.step.set(snap.step);
-      this.totalSteps.set(snap.totalSteps);
-      this.day.set(snap.day);
-      this.totalDays.set(snap.totalDays);
-      this.finished.set(snap.finished);
-      this.papers.set(snap.papers);
-      this.portfolio.set(snap.portfolio);
-      this.orders.set(snap.orders);
-      this.fills.set(snap.fills);
-      if (snap.papers.length > 0 && !snap.papers.some((p) => p.id === this.selectedPaperId())) {
-        this.selectedPaperId.set(snap.papers[0].id);
+      try {
+        // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
+        const snap = await this.api.getSnapshot();
+        this.sessionId.set(snap.sessionId);
+        this.blind.set(snap.blind);
+        this.step.set(snap.step);
+        this.totalSteps.set(snap.totalSteps);
+        this.day.set(snap.day);
+        this.totalDays.set(snap.totalDays);
+        this.finished.set(snap.finished);
+        this.papers.set(snap.papers);
+        this.portfolio.set(snap.portfolio);
+        this.orders.set(snap.orders);
+        this.fills.set(snap.fills);
+        if (snap.papers.length > 0 && !snap.papers.some((p) => p.id === this.selectedPaperId())) {
+          this.selectedPaperId.set(snap.papers[0].id);
+        }
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Не удалось загрузить сессию.');
+      } finally {
+        this.loading.set(false);
       }
-    } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'Не удалось загрузить сессию.');
-    } finally {
-      this.loading.set(false);
-    }
+    });
   }
 
   selectPaper(paperId: string): void {
@@ -137,85 +147,117 @@ export class ArenaStore {
     this.stopTimer();
   }
 
-  async stepOnce(): Promise<void> {
-    if (this.stepInFlight || !this.canStep()) {
+  async estimateOrder(paperId: string, lots: number | null): Promise<void> {
+    if (lots === null || !Number.isInteger(lots) || lots < 1) {
+      this.estimatedPct.set(null);
       return;
     }
-    this.stepInFlight = true;
-    this.error.set(null);
-
+    const seq = ++this.estimateSeq;
     try {
-      const res = await this.api.step();
-      this.step.set(res.step);
-      this.day.set(res.day);
-      this.finished.set(res.finished);
-      this.portfolio.set(res.portfolio);
-      this.orders.set(res.orders);
-      this.fills.set(res.fills);
-
-      this.papers.update((current) =>
-        current.map((paper) => {
-          const bar = res.bars[paper.id];
-          const stat = res.paperStats[paper.id];
-          if (!bar) {
-            return paper;
-          }
-          const alreadyHas = paper.candles.some((c) => c.step === bar.step);
-          return {
-            ...paper,
-            candles: alreadyHas ? paper.candles : [...paper.candles, bar],
-            changePct: stat ? stat.changePct : paper.changePct,
-            lastPrice: stat ? stat.lastPrice : bar.close,
-          };
-        }),
-      );
-
-      if (res.finished) {
-        this.pause();
+      const res = await this.api.estimateOrder({ paperId, lots });
+      if (seq === this.estimateSeq) {
+        this.estimatedPct.set(res.amountPct);
       }
-    } catch (err) {
-      this.pause();
-      this.error.set(err instanceof Error ? err.message : 'Ошибка при переходе к следующей свече.');
-    } finally {
-      this.stepInFlight = false;
+    } catch {
+      if (seq === this.estimateSeq) {
+        this.estimatedPct.set(null);
+      }
     }
   }
 
-  async placeOrder(draft: OrderDraft): Promise<ArenaCommandResult> {
-    this.error.set(null);
-    this.notice.set(null);
-    // INV-2: заявка всегда уходит с номером последней свечи, которую видел пользователь.
-    const result = await this.api.placeOrder({
-      seenStep: this.step(),
-      paperId: draft.paperId,
-      side: draft.side,
-      type: draft.type,
-      lots: draft.lots,
-      tif: draft.tif,
-      limitPrice: draft.limitPrice,
-      stopPrice: draft.stopPrice,
-      takeProfitPrice: draft.takeProfitPrice,
-      trailingPct: draft.trailingPct,
-    });
+  stepOnce(): Promise<void> {
+    return this.enqueue(async () => {
+      if (!this.canStep()) {
+        return;
+      }
+      this.error.set(null);
+      this.notice.set(null);
 
-    this.applyCommandResult(result, 'Заявка выставлена.');
-    return result;
+      try {
+        const res = await this.api.step();
+        this.step.set(res.step);
+        this.day.set(res.day);
+        this.finished.update((was) => was || res.finished);
+        this.portfolio.set(res.portfolio);
+        this.orders.set(res.orders);
+        this.fills.set(res.fills);
+
+        this.papers.update((current) =>
+          current.map((paper) => {
+            const bar = res.bars[paper.id];
+            const stat = res.paperStats[paper.id];
+            if (!bar) {
+              return paper;
+            }
+            const alreadyHas = paper.candles.some((c) => c.step === bar.step);
+            return {
+              ...paper,
+              candles: alreadyHas ? paper.candles : [...paper.candles, bar],
+              changePct: stat ? stat.changePct : paper.changePct,
+              lastPrice: stat ? stat.lastPrice : bar.close,
+            };
+          }),
+        );
+
+        if (this.finished()) {
+          this.pause();
+        }
+      } catch (err) {
+        this.pause();
+        this.error.set(
+          err instanceof Error ? err.message : 'Ошибка при переходе к следующей свече.',
+        );
+      }
+    });
   }
 
-  async cancelOrder(orderId: string): Promise<ArenaCommandResult> {
-    this.error.set(null);
-    this.notice.set(null);
-    // INV-2: отмена всегда уходит с seenStep.
-    const result = await this.api.cancelOrder({
-      seenStep: this.step(),
-      orderId,
+  placeOrder(draft: OrderDraft): Promise<ArenaCommandResult | null> {
+    return this.enqueue(async () => {
+      this.error.set(null);
+      this.notice.set(null);
+      try {
+        // INV-2: заявка всегда уходит с номером последней свечи, которую видел пользователь.
+        const result = await this.api.placeOrder({
+          seenStep: this.step(),
+          paperId: draft.paperId,
+          side: draft.side,
+          type: draft.type,
+          lots: draft.lots,
+          tif: draft.tif,
+          limitPrice: draft.limitPrice,
+          stopPrice: draft.stopPrice,
+          takeProfitPrice: draft.takeProfitPrice,
+          trailingPct: draft.trailingPct,
+        });
+        this.applyCommandResult(result, 'Заявка выставлена.');
+        return result;
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Не удалось выставить заявку.');
+        return null;
+      }
     });
+  }
 
-    if (this.editingOrder()?.id === orderId) {
-      this.editingOrder.set(null);
-    }
-    this.applyCommandResult(result, 'Заявка отменена.');
-    return result;
+  cancelOrder(orderId: string): Promise<ArenaCommandResult | null> {
+    return this.enqueue(async () => {
+      this.error.set(null);
+      this.notice.set(null);
+      try {
+        // INV-2: отмена всегда уходит с seenStep.
+        const result = await this.api.cancelOrder({
+          seenStep: this.step(),
+          orderId,
+        });
+        if (this.editingOrder()?.id === orderId) {
+          this.editingOrder.set(null);
+        }
+        this.applyCommandResult(result, 'Заявка отменена.');
+        return result;
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Не удалось отменить заявку.');
+        return null;
+      }
+    });
   }
 
   startEditOrder(order: ArenaOrder): void {
@@ -227,39 +269,59 @@ export class ArenaStore {
     this.editingOrder.set(null);
   }
 
-  async replaceOrder(
+  replaceOrder(
     orderId: string,
     draft: Omit<OrderDraft, 'paperId' | 'side' | 'type'>,
-  ): Promise<ArenaCommandResult> {
-    this.error.set(null);
-    this.notice.set(null);
-    // INV-2: замена всегда уходит с seenStep.
-    const result = await this.api.replaceOrder({
-      seenStep: this.step(),
-      orderId,
-      lots: draft.lots,
-      tif: draft.tif,
-      limitPrice: draft.limitPrice,
-      stopPrice: draft.stopPrice,
-      takeProfitPrice: draft.takeProfitPrice,
-      trailingPct: draft.trailingPct,
+  ): Promise<ArenaCommandResult | null> {
+    return this.enqueue(async () => {
+      this.error.set(null);
+      this.notice.set(null);
+      try {
+        // INV-2: замена всегда уходит с seenStep.
+        const result = await this.api.replaceOrder({
+          seenStep: this.step(),
+          orderId,
+          lots: draft.lots,
+          tif: draft.tif,
+          limitPrice: draft.limitPrice,
+          stopPrice: draft.stopPrice,
+          takeProfitPrice: draft.takeProfitPrice,
+          trailingPct: draft.trailingPct,
+        });
+        this.editingOrder.set(null);
+        this.applyCommandResult(result, 'Заявка заменена.');
+        return result;
+      } catch (err) {
+        this.editingOrder.set(null);
+        this.error.set(err instanceof Error ? err.message : 'Не удалось заменить заявку.');
+        return null;
+      }
     });
-
-    if (result.accepted) {
-      this.editingOrder.set(null);
-    }
-    this.applyCommandResult(result, 'Заявка заменена.');
-    return result;
   }
 
-  async finishSession(): Promise<void> {
-    this.pause();
-    this.error.set(null);
-    const res = await this.api.finishSession();
-    this.finished.set(true);
-    this.portfolio.set(res.portfolio);
-    this.editingOrder.set(null);
-    this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
+  finishSession(): Promise<void> {
+    return this.enqueue(async () => {
+      this.pause();
+      this.error.set(null);
+      try {
+        const res = await this.api.finishSession();
+        this.finished.set(true);
+        this.portfolio.set(res.portfolio);
+        this.editingOrder.set(null);
+        this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
+      } catch (err) {
+        this.error.set(err instanceof Error ? err.message : 'Не удалось завершить сессию.');
+      }
+    });
+  }
+
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   private applyCommandResult(result: ArenaCommandResult, successText: string): void {
@@ -268,7 +330,7 @@ export class ArenaStore {
     if (result.accepted) {
       this.notice.set(successText);
     } else {
-      this.error.set(result.reason ?? 'Команда отклонена.');
+      this.error.set(formatRejectReason(result.reason, result.field));
     }
   }
 

@@ -201,7 +201,6 @@ function round2(value: number): number {
           <input
             id="arena-lots"
             tuiInputNumber
-            [min]="1"
             [ngModel]="lots()"
             (ngModelChange)="onLotsChange($event)"
           />
@@ -209,7 +208,7 @@ function round2(value: number): number {
 
         <div class="hint-row tui-text_body-xs">
           <span>Цена: {{ formatPrice(lastPrice()) }}</span>
-          <span>Оценка: {{ estimatedPctText() }}</span>
+          <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
         </div>
 
         <tui-segmented
@@ -306,9 +305,11 @@ export class ArenaOrderTicket {
   readonly portfolio = input.required<ArenaPortfolio>();
   readonly finished = input.required<boolean>();
   readonly editingOrder = input<ArenaOrder | null>(null);
+  readonly estimatedPct = input<number | null>(null);
   readonly error = input<string | null>(null);
 
   readonly paperSelect = output<string>();
+  readonly estimateRequest = output<{ paperId: string; lots: number | null }>();
   readonly submitOrder = output<OrderDraft>();
   readonly submitReplace = output<{
     orderId: string;
@@ -322,15 +323,18 @@ export class ArenaOrderTicket {
     this.papers().find((p) => p.id === id)?.label ?? `Бумага ${id}`;
   protected readonly Boolean = Boolean;
   protected readonly formatPrice = formatPrice;
+  protected readonly formatPct = formatPct;
 
   protected readonly side = signal<OrderSide>('buy');
   protected readonly orderType = signal<OrderType>('market');
-  protected readonly lots = signal(5);
+  protected readonly lots = signal<number | null>(5);
   protected readonly tif = signal<TimeInForce>('day');
   protected readonly limitPrice = signal(97);
   protected readonly stopPrice = signal(103);
   protected readonly takeProfitPrice = signal(108);
   protected readonly trailingPct = signal(5);
+
+  private lastPaperId: string | null = null;
 
   protected readonly paperIds = computed(() => this.papers().map((p) => p.id));
   protected readonly isSellOnly = computed(() => SELL_ONLY_TYPES.has(this.orderType()));
@@ -339,14 +343,9 @@ export class ArenaOrderTicket {
     return found?.lastPrice ?? 100;
   });
 
-  protected readonly estimatedPctText = computed(() => {
-    const pct = round2(this.lots() * this.lastPrice() * 0.01);
-    return formatPct(pct);
-  });
-
   protected readonly validationError = computed<string | null>(() => {
     const lots = this.lots();
-    if (!Number.isInteger(lots) || lots < 1) {
+    if (lots === null || !Number.isInteger(lots) || lots < 1) {
       return 'Укажите целое число лотов (от 1).';
     }
     const type = this.orderType();
@@ -393,6 +392,22 @@ export class ArenaOrderTicket {
         }
       }
     });
+
+    effect(() => {
+      const paperId = this.selectedPaperId();
+      if (!this.editingOrder() && this.lastPaperId !== paperId) {
+        this.lastPaperId = paperId;
+        this.syncDefaultPrices(this.orderType(), this.side());
+      }
+    });
+
+    effect(() => {
+      // INV-6: оценка суммы запрашивается у источника, клиент не считает.
+      this.estimateRequest.emit({
+        paperId: this.selectedPaperId(),
+        lots: this.lots(),
+      });
+    });
   }
 
   protected onSideIndexChange(index: number): void {
@@ -416,17 +431,18 @@ export class ArenaOrderTicket {
   }
 
   protected onLotsChange(value: number | null): void {
-    this.lots.set(value === null ? 1 : Math.max(1, Math.round(value)));
+    this.lots.set(value);
   }
 
   protected onSubmit(): void {
-    if (this.validationError() || this.finished()) {
+    const lots = this.lots();
+    if (this.validationError() || this.finished() || lots === null) {
       return;
     }
     const type = this.orderType();
     const edit = this.editingOrder();
     const params = {
-      lots: this.lots(),
+      lots,
       tif: this.tif(),
       limitPrice: type === 'limit' || type === 'stop_limit' ? this.limitPrice() : undefined,
       stopPrice:

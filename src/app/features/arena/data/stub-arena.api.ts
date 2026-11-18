@@ -10,9 +10,12 @@ import {
   ArenaPaperStat,
   ArenaPortfolio,
   ArenaPosition,
+  ArenaRejectReason,
   ArenaSnapshot,
   ArenaStepResult,
   CancelOrderCommand,
+  EstimateOrderCommand,
+  OrderEstimateResult,
   PlaceOrderCommand,
   ReplaceOrderCommand,
 } from './arena.models';
@@ -41,6 +44,7 @@ const PAPER_CONFIGS: readonly PaperConfig[] = [
 
 const WARMUP_BARS = 20;
 const TOTAL_DAYS = 60;
+const LAST_STEP = TOTAL_DAYS - 1;
 const COMMISSION_RATE = 0.003;
 const LOT_CAPITAL_WEIGHT = 0.01;
 
@@ -62,9 +66,9 @@ function generateCandles(cfg: PaperConfig): ArenaCandle[] {
 
   let price = 100;
   for (let i = 0; i < WARMUP_BARS + TOTAL_DAYS; i++) {
-    const step = i - WARMUP_BARS + 1;
-    const day = step <= 0 ? 0 : step;
-    const candleInDay = step <= 0 ? i + 1 : 1;
+    const step = i - WARMUP_BARS;
+    const day = step < 0 ? 0 : step + 1;
+    const candleInDay = step < 0 ? i + 1 : 1;
 
     const wave =
       Math.sin((i + 1) * 0.43 + cfg.phase) * cfg.volatility +
@@ -84,19 +88,21 @@ function generateCandles(cfg: PaperConfig): ArenaCandle[] {
     price = close;
   }
 
-  // Масштабируем так, чтобы open первого сессионного бара (step === 1) был ровно 100.00 (INV-7).
-  const startBar = raw[WARMUP_BARS];
-  const scale = 100 / startBar.open;
+  // INV-7 (decisions.md, «Слепой режим»): P0 = open шага 0, V_ref = средний объём баров прогрева.
+  const stepZeroBar = raw[WARMUP_BARS];
+  const priceScale = 100 / stepZeroBar.open;
+  const warmupVolumeAvg =
+    raw.slice(0, WARMUP_BARS).reduce((sum, b) => sum + b.volume, 0) / WARMUP_BARS || 1;
 
   return raw.map((bar) => ({
     step: bar.step,
     day: bar.day,
     candleInDay: bar.candleInDay,
-    open: round2(bar.open * scale),
-    high: round2(bar.high * scale),
-    low: round2(bar.low * scale),
-    close: round2(bar.close * scale),
-    volume: bar.volume,
+    open: round2(bar.open * priceScale),
+    high: round2(bar.high * priceScale),
+    low: round2(bar.low * priceScale),
+    close: round2(bar.close * priceScale),
+    volume: round2((100 * bar.volume) / warmupVolumeAvg),
   }));
 }
 
@@ -104,7 +110,7 @@ function generateCandles(cfg: PaperConfig): ArenaCandle[] {
 export class StubArenaApi implements ArenaApi {
   private readonly sessionId = 'S-0104';
   private readonly allCandles = new Map<string, readonly ArenaCandle[]>();
-  private cursor = 1;
+  private cursor = 0;
   private finished = false;
   private cashPct = 100;
   private costsPct = 0;
@@ -126,8 +132,8 @@ export class StubArenaApi implements ArenaApi {
       sessionId: this.sessionId,
       blind: true,
       step: this.cursor,
-      totalSteps: TOTAL_DAYS,
-      day: this.cursor,
+      totalSteps: LAST_STEP,
+      day: this.cursor + 1,
       totalDays: TOTAL_DAYS,
       finished: this.finished,
       papers: this.buildVisiblePapers(),
@@ -138,10 +144,10 @@ export class StubArenaApi implements ArenaApi {
   }
 
   async step(): Promise<ArenaStepResult> {
-    if (!this.finished && this.cursor < TOTAL_DAYS) {
+    if (!this.finished && this.cursor < LAST_STEP) {
       this.cursor += 1;
       this.executeMarketOrdersAtCursor();
-      if (this.cursor >= TOTAL_DAYS) {
+      if (this.cursor >= LAST_STEP) {
         this.finished = true;
       }
     }
@@ -149,14 +155,13 @@ export class StubArenaApi implements ArenaApi {
     const bars: Record<string, ArenaCandle> = {};
     const paperStats: Record<string, ArenaPaperStat> = {};
     for (const cfg of PAPER_CONFIGS) {
-      const candle = this.candleAt(cfg.id, this.cursor);
-      bars[cfg.id] = candle;
+      bars[cfg.id] = this.candleAt(cfg.id, this.cursor);
       paperStats[cfg.id] = this.computePaperStat(cfg.id);
     }
 
     return {
       step: this.cursor,
-      day: this.cursor,
+      day: this.cursor + 1,
       finished: this.finished,
       bars,
       paperStats,
@@ -166,27 +171,39 @@ export class StubArenaApi implements ArenaApi {
     };
   }
 
+  async estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult> {
+    if (
+      !this.allCandles.has(command.paperId) ||
+      !Number.isFinite(command.lots) ||
+      command.lots <= 0
+    ) {
+      return { amountPct: 0 };
+    }
+    const close = this.candleAt(command.paperId, this.cursor).close;
+    return { amountPct: round2(command.lots * close * LOT_CAPITAL_WEIGHT) };
+  }
+
   async placeOrder(command: PlaceOrderCommand): Promise<ArenaCommandResult> {
     if (this.finished) {
-      return this.reject('Сессия завершена: новые заявки не принимаются.');
+      return this.reject('SESSION_NOT_ACTIVE');
     }
     if (
       !Number.isInteger(command.seenStep) ||
-      command.seenStep < 1 ||
+      command.seenStep < 0 ||
       command.seenStep > this.cursor
     ) {
-      return this.reject('Некорректный номер свечи (seenStep).');
+      return this.reject('INVALID_PARAMS', 'seenStep');
     }
     if (!Number.isInteger(command.lots) || command.lots < 1) {
-      return this.reject('Количество лотов должно быть целым числом больше нуля.');
+      return this.reject('INVALID_PARAMS', 'lots');
     }
     if (!this.allCandles.has(command.paperId)) {
-      return this.reject('Неизвестная бумага.');
+      return this.reject('INVALID_PARAMS', 'paperId');
     }
 
-    const validationError = this.validateOrderParams(command);
-    if (validationError) {
-      return this.reject(validationError);
+    const validation = this.validateOrder(command);
+    if (validation) {
+      return this.reject(validation.reason, validation.field);
     }
 
     const currentClose = this.candleAt(command.paperId, this.cursor).close;
@@ -199,7 +216,8 @@ export class StubArenaApi implements ArenaApi {
       filledLots: 0,
       tif: command.tif,
       status: 'active',
-      createdStep: command.seenStep,
+      step: this.cursor,
+      seenStep: command.seenStep,
       limitPrice: command.limitPrice,
       stopPrice: command.stopPrice,
       takeProfitPrice: command.takeProfitPrice,
@@ -218,22 +236,22 @@ export class StubArenaApi implements ArenaApi {
 
   async cancelOrder(command: CancelOrderCommand): Promise<ArenaCommandResult> {
     if (this.finished) {
-      return this.reject('Сессия завершена.');
+      return this.reject('SESSION_NOT_ACTIVE');
     }
     if (
       !Number.isInteger(command.seenStep) ||
-      command.seenStep < 1 ||
+      command.seenStep < 0 ||
       command.seenStep > this.cursor
     ) {
-      return this.reject('Некорректный номер свечи (seenStep).');
+      return this.reject('INVALID_PARAMS', 'seenStep');
     }
     const existing = this.orders.find((o) => o.id === command.orderId);
     if (!existing || existing.status !== 'active') {
-      return this.reject('Заявка уже неактивна.');
+      return this.reject('ORDER_NOT_ACTIVE');
     }
 
     this.orders = this.orders.map((o) =>
-      o.id === command.orderId ? { ...o, status: 'cancelled' } : o,
+      o.id === command.orderId ? { ...o, status: 'cancelled' as const } : o,
     );
 
     return {
@@ -245,25 +263,25 @@ export class StubArenaApi implements ArenaApi {
 
   async replaceOrder(command: ReplaceOrderCommand): Promise<ArenaCommandResult> {
     if (this.finished) {
-      return this.reject('Сессия завершена.');
+      return this.reject('SESSION_NOT_ACTIVE');
     }
     if (
       !Number.isInteger(command.seenStep) ||
-      command.seenStep < 1 ||
+      command.seenStep < 0 ||
       command.seenStep > this.cursor
     ) {
-      return this.reject('Некорректный номер свечи (seenStep).');
+      return this.reject('INVALID_PARAMS', 'seenStep');
     }
     if (!Number.isInteger(command.lots) || command.lots < 1) {
-      return this.reject('Количество лотов должно быть целым числом больше нуля.');
+      return this.reject('INVALID_PARAMS', 'lots');
     }
 
     const existing = this.orders.find((o) => o.id === command.orderId);
     if (!existing || existing.status !== 'active') {
-      return this.reject('Заявка уже неактивна.');
+      return this.reject('ORDER_NOT_ACTIVE');
     }
 
-    const validationError = this.validateOrderParams({
+    const validation = this.validateOrder({
       ...existing,
       seenStep: command.seenStep,
       lots: command.lots,
@@ -273,8 +291,8 @@ export class StubArenaApi implements ArenaApi {
       takeProfitPrice: command.takeProfitPrice,
       trailingPct: command.trailingPct,
     });
-    if (validationError) {
-      return this.reject(validationError);
+    if (validation) {
+      return this.reject(validation.reason, validation.field);
     }
 
     const replaced: ArenaOrder = {
@@ -283,7 +301,8 @@ export class StubArenaApi implements ArenaApi {
       lots: command.lots,
       filledLots: 0,
       tif: command.tif,
-      createdStep: command.seenStep,
+      step: this.cursor,
+      seenStep: command.seenStep,
       limitPrice: command.limitPrice,
       stopPrice: command.stopPrice,
       takeProfitPrice: command.takeProfitPrice,
@@ -311,60 +330,87 @@ export class StubArenaApi implements ArenaApi {
     return {
       sessionId: this.sessionId,
       finishedAtStep: this.cursor,
-      finishedAtDay: this.cursor,
+      finishedAtDay: this.cursor + 1,
       portfolio: this.buildPortfolio(),
     };
   }
 
-  private reject(reason: string): ArenaCommandResult {
+  private reject(reason: ArenaRejectReason, field?: string): ArenaCommandResult {
     return {
       accepted: false,
       reason,
+      field,
       orders: [...this.orders],
       portfolio: this.buildPortfolio(),
     };
   }
 
-  private validateOrderParams(cmd: PlaceOrderCommand): string | null {
+  private validateOrder(
+    cmd: PlaceOrderCommand,
+  ): { reason: ArenaRejectReason; field?: string } | null {
+    const currentClose = this.candleAt(cmd.paperId, this.cursor).close;
+
     if (cmd.type === 'trailing') {
       if (cmd.side !== 'sell') {
-        return 'Трейлинг-стоп доступен только для продажи.';
+        return { reason: 'INVALID_PARAMS', field: 'side' };
       }
       if (cmd.trailingPct == null || cmd.trailingPct <= 0 || cmd.trailingPct > 50) {
-        return 'Отступ трейлинг-стопа должен быть в диапазоне (0; 50] %.';
+        return { reason: 'INVALID_PARAMS', field: 'trailingPct' };
       }
     }
+
     if (cmd.type === 'oco') {
       if (cmd.side !== 'sell') {
-        return 'OCO-заявка в тренажёре доступна только для продажи (стоп + тейк-профит).';
+        return { reason: 'INVALID_PARAMS', field: 'side' };
       }
-      if (cmd.stopPrice == null || cmd.takeProfitPrice == null) {
-        return 'Для OCO необходимо указать цены стопа и тейк-профита.';
+      if (cmd.stopPrice == null || cmd.stopPrice <= 0) {
+        return { reason: 'INVALID_PARAMS', field: 'stopPrice' };
       }
-      if (cmd.stopPrice >= cmd.takeProfitPrice) {
-        return 'В OCO цена стопа должна быть ниже цены тейк-профита.';
+      if (
+        cmd.takeProfitPrice == null ||
+        cmd.takeProfitPrice <= currentClose ||
+        cmd.stopPrice >= cmd.takeProfitPrice
+      ) {
+        return { reason: 'INVALID_PARAMS', field: 'takeProfitPrice' };
       }
     }
+
     if (cmd.type === 'limit' && (cmd.limitPrice == null || cmd.limitPrice <= 0)) {
-      return 'Укажите корректную цену лимита.';
+      return { reason: 'INVALID_PARAMS', field: 'limitPrice' };
     }
     if (cmd.type === 'stop' && (cmd.stopPrice == null || cmd.stopPrice <= 0)) {
-      return 'Укажите корректную цену стопа.';
+      return { reason: 'INVALID_PARAMS', field: 'stopPrice' };
     }
-    if (
-      cmd.type === 'stop_limit' &&
-      (cmd.stopPrice == null || cmd.stopPrice <= 0 || cmd.limitPrice == null || cmd.limitPrice <= 0)
-    ) {
-      return 'Укажите корректные цены стопа и лимита.';
+    if (cmd.type === 'stop_limit') {
+      if (cmd.stopPrice == null || cmd.stopPrice <= 0) {
+        return { reason: 'INVALID_PARAMS', field: 'stopPrice' };
+      }
+      if (cmd.limitPrice == null || cmd.limitPrice <= 0) {
+        return { reason: 'INVALID_PARAMS', field: 'limitPrice' };
+      }
     }
     if (cmd.type === 'take_profit') {
       if (cmd.side !== 'sell') {
-        return 'Тейк-профит доступен только для продажи.';
+        return { reason: 'INVALID_PARAMS', field: 'side' };
       }
-      if (cmd.takeProfitPrice == null || cmd.takeProfitPrice <= 0) {
-        return 'Укажите корректную цену тейк-профита.';
+      if (cmd.takeProfitPrice == null || cmd.takeProfitPrice <= currentClose) {
+        return { reason: 'INVALID_PARAMS', field: 'takeProfitPrice' };
       }
     }
+
+    // Проверка средств/позиции по close последнего бара с комиссией (decisions.md:47).
+    if (cmd.side === 'buy') {
+      const requiredPct = cmd.lots * currentClose * LOT_CAPITAL_WEIGHT * (1 + COMMISSION_RATE);
+      if (requiredPct > this.cashPct) {
+        return { reason: 'INSUFFICIENT_CASH' };
+      }
+    } else {
+      const pos = this.positions.get(cmd.paperId)!;
+      if (cmd.lots > pos.lots) {
+        return { reason: 'INSUFFICIENT_POSITION' };
+      }
+    }
+
     return null;
   }
 
@@ -387,7 +433,11 @@ export class StubArenaApi implements ArenaApi {
         const execLots = Math.min(order.lots, maxAffordableLots);
 
         if (execLots <= 0) {
-          updatedOrders.push({ ...order, status: 'rejected', note: 'Недостаточно средств' });
+          updatedOrders.push({
+            ...order,
+            status: 'rejected',
+            rejectReason: 'INSUFFICIENT_CASH',
+          });
           continue;
         }
 
@@ -403,12 +453,16 @@ export class StubArenaApi implements ArenaApi {
           ...order,
           filledLots: execLots,
           status: execLots < order.lots ? 'partial' : 'filled',
-          note: execLots < order.lots ? 'Недостаточно средств для остатка' : undefined,
+          rejectReason: execLots < order.lots ? 'INSUFFICIENT_CASH' : undefined,
         });
       } else {
         const execLots = Math.min(order.lots, pos.lots);
         if (execLots <= 0) {
-          updatedOrders.push({ ...order, status: 'rejected', note: 'Позиция отсутствует' });
+          updatedOrders.push({
+            ...order,
+            status: 'rejected',
+            rejectReason: 'INSUFFICIENT_POSITION',
+          });
           continue;
         }
 
@@ -425,7 +479,7 @@ export class StubArenaApi implements ArenaApi {
           ...order,
           filledLots: execLots,
           status: execLots < order.lots ? 'partial' : 'filled',
-          note: execLots < order.lots ? 'Продана вся доступная позиция' : undefined,
+          rejectReason: execLots < order.lots ? 'INSUFFICIENT_POSITION' : undefined,
         });
       }
     }
@@ -460,12 +514,12 @@ export class StubArenaApi implements ArenaApi {
 
   private candleAt(paperId: string, step: number): ArenaCandle {
     const list = this.allCandles.get(paperId)!;
-    const index = WARMUP_BARS + step - 1;
+    const index = WARMUP_BARS + step;
     return list[Math.max(0, Math.min(list.length - 1, index))];
   }
 
   private computePaperStat(paperId: string): ArenaPaperStat {
-    const startPrice = this.candleAt(paperId, 1).open;
+    const startPrice = this.candleAt(paperId, 0).open;
     const lastPrice = this.candleAt(paperId, this.cursor).close;
     return {
       changePct: round2(((lastPrice - startPrice) / startPrice) * 100),
@@ -474,7 +528,7 @@ export class StubArenaApi implements ArenaApi {
   }
 
   private buildVisiblePapers(): ArenaPaper[] {
-    const endIndex = WARMUP_BARS + this.cursor;
+    const endIndex = WARMUP_BARS + this.cursor + 1;
     return PAPER_CONFIGS.map((cfg) => {
       const candles = this.allCandles.get(cfg.id)!.slice(0, endIndex);
       const stat = this.computePaperStat(cfg.id);

@@ -32,6 +32,11 @@ function toChartTime(step: number): UTCTimestamp {
   return (step + 1000) as UTCTimestamp;
 }
 
+function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'): string {
+  const value = getComputedStyle(el).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
 function computeSma(candles: readonly ArenaCandle[], period: number): LineData<Time>[] {
   const result: LineData<Time>[] = [];
   let sum = 0;
@@ -65,6 +70,7 @@ export class ArenaChart {
   private readonly destroyRef = inject(DestroyRef);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
+  readonly paperId = input<string>('');
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -78,6 +84,11 @@ export class ArenaChart {
   private markersPlugin: ISeriesMarkersPluginApi<Time> | null = null;
   private priceLines: IPriceLine[] = [];
   private candleByTime = new Map<number, ArenaCandle>();
+  private lastFittedPaperId: string | null = null;
+
+  private positiveColor = 'currentColor';
+  private negativeColor = 'currentColor';
+  private warningColor = 'currentColor';
 
   constructor() {
     afterNextRender(() => {
@@ -86,7 +97,8 @@ export class ArenaChart {
     });
 
     effect(() => {
-      // Отслеживаем все входные сигналы для перерисовки при обновлении свечей, заявок и индикаторов.
+      // Отслеживаем все входные сигналы для перерисовки при обновлении бумаги, свечей, заявок и индикаторов.
+      this.paperId();
       this.candles();
       this.orders();
       this.fills();
@@ -103,6 +115,14 @@ export class ArenaChart {
 
   private initChart(): void {
     const el = this.container().nativeElement;
+    const textColor = readCssColor(el, '--tui-text-secondary');
+    const borderColor = readCssColor(el, '--tui-border-normal');
+    const sma20Color = readCssColor(el, '--tui-text-action');
+    const sma50Color = readCssColor(el, '--tui-background-accent-1');
+    this.positiveColor = readCssColor(el, '--tui-text-positive');
+    this.negativeColor = readCssColor(el, '--tui-text-negative');
+    this.warningColor = readCssColor(el, '--tui-background-accent-2');
+
     const formatTooltipTime = (time: Time): string => {
       const candle = typeof time === 'number' ? this.candleByTime.get(time) : undefined;
       if (!candle) {
@@ -124,17 +144,17 @@ export class ArenaChart {
       height: 360,
       layout: {
         background: { color: 'transparent' },
-        textColor: '#6B6D80',
+        textColor,
       },
       grid: {
-        vertLines: { color: 'rgba(128, 128, 128, 0.12)' },
-        horzLines: { color: 'rgba(128, 128, 128, 0.12)' },
+        vertLines: { color: borderColor },
+        horzLines: { color: borderColor },
       },
       rightPriceScale: {
-        borderColor: 'rgba(128, 128, 128, 0.25)',
+        borderColor,
       },
       timeScale: {
-        borderColor: 'rgba(128, 128, 128, 0.25)',
+        borderColor,
         minBarSpacing: 8,
         tickMarkFormatter: (time: Time) => formatTick(time),
       },
@@ -144,22 +164,22 @@ export class ArenaChart {
     });
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#2FA57D',
-      downColor: '#E5483A',
+      upColor: this.positiveColor,
+      downColor: this.negativeColor,
       borderVisible: false,
-      wickUpColor: '#2FA57D',
-      wickDownColor: '#E5483A',
+      wickUpColor: this.positiveColor,
+      wickDownColor: this.negativeColor,
     });
 
     const sma20Series = chart.addSeries(LineSeries, {
-      color: '#526ED3',
+      color: sma20Color,
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
     });
 
     const sma50Series = chart.addSeries(LineSeries, {
-      color: '#8E5BD0',
+      color: sma50Color,
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -203,7 +223,7 @@ export class ArenaChart {
     this.priceLines = [];
 
     for (const order of this.orders()) {
-      const color = order.side === 'buy' ? '#008764' : '#EB1700';
+      const color = order.side === 'buy' ? this.positiveColor : this.negativeColor;
       if (order.limitPrice != null) {
         this.priceLines.push(
           this.candleSeries.createPriceLine({
@@ -219,7 +239,7 @@ export class ArenaChart {
         this.priceLines.push(
           this.candleSeries.createPriceLine({
             price: order.stopPrice,
-            color: '#E07B39',
+            color: this.warningColor,
             lineWidth: 1,
             lineStyle: 2,
             title: `Стоп ${order.lots} лот.`,
@@ -240,16 +260,23 @@ export class ArenaChart {
     }
 
     if (this.markersPlugin) {
-      const markers: SeriesMarker<Time>[] = this.fills().map((fill) => ({
-        time: toChartTime(fill.step),
-        position: fill.side === 'buy' ? 'belowBar' : 'aboveBar',
-        color: fill.side === 'buy' ? '#008764' : '#EB1700',
-        shape: fill.side === 'buy' ? 'arrowUp' : 'arrowDown',
-        text: `${fill.side === 'buy' ? '+' : '−'}${fill.lots} лот.`,
-      }));
+      // lightweight-charts 5 требует маркеры, отсортированные по времени по возрастанию.
+      const markers: SeriesMarker<Time>[] = [...this.fills()]
+        .sort((a, b) => a.step - b.step)
+        .map((fill) => ({
+          time: toChartTime(fill.step),
+          position: fill.side === 'buy' ? 'belowBar' : 'aboveBar',
+          color: fill.side === 'buy' ? this.positiveColor : this.negativeColor,
+          shape: fill.side === 'buy' ? 'arrowUp' : 'arrowDown',
+          text: `${fill.side === 'buy' ? '+' : '−'}${fill.lots} лот.`,
+        }));
       this.markersPlugin.setMarkers(markers);
     }
 
-    this.chart.timeScale().fitContent();
+    const currentPaperId = this.paperId();
+    if (list.length > 0 && this.lastFittedPaperId !== currentPaperId) {
+      this.lastFittedPaperId = currentPaperId;
+      this.chart.timeScale().fitContent();
+    }
   }
 }

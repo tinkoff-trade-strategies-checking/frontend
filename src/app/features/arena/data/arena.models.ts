@@ -11,6 +11,14 @@ export type TimeInForce = 'day' | 'gtc';
 
 export type OrderStatus = 'active' | 'filled' | 'partial' | 'cancelled' | 'expired' | 'rejected';
 
+export type ArenaRejectReason =
+  | 'INVALID_PARAMS'
+  | 'INSUFFICIENT_CASH'
+  | 'INSUFFICIENT_POSITION'
+  | 'SESSION_NOT_ACTIVE'
+  | 'ORDER_NOT_ACTIVE'
+  | 'LIQUIDITY_LIMIT';
+
 export interface ArenaCandle {
   readonly step: number;
   readonly day: number;
@@ -40,13 +48,15 @@ export interface ArenaOrder {
   readonly filledLots: number;
   readonly tif: TimeInForce;
   readonly status: OrderStatus;
-  readonly createdStep: number;
+  readonly step: number;
+  readonly seenStep: number;
   readonly limitPrice?: number;
   readonly stopPrice?: number;
   readonly takeProfitPrice?: number;
   readonly trailingPct?: number;
   readonly peakPrice?: number;
-  readonly note?: string;
+  readonly rejectReason?: ArenaRejectReason;
+  readonly rejectField?: string;
 }
 
 export interface ArenaFill {
@@ -141,9 +151,19 @@ export interface ReplaceOrderCommand {
   readonly trailingPct?: number;
 }
 
+export interface EstimateOrderCommand {
+  readonly paperId: string;
+  readonly lots: number;
+}
+
+export interface OrderEstimateResult {
+  readonly amountPct: number;
+}
+
 export interface ArenaCommandResult {
   readonly accepted: boolean;
-  readonly reason?: string;
+  readonly reason?: ArenaRejectReason;
+  readonly field?: string;
   readonly order?: ArenaOrder;
   readonly orders: readonly ArenaOrder[];
   readonly portfolio: ArenaPortfolio;
@@ -159,6 +179,7 @@ export interface ArenaFinishResult {
 export interface ArenaApi {
   getSnapshot(): Promise<ArenaSnapshot>;
   step(): Promise<ArenaStepResult>;
+  estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;
   placeOrder(command: PlaceOrderCommand): Promise<ArenaCommandResult>;
   cancelOrder(command: CancelOrderCommand): Promise<ArenaCommandResult>;
   replaceOrder(command: ReplaceOrderCommand): Promise<ArenaCommandResult>;

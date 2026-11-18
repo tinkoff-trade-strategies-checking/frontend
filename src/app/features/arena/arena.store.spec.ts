@@ -23,23 +23,33 @@ describe('ArenaStore', () => {
     expect(snapSpy).toHaveBeenCalledTimes(1);
     expect(getItemSpy).not.toHaveBeenCalled();
     expect(store.sessionId()).toBe('S-0104');
-    expect(store.step()).toBe(1);
+    expect(store.step()).toBe(0);
     getItemSpy.mockRestore();
   });
 
-  it('INV-1: stepOnce добавляет только одну новую свечу и не предзагружает будущее', async () => {
+  it('INV-1: stepOnce добавляет только одну новую свечу и очищает notice', async () => {
     const stub = new StubArenaApi();
     const stepSpy = vi.spyOn(stub, 'step');
     const { store } = setup(stub);
 
     await store.init();
-    const initialLen = store.selectedPaper()!.candles.length;
+    await store.placeOrder({
+      paperId: 'A',
+      side: 'buy',
+      type: 'limit',
+      lots: 5,
+      tif: 'day',
+      limitPrice: 95,
+    });
+    expect(store.notice()).toBe('Заявка выставлена.');
 
+    const initialLen = store.selectedPaper()!.candles.length;
     await store.stepOnce();
     expect(stepSpy).toHaveBeenCalledTimes(1);
-    expect(store.step()).toBe(2);
+    expect(store.step()).toBe(1);
     expect(store.selectedPaper()!.candles.length).toBe(initialLen + 1);
-    expect(store.selectedPaper()!.candles.at(-1)?.step).toBe(2);
+    expect(store.selectedPaper()!.candles.at(-1)?.step).toBe(1);
+    expect(store.notice()).toBeNull();
   });
 
   it('INV-2: placeOrder, replaceOrder и cancelOrder отправляются с seenStep последней показанной свечи', async () => {
@@ -52,7 +62,7 @@ describe('ArenaStore', () => {
     await store.init();
     await store.stepOnce();
     await store.stepOnce();
-    expect(store.step()).toBe(3);
+    expect(store.step()).toBe(2);
 
     const placed = await store.placeOrder({
       paperId: 'A',
@@ -62,27 +72,23 @@ describe('ArenaStore', () => {
       tif: 'day',
       limitPrice: 95,
     });
-    expect(placeSpy).toHaveBeenCalledWith(expect.objectContaining({ seenStep: 3 }));
+    expect(placeSpy).toHaveBeenCalledWith(expect.objectContaining({ seenStep: 2 }));
 
-    const orderId = placed.order!.id;
-    const replaced = await store.replaceOrder(orderId, {
-      lots: 8,
-      tif: 'gtc',
-      limitPrice: 94,
-    });
-    expect(replaceSpy).toHaveBeenCalledWith(expect.objectContaining({ seenStep: 3, orderId }));
+    const orderId = placed!.order!.id;
+    const replaced = await apiReplace(store, orderId);
+    expect(replaceSpy).toHaveBeenCalledWith(expect.objectContaining({ seenStep: 2, orderId }));
 
-    await store.cancelOrder(replaced.order!.id);
+    await store.cancelOrder(replaced!.order!.id);
     expect(cancelSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ seenStep: 3, orderId: replaced.order!.id }),
+      expect.objectContaining({ seenStep: 2, orderId: replaced!.order!.id }),
     );
   });
 
-  it('INV-6: отображает метрики портфеля из источника без пересчёта на клиенте', async () => {
+  it('INV-6: оценка заявки и метрики портфеля приходят из источника без расчёта в клиенте', async () => {
     const customSnapshot: ArenaSnapshot = {
       sessionId: 'S-MOCK',
       blind: true,
-      step: 1,
+      step: 0,
       totalSteps: 10,
       day: 1,
       totalDays: 10,
@@ -94,7 +100,7 @@ describe('ArenaStore', () => {
           sector: 'IT',
           candles: [
             {
-              step: 1,
+              step: 0,
               day: 1,
               candleInDay: 1,
               open: 100,
@@ -124,13 +130,51 @@ describe('ArenaStore', () => {
 
     const stub = new StubArenaApi();
     vi.spyOn(stub, 'getSnapshot').mockResolvedValue(customSnapshot);
+    vi.spyOn(stub, 'estimateOrder').mockResolvedValue({ amountPct: 42.42 });
     const { store } = setup(stub);
 
     await store.init();
     expect(store.portfolio()).toEqual(customSnapshot.portfolio);
+
+    await store.estimateOrder('A', 7);
+    expect(store.estimatedPct()).toBe(42.42);
   });
 
-  it('поддерживает скорости ×1, ×5, ×10, ×100, паузу и завершение сессии', async () => {
+  it('сериализует команды и шаги, сбрасывает editingOrder при отказе замены и ловит ошибки API', async () => {
+    const stub = new StubArenaApi();
+    const { store } = setup(stub);
+    await store.init();
+
+    const placed = await store.placeOrder({
+      paperId: 'A',
+      side: 'buy',
+      type: 'limit',
+      lots: 5,
+      tif: 'day',
+      limitPrice: 95,
+    });
+    const order = placed!.order!;
+    store.startEditOrder(order);
+    expect(store.editingOrder()?.id).toBe(order.id);
+
+    // Отказ замены (недостаточно средств) сбрасывает режим замены и выставляет error.
+    await store.replaceOrder(order.id, { lots: 500, tif: 'day', limitPrice: 95 });
+    expect(store.editingOrder()).toBeNull();
+    expect(store.error()).toContain('Недостаточно свободных средств');
+
+    // Исключение в API перехватывается в store.error.
+    vi.spyOn(stub, 'placeOrder').mockRejectedValueOnce(new Error('Сетевой сбой'));
+    await store.placeOrder({
+      paperId: 'A',
+      side: 'buy',
+      type: 'market',
+      lots: 1,
+      tif: 'day',
+    });
+    expect(store.error()).toBe('Сетевой сбой');
+  });
+
+  it('поддерживает скорости ×1, ×5, ×10, ×100, паузу и не сбрасывает finished', async () => {
     const { store } = setup();
     await store.init();
 
@@ -148,3 +192,11 @@ describe('ArenaStore', () => {
     expect(store.canStep()).toBe(false);
   });
 });
+
+function apiReplace(store: ArenaStore, orderId: string) {
+  return store.replaceOrder(orderId, {
+    lots: 8,
+    tif: 'gtc',
+    limitPrice: 94,
+  });
+}

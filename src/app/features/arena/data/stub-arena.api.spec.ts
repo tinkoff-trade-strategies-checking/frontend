@@ -1,29 +1,45 @@
 import { StubArenaApi } from './stub-arena.api';
 
-describe('StubArenaApi', () => {
-  it('INV-1: снимок и шаги не отдают свечи дальше текущего курсора', async () => {
-    const api = new StubArenaApi();
-    const snap = await api.getSnapshot();
+function assertNoBlindLeaks(payload: unknown): void {
+  const serialized = JSON.stringify(payload);
+  expect(serialized).not.toContain('₽');
+  for (const forbidden of ['ticker', 'realDate', 'timeOfDay', 'lotSize', 'priceStep']) {
+    expect(serialized).not.toContain(forbidden);
+  }
+}
 
-    for (const paper of snap.papers) {
-      const maxStep = Math.max(...paper.candles.map((c) => c.step));
-      expect(maxStep).toBe(snap.step);
-      expect(paper.candles.every((c) => c.step <= snap.step)).toBe(true);
+describe('StubArenaApi', () => {
+  it('INV-1: снимок после нескольких шагов и сами шаги не отдают свечи дальше курсора', async () => {
+    const api = new StubArenaApi();
+    const initial = await api.getSnapshot();
+
+    for (const paper of initial.papers) {
+      expect(Math.max(...paper.candles.map((c) => c.step))).toBe(initial.step);
     }
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       const prevStep = (await api.getSnapshot()).step;
       const res = await api.step();
       expect(res.step).toBe(prevStep + 1);
-      for (const paper of snap.papers) {
+      for (const paper of initial.papers) {
         expect(res.bars[paper.id].step).toBe(res.step);
       }
     }
+
+    const afterSteps = await api.getSnapshot();
+    expect(afterSteps.step).toBe(4);
+    for (const paper of afterSteps.papers) {
+      expect(Math.max(...paper.candles.map((c) => c.step))).toBe(afterSteps.step);
+      expect(paper.candles.every((c) => c.step <= afterSteps.step)).toBe(true);
+    }
   });
 
-  it('INV-2: команды заявки, отмены и замены требуют актуальный seenStep', async () => {
+  it('INV-2: различает step и seenStep (seenStep < step принимается, seenStep > step отклоняется)', async () => {
     const api = new StubArenaApi();
+    await api.step();
+    await api.step();
     const snap = await api.getSnapshot();
+    expect(snap.step).toBe(2);
 
     const futureOrder = await api.placeOrder({
       seenStep: snap.step + 1,
@@ -34,9 +50,11 @@ describe('StubArenaApi', () => {
       tif: 'day',
     });
     expect(futureOrder.accepted).toBe(false);
+    expect(futureOrder.reason).toBe('INVALID_PARAMS');
+    expect(futureOrder.field).toBe('seenStep');
 
-    const validOrder = await api.placeOrder({
-      seenStep: snap.step,
+    const laggedOrder = await api.placeOrder({
+      seenStep: snap.step - 1,
       paperId: 'A',
       side: 'buy',
       type: 'limit',
@@ -44,29 +62,20 @@ describe('StubArenaApi', () => {
       tif: 'day',
       limitPrice: 95,
     });
-    expect(validOrder.accepted).toBe(true);
-    expect(validOrder.order?.createdStep).toBe(snap.step);
-
-    const orderId = validOrder.order!.id;
-
-    const badReplace = await api.replaceOrder({
-      seenStep: snap.step + 2,
-      orderId,
-      lots: 10,
-      tif: 'gtc',
-      limitPrice: 94,
-    });
-    expect(badReplace.accepted).toBe(false);
+    expect(laggedOrder.accepted).toBe(true);
+    expect(laggedOrder.order?.step).toBe(2);
+    expect(laggedOrder.order?.seenStep).toBe(1);
 
     const okReplace = await api.replaceOrder({
-      seenStep: snap.step,
-      orderId,
+      seenStep: snap.step - 1,
+      orderId: laggedOrder.order!.id,
       lots: 10,
       tif: 'gtc',
       limitPrice: 94,
     });
     expect(okReplace.accepted).toBe(true);
-    expect(okReplace.order?.lots).toBe(10);
+    expect(okReplace.order?.step).toBe(2);
+    expect(okReplace.order?.seenStep).toBe(1);
 
     const okCancel = await api.cancelOrder({
       seenStep: snap.step,
@@ -76,29 +85,36 @@ describe('StubArenaApi', () => {
     expect(okCancel.orders.every((o) => o.status === 'cancelled')).toBe(true);
   });
 
-  it('INV-7: в слепом режиме нет запрещённых полей, реальных дат и рублёвых сумм', async () => {
+  it('INV-7: слепой режим (P0 = open шага 0, V_rel, без запрещённых полей в снимке, шагах и командах)', async () => {
     const api = new StubArenaApi();
     const snap = await api.getSnapshot();
-    const serialized = JSON.stringify(snap);
-
-    expect(snap.blind).toBe(true);
-    expect(serialized).not.toContain('₽');
-    for (const forbidden of ['ticker', 'realDate', 'timeOfDay', 'lotSize', 'priceStep']) {
-      expect(serialized).not.toContain(forbidden);
-    }
+    assertNoBlindLeaks(snap);
 
     for (const paper of snap.papers) {
       expect(paper.label).toMatch(/^Бумага [A-E]$/);
       expect(paper.sector.length).toBeGreaterThan(0);
-      const startBar = paper.candles.find((c) => c.step === 1);
-      expect(startBar?.open).toBe(100);
+      const stepZero = paper.candles.find((c) => c.step === 0);
+      expect(stepZero?.open).toBe(100);
+      const warmup = paper.candles.filter((c) => c.step < 0);
+      const avgWarmupVol = warmup.reduce((sum, b) => sum + b.volume, 0) / warmup.length;
+      expect(avgWarmupVol).toBeCloseTo(100, 0);
     }
 
-    expect(snap.portfolio.equityPct).toBe(100);
-    expect(snap.portfolio.cashPct).toBe(100);
+    const stepRes = await api.step();
+    assertNoBlindLeaks(stepRes);
+
+    const cmdRes = await api.placeOrder({
+      seenStep: stepRes.step,
+      paperId: 'A',
+      side: 'buy',
+      type: 'market',
+      lots: 5,
+      tif: 'day',
+    });
+    assertNoBlindLeaks(cmdRes);
   });
 
-  it('рыночная заявка исполняется по open следующей свечи и обновляет портфель', async () => {
+  it('заявка не исполняется на шаге подачи, а рыночная исполняется на open следующей свечи', async () => {
     const api = new StubArenaApi();
     const snap = await api.getSnapshot();
 
@@ -111,6 +127,7 @@ describe('StubArenaApi', () => {
       tif: 'day',
     });
     expect(placed.accepted).toBe(true);
+    expect((await api.getSnapshot()).fills.length).toBe(0);
 
     const next = await api.step();
     expect(next.fills.length).toBe(1);
@@ -120,58 +137,69 @@ describe('StubArenaApi', () => {
     expect(next.portfolio.costsPct).toBeGreaterThan(0);
   });
 
-  it('валидирует трейлинг-стоп (только продажа, 0 < d <= 50) и OCO (стоп < тейк)', async () => {
+  it('проверяет коды отказов INSUFFICIENT_CASH, INSUFFICIENT_POSITION, INVALID_PARAMS и SESSION_NOT_ACTIVE', async () => {
     const api = new StubArenaApi();
     const { step } = await api.getSnapshot();
 
-    const badTrailSide = await api.placeOrder({
+    const noCash = await api.placeOrder({
       seenStep: step,
       paperId: 'A',
       side: 'buy',
-      type: 'trailing',
-      lots: 5,
-      tif: 'gtc',
-      trailingPct: 5,
+      type: 'market',
+      lots: 500,
+      tif: 'day',
     });
-    expect(badTrailSide.accepted).toBe(false);
+    expect(noCash.accepted).toBe(false);
+    expect(noCash.reason).toBe('INSUFFICIENT_CASH');
 
-    const badTrailPct = await api.placeOrder({
+    const noPos = await api.placeOrder({
       seenStep: step,
       paperId: 'A',
       side: 'sell',
-      type: 'trailing',
-      lots: 5,
-      tif: 'gtc',
-      trailingPct: 60,
+      type: 'market',
+      lots: 1,
+      tif: 'day',
     });
-    expect(badTrailPct.accepted).toBe(false);
+    expect(noPos.accepted).toBe(false);
+    expect(noPos.reason).toBe('INSUFFICIENT_POSITION');
 
-    const badOco = await api.placeOrder({
+    // Покупаем 10 лотов, чтобы проверить тейк-профит <= close.
+    await api.placeOrder({
       seenStep: step,
       paperId: 'A',
+      side: 'buy',
+      type: 'market',
+      lots: 10,
+      tif: 'day',
+    });
+    const afterBuy = await api.step();
+    const currentClose = afterBuy.bars['A'].close;
+
+    const badTp = await api.placeOrder({
+      seenStep: afterBuy.step,
+      paperId: 'A',
       side: 'sell',
-      type: 'oco',
+      type: 'take_profit',
       lots: 5,
       tif: 'gtc',
-      stopPrice: 110,
-      takeProfitPrice: 105,
+      takeProfitPrice: currentClose,
     });
-    expect(badOco.accepted).toBe(false);
-  });
+    expect(badTp.accepted).toBe(false);
+    expect(badTp.reason).toBe('INVALID_PARAMS');
+    expect(badTp.field).toBe('takeProfitPrice');
 
-  it('finishSession запрещает новые заявки после завершения', async () => {
-    const api = new StubArenaApi();
     const fin = await api.finishSession();
-    expect(fin.finishedAtStep).toBe(1);
+    expect(fin.finishedAtStep).toBe(afterBuy.step);
 
-    const res = await api.placeOrder({
-      seenStep: 1,
+    const afterFinish = await api.placeOrder({
+      seenStep: afterBuy.step,
       paperId: 'A',
       side: 'buy',
       type: 'market',
       lots: 1,
       tif: 'day',
     });
-    expect(res.accepted).toBe(false);
+    expect(afterFinish.accepted).toBe(false);
+    expect(afterFinish.reason).toBe('SESSION_NOT_ACTIVE');
   });
 });

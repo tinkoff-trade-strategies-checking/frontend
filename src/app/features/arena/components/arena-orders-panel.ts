@@ -1,8 +1,19 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { TuiButton } from '@taiga-ui/core';
 import { TuiBadge, TuiTabs } from '@taiga-ui/kit';
-import { formatBlindCandleLabel, formatLots, formatPct, formatPrice } from '../arena.format';
-import { ArenaFill, ArenaOrder, ORDER_TYPE_LABELS } from '../data/arena.models';
+import {
+  formatBlindCandleLabel,
+  formatLots,
+  formatPct,
+  formatPrice,
+  formatRejectReason,
+} from '../arena.format';
+import {
+  ArenaFill,
+  ArenaOrder,
+  ORDER_STATUS_LABELS,
+  ORDER_TYPE_LABELS,
+} from '../data/arena.models';
 
 @Component({
   selector: 'app-arena-orders-panel',
@@ -18,6 +29,10 @@ import { ArenaFill, ArenaOrder, ORDER_TYPE_LABELS } from '../data/arena.models';
         <button tuiTab type="button">
           Сделки
           <span tuiBadge size="s" class="tab-badge">{{ fills().length }}</span>
+        </button>
+        <button tuiTab type="button">
+          Снятые
+          <span tuiBadge size="s" class="tab-badge">{{ closedOrders().length }}</span>
         </button>
       </tui-tabs>
 
@@ -80,7 +95,7 @@ import { ArenaFill, ArenaOrder, ORDER_TYPE_LABELS } from '../data/arena.models';
             </table>
           </div>
         }
-      } @else {
+      } @else if (activeTab() === 1) {
         @if (fills().length === 0) {
           <div class="empty tui-text_body-s">
             Сделок пока нет. Рыночная заявка исполняется на открытии следующей свечи.
@@ -111,6 +126,46 @@ import { ArenaFill, ArenaOrder, ORDER_TYPE_LABELS } from '../data/arena.models';
                     <td class="num">{{ formatPrice(fill.price) }}</td>
                     <td class="num">{{ formatPct(fill.amountPct) }}</td>
                     <td class="num">{{ formatPct(fill.costPct) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      } @else {
+        @if (closedOrders().length === 0) {
+          <div class="empty tui-text_body-s">Снятых и отклонённых заявок нет.</div>
+        } @else {
+          <div class="table-scroll">
+            <table class="arena-table">
+              <thead>
+                <tr>
+                  <th>Бумага</th>
+                  <th>Тип</th>
+                  <th class="num">Лоты</th>
+                  <th>Статус</th>
+                  <th>Причина</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of closedOrders(); track order.id) {
+                  <tr>
+                    <td>
+                      <span [class]="order.side === 'buy' ? 'pos' : 'neg'">
+                        {{ order.side === 'buy' ? 'Купить' : 'Продать' }}
+                      </span>
+                      Бумага {{ order.paperId }}
+                    </td>
+                    <td>{{ typeLabel(order.type) }}</td>
+                    <td class="num">{{ formatLots(order.lots) }}</td>
+                    <td>{{ statusLabel(order.status) }}</td>
+                    <td class="tui-text_body-xs">
+                      {{
+                        order.rejectReason
+                          ? formatReason(order.rejectReason, order.rejectField)
+                          : '—'
+                      }}
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -197,6 +252,7 @@ import { ArenaFill, ArenaOrder, ORDER_TYPE_LABELS } from '../data/arena.models';
 })
 export class ArenaOrdersPanel {
   readonly activeOrders = input.required<readonly ArenaOrder[]>();
+  readonly closedOrders = input<readonly ArenaOrder[]>([]);
   readonly fills = input.required<readonly ArenaFill[]>();
   readonly finished = input.required<boolean>();
 
@@ -208,9 +264,14 @@ export class ArenaOrdersPanel {
   protected readonly formatPrice = formatPrice;
   protected readonly formatPct = formatPct;
   protected readonly formatCandle = formatBlindCandleLabel;
+  protected readonly formatReason = formatRejectReason;
 
   protected typeLabel(type: ArenaOrder['type']): string {
     return ORDER_TYPE_LABELS[type];
+  }
+
+  protected statusLabel(status: ArenaOrder['status']): string {
+    return ORDER_STATUS_LABELS[status];
   }
 
   protected describeOrder(order: ArenaOrder): string {

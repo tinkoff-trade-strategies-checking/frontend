@@ -99,6 +99,7 @@
         @if (store.selectedPaper(); as paper) {
           <div class="chart-box">
             <app-arena-chart
+              [paperId]="paper.id"
               [candles]="paper.candles"
               [orders]="selectedPaperOrders()"
               [fills]="selectedPaperFills()"
@@ -111,6 +112,7 @@
 
       <app-arena-orders-panel
         [activeOrders]="store.activeOrders()"
+        [closedOrders]="store.closedOrders()"
         [fills]="store.fills()"
         [finished]="store.finished()"
         (cancelOrder)="store.cancelOrder($event)"
@@ -125,8 +127,10 @@
         [portfolio]="store.portfolio()"
         [finished]="store.finished()"
         [editingOrder]="store.editingOrder()"
+        [estimatedPct]="store.estimatedPct()"
         [error]="store.error()"
         (paperSelect)="store.selectPaper($event)"
+        (estimateRequest)="store.estimateOrder($event.paperId, $event.lots)"
         (submitOrder)="store.placeOrder($event)"
         (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
         (cancelEdit)="store.cancelEditOrder()"

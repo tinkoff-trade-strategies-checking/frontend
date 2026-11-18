@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideTaiga } from '@taiga-ui/core';
+import { vi } from 'vitest';
 import { formatBlindAxisTick, formatBlindCandleLabel } from './arena.format';
 import { ArenaPage } from './arena-page';
 import { ArenaChart } from './components/arena-chart';
-import { ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
+import { ARENA_API, ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
+import { StubArenaApi } from './data/stub-arena.api';
 
 @Component({
   selector: 'app-arena-chart',
@@ -12,6 +14,7 @@ import { ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
   template: `<div class="stub-chart">Свечей: {{ candles().length }}</div>`,
 })
 class StubArenaChart {
+  readonly paperId = input<string>('');
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -20,25 +23,38 @@ class StubArenaChart {
 }
 
 describe('ArenaPage', () => {
+  let stubApi: StubArenaApi;
+
   beforeEach(async () => {
+    stubApi = new StubArenaApi();
+    vi.spyOn(stubApi, 'estimateOrder').mockResolvedValue({ amountPct: 77.77 });
+
     await TestBed.configureTestingModule({
       imports: [ArenaPage],
       providers: [provideTaiga()],
     })
       .overrideComponent(ArenaPage, {
-        remove: { imports: [ArenaChart] },
-        add: { imports: [StubArenaChart] },
+        remove: {
+          imports: [ArenaChart],
+          providers: [{ provide: ARENA_API, useClass: StubArenaApi }],
+        },
+        add: {
+          imports: [StubArenaChart],
+          providers: [{ provide: ARENA_API, useValue: stubApi }],
+        },
       })
       .compileComponents();
   });
 
-  it('отображает плеер, вкладки бумаг, форму заявки и портфель в слепом режиме без рублёвых сумм', async () => {
+  it('INV-6/INV-7: отображает оценку из ArenaApi, русские типы заявок, подписи портфеля и вкладку Снятые без ₽', async () => {
     const fixture = TestBed.createComponent(ArenaPage);
     fixture.detectChanges();
     await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
     expect(text).toContain('Арена');
     expect(text).toContain('Слепая сессия');
     expect(text).toContain('День 1 из 60');
@@ -49,9 +65,9 @@ describe('ArenaPage', () => {
     expect(text).toContain('Портфель');
     expect(text).toContain('Стоимость портфеля');
     expect(text).toContain('P&L');
-    expect(text).toContain('в % от капитала');
+    expect(text).toContain('Снятые');
+    expect(text).toContain('77,77 %');
 
-    const root = fixture.nativeElement as HTMLElement;
     const typeSelect = root.querySelector('#arena-order-type') as HTMLSelectElement | null;
     expect(typeSelect).not.toBeNull();
     const optionTexts = Array.from(typeSelect!.options).map((o) => o.textContent?.trim());
@@ -66,9 +82,9 @@ describe('ArenaPage', () => {
   });
 
   it('форматирует короткие метки оси времени и полные подписи перекрестия', () => {
-    expect(formatBlindAxisTick(0, 0)).toBe('п−1');
-    expect(formatBlindAxisTick(-2, 0)).toBe('п−3');
-    expect(formatBlindAxisTick(5, 5)).toBe('д5');
+    expect(formatBlindAxisTick(-1, 0)).toBe('п−1');
+    expect(formatBlindAxisTick(-3, 0)).toBe('п−3');
+    expect(formatBlindAxisTick(5, 6)).toBe('д6');
     expect(formatBlindCandleLabel(5, 1)).toBe('день 5, свеча 1');
   });
 });
