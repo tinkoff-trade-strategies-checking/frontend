@@ -103,7 +103,7 @@ const ALL_STUB_RECORDS: readonly HistoryEntry[] = [
     title: 'Февраль 2022: шок ликвидности',
     papers: ['VTBR', 'GAZP'],
     periodLabel: '14.02.2022 — 11.04.2022',
-    netReturnPct: -94.2,
+    netReturnPct: -100,
     playedDays: 39,
     totalDays: 60,
     algoName: null,
