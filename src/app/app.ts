@@ -3,9 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TuiButton, TuiRoot } from '@taiga-ui/core';
 import { filter, map, startWith } from 'rxjs';
+import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 import { StubSessionRegistry } from './shared/stub-session-registry';
-
-const DEFAULT_REPORT_SESSION_ID = 'S-0103';
 
 @Component({
   selector: 'app-root',

@@ -34,7 +34,7 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
   selector: 'app-report-equity-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="chart-legend tui-text_body-xs" aria-hidden="true">
+    <div class="chart-legend tui-text_body-xs">
       <span class="legend-item"><span class="swatch swatch-human"></span>Вы</span>
       <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм</span>
       <span class="legend-item"><span class="swatch swatch-bench"></span>IMOEX</span>

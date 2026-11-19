@@ -87,6 +87,36 @@ describe('LaunchPage', () => {
     expect(textAfter).not.toContain('Сбербанк');
   });
 
+  it('поле «Дата начала»: tuiInputDate внутри подписи, ввод и очистка меняют store', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const store = fixture.debugElement.injector.get(LaunchStore);
+
+    await store.setStartMode('custom');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const input = root.querySelector<HTMLInputElement>(
+      'label[for="launch-custom-date"] input[tuiInputDate]',
+    );
+    expect(input).not.toBeNull();
+    expect(input?.id).toBe('launch-custom-date');
+
+    input!.value = '01.02.2020';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(store.customStartDate()).toBe('2020-02-01');
+
+    input!.value = '';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(store.customStartDate()).toBe('');
+  });
+
   it('показывает кнопку «Повторить» при ошибке загрузки параметров', async () => {
     vi.spyOn(stubApi, 'getLaunchOptions').mockRejectedValueOnce(new Error('Network error'));
 
