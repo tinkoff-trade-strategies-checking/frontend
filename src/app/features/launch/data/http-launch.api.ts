@@ -4,6 +4,7 @@ import { createSession } from '../../../api/fn/sessions/create-session';
 import { getLaunchOptions } from '../../../api/fn/marketdata/get-launch-options';
 import { listAvailablePapers } from '../../../api/fn/marketdata/list-available-papers';
 import { LaunchOptions as ApiLaunchOptions } from '../../../api/models/launch-options';
+import { LaunchRejectReason as ApiLaunchRejectReason } from '../../../api/models/launch-reject-reason';
 import { toProblem } from '../../../core/api-problem';
 import {
   CandleTimeframe,
@@ -11,16 +12,20 @@ import {
   LaunchCommandResult,
   LaunchCustomPaper,
   LaunchOptions,
-  LaunchRejectReason,
   StartSessionCommand,
 } from './launch.models';
 
-const REJECT_REASONS: readonly string[] = [
-  'NO_MATCHING_PERIOD',
-  'TOO_MANY_BARS',
-  'INVALID_PARAMS',
-  'CORPORATE_ACTION_ON_PERIOD',
-];
+// Исчерпывающая запись по сгенерированному типу: новая причина в контракте не соберётся, пока её не учтут.
+const REJECT_REASONS: Readonly<Record<ApiLaunchRejectReason, true>> = {
+  NO_MATCHING_PERIOD: true,
+  TOO_MANY_BARS: true,
+  INVALID_PARAMS: true,
+  CORPORATE_ACTION_ON_PERIOD: true,
+};
+
+function isRejectReason(code: string | null): code is ApiLaunchRejectReason {
+  return code !== null && Object.hasOwn(REJECT_REASONS, code);
+}
 
 /**
  * Деньги и проценты контракта — десятичные строки (INV-6). Число нужно только полю ввода и подписям;
@@ -80,14 +85,10 @@ export class HttpLaunchApi implements LaunchApi {
     } catch (error) {
       // Отказ запуска — 422 с кодом из LaunchRejectReason: это ответ пользователю, а не сбой.
       const problem = toProblem(error);
-      if (
-        problem.status === 422 &&
-        problem.code !== null &&
-        REJECT_REASONS.includes(problem.code)
-      ) {
+      if (problem.status === 422 && isRejectReason(problem.code)) {
         return {
           accepted: false,
-          reason: problem.code as LaunchRejectReason,
+          reason: problem.code,
           field: problem.field,
           barsCount: problem.barsCount,
           maxBars: problem.maxBars,

@@ -72,6 +72,15 @@ describe('http-interceptors', () => {
     expect(navigate).toHaveBeenCalledWith(['/login'], expect.anything());
   });
 
+  it('401 на выходе (сессия уже истекла) не даёт лишней переадресации', () => {
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    http.post('/api/v1/auth/logout', {}).subscribe({ error: () => undefined });
+    controller
+      .expectOne('/api/v1/auth/logout')
+      .flush({ code: 'UNAUTHENTICATED' }, { status: 401, statusText: 'Unauthorized' });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it('401 на /me и на входе не уводит на /login', () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     http.get('/api/v1/me').subscribe({ error: () => undefined });

@@ -9,9 +9,7 @@ import {
   HistoryRegimeFilter,
   HistoryStatusFilter,
 } from './data/history.models';
-import { StubHistoryApi } from './data/stub-history.api';
-import { HttpHistoryApi } from './data/http-history.api';
-import { apiImpl } from '../../core/api-mode';
+import { HISTORY_API_IMPL } from '../../api-impls';
 import {
   formatHistoryTitle,
   formatMoscowDateTime,
@@ -49,10 +47,7 @@ const REGIME_FILTERS: readonly { readonly id: HistoryRegimeFilter; readonly labe
 @Component({
   selector: 'app-history-page',
   imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiSegmented],
-  providers: [
-    { provide: HISTORY_API, useClass: apiImpl(StubHistoryApi, HttpHistoryApi) },
-    HistoryStore,
-  ],
+  providers: [{ provide: HISTORY_API, useClass: HISTORY_API_IMPL }, HistoryStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './history-page.html',
   styleUrl: './history-page.less',

@@ -80,6 +80,10 @@
                 {
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.stub.ts"
+                },
+                {
+                  "replace": "src/app/api-impls.ts",
+                  "with": "src/app/api-impls.stub.ts"
                 }
               ]
             },
@@ -91,6 +95,10 @@
                 {
                   "replace": "src/environments/environment.ts",
                   "with": "src/environments/environment.stub.ts"
+                },
+                {
+                  "replace": "src/app/api-impls.ts",
+                  "with": "src/app/api-impls.stub.ts"
                 }
               ]
             }

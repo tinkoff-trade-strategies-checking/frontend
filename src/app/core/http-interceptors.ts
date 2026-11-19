@@ -41,7 +41,9 @@ export const apiErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const http = inject(HttpClient);
   const auth = inject(AuthService);
   const router = inject(Router);
-  const isAuthEndpoint = req.url.endsWith('/me') || req.url.endsWith('/auth/login');
+  const isAuthEndpoint = ['/me', '/auth/login', '/auth/logout'].some((suffix) =>
+    req.url.endsWith(suffix),
+  );
 
   return next(req).pipe(
     catchError((error: unknown) => {

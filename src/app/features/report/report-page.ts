@@ -6,7 +6,7 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import { DivergenceType, EquityCurvePoint, REPORT_API } from './data/report.models';
-import { StubReportApi } from './data/stub-report.api';
+import { REPORT_API_IMPL } from '../../api-impls';
 import {
   DIVERGENCE_TYPE_LABELS,
   formatDeltaBars,
@@ -53,7 +53,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
     ReportEquityChart,
     ReportUnderwaterChart,
   ],
-  providers: [{ provide: REPORT_API, useClass: StubReportApi }, ReportStore],
+  providers: [{ provide: REPORT_API, useClass: REPORT_API_IMPL }, ReportStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './report-page.html',
   styleUrl: './report-page.less',

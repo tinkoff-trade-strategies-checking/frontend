@@ -63,7 +63,12 @@ export function toProblem(error: unknown): ApiProblem {
   };
 }
 
-const MESSAGES: Readonly<Partial<Record<ProblemCode, string>>> = {
+/**
+ * Текст по коду ошибки. `null` — код разбирает вызывающий (отказ запуска, неподходящий запрос) или он
+ * описан статусом. Запись исчерпывающая: новый код из контракта (`api:sync`) не соберётся, пока для него
+ * не решено, что показывать.
+ */
+export const PROBLEM_MESSAGES: Readonly<Record<ProblemCode, string | null>> = {
   UNAUTHENTICATED: 'Сессия входа истекла. Войдите снова.',
   INVALID_CREDENTIALS: 'Неверная почта или пароль.',
   CSRF_INVALID: 'Не удалось подтвердить запрос. Обновите страницу и повторите.',
@@ -78,6 +83,12 @@ const MESSAGES: Readonly<Partial<Record<ProblemCode, string>>> = {
   TOO_MANY_REQUESTS: 'Слишком много попыток.',
   SERVICE_UNAVAILABLE: 'Сервис временно недоступен. Попробуйте позже.',
   INTERNAL_ERROR: 'Внутренняя ошибка сервера. Попробуйте позже.',
+  NO_MATCHING_PERIOD: null,
+  TOO_MANY_BARS: null,
+  CORPORATE_ACTION_ON_PERIOD: null,
+  METHOD_NOT_ALLOWED: null,
+  NOT_ACCEPTABLE: null,
+  UNSUPPORTED_MEDIA_TYPE: null,
 };
 
 /** Текст для пользователя по коду ошибки; без кода — по статусу. */
@@ -85,15 +96,15 @@ export function problemMessage(problem: ApiProblem, fallback: string): string {
   if (problem.code === 'TOO_MANY_REQUESTS' && problem.retryAfterSec !== null) {
     return `Слишком много попыток. Повторите через ${problem.retryAfterSec} с.`;
   }
-  const byCode = problem.code === null ? undefined : MESSAGES[problem.code];
-  if (byCode !== undefined) {
+  const byCode = problem.code === null ? undefined : PROBLEM_MESSAGES[problem.code];
+  if (byCode !== undefined && byCode !== null) {
     return byCode;
   }
   if (problem.status === 0) {
     return 'Нет связи с сервером. Проверьте соединение.';
   }
   if (problem.status === 503) {
-    return MESSAGES.SERVICE_UNAVAILABLE as string;
+    return PROBLEM_MESSAGES.SERVICE_UNAVAILABLE as string;
   }
   return fallback;
 }

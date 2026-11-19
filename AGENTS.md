@@ -29,7 +29,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
 
 - `src/app/app.ts`, `app.html` — оболочка: `tui-root`, навигация, `router-outlet`.
 - `src/app/app.routes.ts` — ленивые маршруты разделов; все, кроме `/login`, закрыты `authGuard`.
-- `src/environments/` — режим данных: `environment.ts` (`apiMode: 'real'`, по умолчанию) и `environment.stub.ts` (`'stub'`); подменяются конфигурациями `stub` и `development-stub` в `angular.json` (юнит-тесты идут в `development-stub`). Реализацию порта выбирает `apiImpl(Stub…, Http…)` в `providers` страницы; тесты подменяют `STUB_MODE`.
+- `src/environments/` — режим данных: `environment.ts` (`apiMode: 'real'`, по умолчанию) и `environment.stub.ts` (`'stub'`); подменяются конфигурациями `stub` и `development-stub` в `angular.json` (юнит-тесты идут в `development-stub`). Реализации портов — `src/app/api-impls.ts` (настоящие), в `stub`-конфигурациях его подменяет `api-impls.stub.ts`, поэтому заглушки запуска и истории в боевой бандл не попадают; страницы берут `*_API_IMPL` оттуда. Разделы, ещё не подключённые к API, в настоящем режиме закрыты: `core/real-features.ts` (`REAL_FEATURES`, `featureGuard` ведёт на `/history`); каждая часть frontend#8 включает свои. Тесты подменяют `STUB_MODE`.
 - `src/app/core/` — сквозное: `http-interceptors.ts` (cookie, повтор при `CSRF_INVALID`, 401 → `/login`), `api-problem.ts` (разбор `application/problem+json`, ветвление по `code`, тексты ошибок), `auth/` (`AuthService`: `GET /me` даёт профиль и CSRF-cookie; `authGuard`), `api-mode.ts`.
 - `src/app/features/login/` — страница входа (`/login`).
 - `src/app/features/<раздел>/` — фичи: `launch`, `arena`, `replay`, `workshop`, `report`. Всё, что относится к разделу, — в его папке.

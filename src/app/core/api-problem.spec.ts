@@ -1,5 +1,5 @@
 import { HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { errorMessage, toProblem } from './api-problem';
+import { errorMessage, PROBLEM_MESSAGES, toProblem } from './api-problem';
 
 function httpError(status: number, body: unknown, headers?: Record<string, string>) {
   return new HttpErrorResponse({ status, error: body, headers: new HttpHeaders(headers) });
@@ -42,5 +42,16 @@ describe('api-problem', () => {
     expect(errorMessage(httpError(0, null), 'f')).toContain('Нет связи');
     expect(errorMessage(httpError(503, null), 'f')).toContain('недоступен');
     expect(errorMessage(new Error('x'), 'запасной текст')).toBe('запасной текст');
+  });
+
+  it('для каждого кода контракта решено, что показывать: текст или null (разбирает вызывающий)', () => {
+    // Тип Record<ProblemCode, …> исчерпывающий — новый код из api:sync не соберётся без записи.
+    const entries = Object.entries(PROBLEM_MESSAGES);
+    expect(entries.length).toBeGreaterThanOrEqual(20);
+    for (const [code, message] of entries) {
+      expect(message === null || message.length > 0, code).toBe(true);
+    }
+    expect(PROBLEM_MESSAGES.TOO_MANY_BARS).toBeNull();
+    expect(errorMessage(httpError(422, { code: 'TOO_MANY_BARS' }), 'запасной')).toBe('запасной');
   });
 });

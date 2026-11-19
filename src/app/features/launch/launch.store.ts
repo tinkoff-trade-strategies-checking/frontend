@@ -12,13 +12,16 @@ import {
   StartMode,
   TraderKind,
 } from './data/launch.models';
+import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
+import { isFeatureOpen } from '../../core/real-features';
 import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 
 @Injectable()
 export class LaunchStore {
   private readonly api = inject(LAUNCH_API);
   private readonly router = inject(Router);
+  private readonly stubMode = inject(STUB_MODE);
   private customPapersLoadSeq = 0;
 
   readonly loading = signal(false);
@@ -278,7 +281,11 @@ export class LaunchStore {
         return false;
       }
 
-      await this.router.navigate(['/arena', result.sessionId]);
+      // Пока арена не подключена к API, в настоящем режиме идём в историю, а не на заглушку арены.
+      const target = isFeatureOpen('arena', this.stubMode)
+        ? ['/arena', result.sessionId]
+        : ['/history'];
+      await this.router.navigate(target);
       return true;
     } catch (error) {
       this.error.set(errorMessage(error, 'Не удалось запустить сессию. Попробуйте ещё раз.'));

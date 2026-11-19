@@ -1,9 +1,12 @@
+import { inject } from '@angular/core';
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
+import { STUB_MODE } from './core/api-mode';
+import { featureGuard } from './core/real-features';
 import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'arena' },
+  { path: '', pathMatch: 'full', redirectTo: () => (inject(STUB_MODE) ? 'arena' : 'new') },
   {
     path: 'login',
     title: 'Вход',
@@ -18,13 +21,13 @@ export const routes: Routes = [
   {
     path: 'arena',
     title: 'Арена',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureGuard('arena')],
     loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
   },
   {
     path: 'arena/:id',
     title: 'Арена',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureGuard('arena')],
     loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
   },
   {
@@ -33,11 +36,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
-  { path: 'report', pathMatch: 'full', redirectTo: `report/${DEFAULT_REPORT_SESSION_ID}` },
+  {
+    path: 'report',
+    pathMatch: 'full',
+    redirectTo: () => (inject(STUB_MODE) ? `report/${DEFAULT_REPORT_SESSION_ID}` : 'history'),
+  },
   {
     path: 'report/:id',
     title: 'Отчёт',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureGuard('report')],
     loadComponent: () => import('./features/report/report-page').then((m) => m.ReportPage),
   },
   {
@@ -49,8 +56,8 @@ export const routes: Routes = [
   {
     path: 'replay/:id',
     title: 'Воспроизведение',
-    canActivate: [authGuard],
+    canActivate: [authGuard, featureGuard('replay')],
     loadComponent: () => import('./features/replay/replay-page').then((m) => m.ReplayPage),
   },
-  { path: '**', redirectTo: 'arena' },
+  { path: '**', redirectTo: () => (inject(STUB_MODE) ? 'arena' : 'new') },
 ];

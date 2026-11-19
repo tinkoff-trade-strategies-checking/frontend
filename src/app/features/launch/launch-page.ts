@@ -13,9 +13,7 @@ import {
   SessionDurationDays,
   TIMEFRAME_LABELS,
 } from './data/launch.models';
-import { StubLaunchApi } from './data/stub-launch.api';
-import { HttpLaunchApi } from './data/http-launch.api';
-import { apiImpl } from '../../core/api-mode';
+import { LAUNCH_API_IMPL } from '../../api-impls';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
 
@@ -44,10 +42,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
     TuiSegmented,
     TuiTextfield,
   ],
-  providers: [
-    { provide: LAUNCH_API, useClass: apiImpl(StubLaunchApi, HttpLaunchApi) },
-    LaunchStore,
-  ],
+  providers: [{ provide: LAUNCH_API, useClass: LAUNCH_API_IMPL }, LaunchStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './launch-page.html',
   styleUrl: './launch-page.less',
