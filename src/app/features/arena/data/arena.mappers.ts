@@ -267,6 +267,7 @@ export function mapStepResult(result: StepResult): ArenaStepResult {
     bars,
     batches,
     paperStats,
+    partial: true,
     portfolio: mapPortfolio(result.portfolio),
     orders: (result.orders as (BlindOrder | OpenOrder)[]).map(mapOrder),
     fills: (result.fills as (BlindFill | OpenFill)[]).map(mapFill),

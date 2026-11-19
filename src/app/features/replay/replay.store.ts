@@ -12,15 +12,16 @@ import { REPLAY_API, ReplaySessionResult } from './data/replay.models';
 class ReplayArenaApiAdapter implements ArenaApi {
   constructor(
     private readonly initialSnapshot: ArenaSnapshot,
-    private readonly stepFn: () => Promise<ArenaStepResult>,
+    private readonly stepFn: (count?: number) => Promise<ArenaStepResult>,
+    readonly batchStep: boolean,
   ) {}
 
   async getSnapshot(): Promise<ArenaSnapshot> {
     return this.initialSnapshot;
   }
 
-  step(): Promise<ArenaStepResult> {
-    return this.stepFn();
+  step(count?: number): Promise<ArenaStepResult> {
+    return this.stepFn(count);
   }
 
   async estimateOrder(): Promise<OrderEstimateResult> {
@@ -64,7 +65,11 @@ export class ReplayStore {
       return null;
     }
     const sessionId = res.session.sessionId;
-    return new ReplayArenaApiAdapter(res.snapshot, () => this.api.step(sessionId));
+    return new ReplayArenaApiAdapter(
+      res.snapshot,
+      (count) => this.api.step(sessionId, count),
+      this.api.batchStep === true,
+    );
   });
 
   async load(sessionId: string, initialStep?: number): Promise<void> {

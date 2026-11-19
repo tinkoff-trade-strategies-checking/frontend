@@ -205,4 +205,62 @@ describe('HttpReplayApi', () => {
   it('шаг до загрузки воспроизведения — ошибка', async () => {
     await expect(api.step(SESSION)).rejects.toThrow();
   });
+
+  it('пачка шагов: step = курсор + count, но не дальше lastStep', async () => {
+    const { pending, req } = load(0);
+    req.flush({
+      status: 'READY',
+      kind: 'SNAPSHOT',
+      session: META,
+      snapshot: {
+        mode: 'OPEN',
+        sessionId: SESSION,
+        regime: 'stress',
+        step: 0,
+        totalSteps: 100,
+        warmupSteps: 0,
+        day: 1,
+        totalDays: 60,
+        finished: false,
+        playing: null,
+        speed: null,
+        papers: [],
+        portfolio: PORTFOLIO,
+        fills: [],
+        orders: [],
+      },
+      increment: null,
+    });
+    await pending;
+    expect(api.batchStep).toBe(true);
+
+    const first = api.step(SESSION, 30);
+    const firstReq = controller.expectOne((r) => r.url === `/api/v1/sessions/${SESSION}/replay`);
+    expect(firstReq.request.params.get('step')).toBe('30');
+    expect(firstReq.request.params.get('fromStep')).toBe('0');
+    firstReq.flush({
+      status: 'READY',
+      kind: 'INCREMENT',
+      session: META,
+      snapshot: null,
+      increment: {
+        mode: 'OPEN',
+        step: 30,
+        day: 1,
+        finished: false,
+        bars: {},
+        paperStats: {},
+        portfolio: PORTFOLIO,
+        fills: [],
+        orders: [],
+      },
+    });
+    expect((await first).partial).toBe(true);
+
+    void api.step(SESSION, 30).catch(() => undefined);
+    const second = controller.expectOne((r) => r.url === `/api/v1/sessions/${SESSION}/replay`);
+    expect(second.request.params.get('step')).toBe('40');
+    expect(second.request.params.get('fromStep')).toBe('30');
+    second.flush({ status: 'NOT_FOUND', sessionId: SESSION });
+  });
 });

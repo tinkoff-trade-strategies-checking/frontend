@@ -61,4 +61,39 @@ describe('ReportStore: отчёт ещё собирается (BUILDING)', () =>
     expect(store.result()?.status).toBe('NOT_FOUND');
     expect(getReport).toHaveBeenCalledTimes(2);
   });
+
+  it('одиночный сбой сети при опросе не останавливает его; три подряд — останавливают с ошибкой', async () => {
+    vi.useFakeTimers();
+    const building: SessionReportResult = {
+      status: 'BUILDING',
+      sessionId: 'a',
+      message: 'Отчёт собирается',
+    };
+    const notFound: SessionReportResult = { status: 'NOT_FOUND', sessionId: 'a' };
+    const getReport = vi
+      .fn<ReportApi['getReport']>()
+      .mockResolvedValueOnce(building)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce(notFound);
+    TestBed.configureTestingModule({
+      providers: [{ provide: REPORT_API, useValue: { getReport } }, ReportStore],
+    });
+    const store = TestBed.inject(ReportStore);
+    store.pollIntervalMs = 1000;
+    await store.load('a');
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.result()?.status).toBe('NOT_FOUND');
+    expect(store.error()).toBeNull();
+
+    const failing = vi
+      .fn<ReportApi['getReport']>()
+      .mockResolvedValueOnce(building)
+      .mockRejectedValue(new Error('network'));
+    const store2 = TestBed.inject(ReportStore);
+    (store2 as unknown as { api: ReportApi }).api = { getReport: failing };
+    await store2.load('a');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(failing).toHaveBeenCalledTimes(4);
+    expect(store2.error()).toBeTruthy();
+  });
 });

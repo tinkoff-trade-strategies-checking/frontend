@@ -140,6 +140,8 @@ export interface ArenaStepResult {
   readonly bars: Readonly<Record<string, ArenaCandle>>;
   /** Все свечи пачки по бумаге (на ×10 и ×100 за такт проходит несколько); у заглушек не задано. */
   readonly batches?: Readonly<Record<string, readonly ArenaCandle[]>>;
+  /** `orders` и `fills` — только изменения за шаг (результат сервера), а не полный список: вливать по id. */
+  readonly partial?: boolean;
   readonly paperStats: Readonly<Record<string, ArenaPaperStat>>;
   readonly portfolio: ArenaPortfolio;
   readonly orders: readonly ArenaOrder[];
@@ -273,11 +275,14 @@ export interface ArenaApi {
    * Без флага (заглушки, воспроизведение) шаги по таймеру делает клиент.
    */
   readonly serverDriven?: boolean;
+  /** Клиентский таймер может брать пачку шагов за команду (воспроизведение на высоких скоростях). */
+  readonly batchStep?: boolean;
   control?(action: PlayerAction, speed?: ArenaSpeed): Promise<ArenaPlayerState>;
   /** Поток событий с номера `lastEventId` (из снимка): сервер досылает всё, что было после него. */
   events?(lastEventId: number | null): Observable<ArenaEvent>;
   getSnapshot(sessionId?: string): Promise<ArenaSnapshot>;
-  step(): Promise<ArenaStepResult>;
+  /** `count` — сколько шагов пройти за одну команду; учитывается, только если `batchStep`. */
+  step(count?: number): Promise<ArenaStepResult>;
   estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;
   placeOrder(command: PlaceOrderCommand): Promise<ArenaCommandResult>;
   cancelOrder(command: CancelOrderCommand): Promise<ArenaCommandResult>;

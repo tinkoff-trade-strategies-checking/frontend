@@ -13,6 +13,8 @@ import { ReplayApi, ReplaySessionResult } from './replay.models';
  */
 @Injectable()
 export class HttpReplayApi implements ReplayApi {
+  readonly batchStep = true;
+
   private readonly api = inject(Api);
   private cursors = new Map<string, { step: number; lastStep: number }>();
 
@@ -60,12 +62,12 @@ export class HttpReplayApi implements ReplayApi {
     }
   }
 
-  async step(sessionId: string): Promise<ArenaStepResult> {
+  async step(sessionId: string, count = 1): Promise<ArenaStepResult> {
     const cursor = this.cursors.get(sessionId);
     if (!cursor) {
       throw new Error('Воспроизведение не загружено.');
     }
-    const next = Math.min(cursor.step + 1, cursor.lastStep);
+    const next = Math.min(cursor.step + Math.max(1, Math.trunc(count)), cursor.lastStep);
     const result = await this.api.invoke(getReplay, {
       sessionId,
       step: next,

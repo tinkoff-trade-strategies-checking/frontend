@@ -34,8 +34,10 @@ export type ReplaySessionResult =
     };
 
 export interface ReplayApi {
+  /** Источник отдаёт пачку шагов за запрос (`step(id, count)`), а не только следующий. */
+  readonly batchStep?: boolean;
   loadSession(sessionId: string, initialStep?: number): Promise<ReplaySessionResult>;
-  step(sessionId: string): Promise<ArenaStepResult>;
+  step(sessionId: string, count?: number): Promise<ArenaStepResult>;
 }
 
 export const REPLAY_API = new InjectionToken<ReplayApi>('REPLAY_API');

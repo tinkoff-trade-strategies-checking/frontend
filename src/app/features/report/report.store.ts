@@ -16,6 +16,8 @@ export class ReportStore {
   /** Пока отчёт собирается (`BUILDING`), перечитываем его раз в `pollIntervalMs`. */
   pollIntervalMs = 2000;
   private static readonly MAX_POLLS = 90;
+  /** Сбоев сети подряд, после которых опрос останавливается. */
+  private static readonly MAX_POLL_FAILURES = 3;
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -103,7 +105,7 @@ export class ReportStore {
     this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
-  private schedulePoll(sessionId: string, seq: number, attempt: number): void {
+  private schedulePoll(sessionId: string, seq: number, attempt: number, failures = 0): void {
     if (attempt > ReportStore.MAX_POLLS) {
       this.error.set('Отчёт собирается дольше обычного. Обновите страницу позже.');
       return;
@@ -122,7 +124,13 @@ export class ReportStore {
           this.schedulePoll(sessionId, seq, attempt + 1);
         }
       } catch (err) {
-        if (seq === this.loadSeq) {
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        // Одиночный сбой сети не должен оставлять экран на «собирается» навсегда: повторяем.
+        if (failures + 1 < ReportStore.MAX_POLL_FAILURES) {
+          this.schedulePoll(sessionId, seq, attempt + 1, failures + 1);
+        } else {
           this.error.set(errorMessage(err, 'Не удалось загрузить отчёт.'));
         }
       }

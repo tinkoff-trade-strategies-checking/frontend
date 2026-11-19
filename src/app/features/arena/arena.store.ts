@@ -42,6 +42,9 @@ const MAX_STALE_SNAPSHOT_RETRIES = 3;
 /** Сколько ждём `report_ready` после `finished`, прежде чем закрыть поток. */
 const FINISHED_STREAM_GRACE_MS = 30_000;
 
+/** Такт воспроизведения с пачками шагов: не чаще, чем идёт такт часов сервера. */
+const BATCH_TICK_MS = 200;
+
 const EMPTY_PORTFOLIO: ArenaPortfolio = {
   equityPct: 100,
   cashPct: 100,
@@ -263,7 +266,7 @@ export class ArenaStore {
       this.notice.set(null);
 
       try {
-        const res = await this.api.step();
+        const res = await this.api.step(this.stepsPerTick());
         if (this.applyStepResult(res) === 'gap') {
           await this.refreshSnapshot(true, false);
         }
@@ -492,9 +495,9 @@ export class ArenaStore {
     this.day.set(res.day);
     this.finished.update((was) => was || res.finished);
     this.portfolio.set(res.portfolio);
-    this.orders.set(this.serverDriven ? mergeById(this.orders(), res.orders) : res.orders);
+    this.orders.set(res.partial ? mergeById(this.orders(), res.orders) : res.orders);
     const fills = hideDates ? res.fills.map(stripFillDate) : res.fills;
-    this.fills.set(this.serverDriven ? mergeById(this.fills(), fills) : fills);
+    this.fills.set(res.partial ? mergeById(this.fills(), fills) : fills);
 
     this.papers.update((current) =>
       current.map((paper) => {
@@ -630,9 +633,23 @@ export class ArenaStore {
     }
   }
 
+  /** Пачка шагов — только у источников, которые это умеют (воспроизведение): иначе на ×100 запрос на каждый шаг. */
+  private tickIntervalMs(): number {
+    return this.api.batchStep
+      ? Math.max(BATCH_TICK_MS, Math.round(1000 / this.speed()))
+      : Math.max(10, Math.round(1000 / this.speed()));
+  }
+
+  private stepsPerTick(): number {
+    if (!this.api.batchStep) {
+      return 1;
+    }
+    return Math.max(1, Math.round((this.speed() * this.tickIntervalMs()) / 1000));
+  }
+
   private startTimer(): void {
     this.stopTimer();
-    const intervalMs = Math.max(10, Math.round(1000 / this.speed()));
+    const intervalMs = this.tickIntervalMs();
     this.timerId = setInterval(() => {
       if (!this.playing() || this.stepping) {
         return;
