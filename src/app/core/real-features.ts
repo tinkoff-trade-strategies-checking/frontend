@@ -9,8 +9,8 @@ import { STUB_MODE } from './api-mode';
  */
 export const REAL_FEATURES: Record<'arena' | 'report' | 'replay', boolean> = {
   arena: true,
-  report: false,
-  replay: false,
+  report: true,
+  replay: true,
 };
 
 export function isFeatureOpen(feature: keyof typeof REAL_FEATURES, stubMode: boolean): boolean {

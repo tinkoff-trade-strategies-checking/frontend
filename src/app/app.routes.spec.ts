@@ -48,7 +48,7 @@ describe('маршруты по режимам', () => {
 
   it('настоящий режим: арена, отчёт и воспроизведение закрыты, пока не подключены, и ведут в историю', async () => {
     const router = await setup(false);
-    REAL_FEATURES.arena = false;
+    Object.assign(REAL_FEATURES, { arena: false, report: false, replay: false });
     for (const url of ['/arena', '/arena/s-1', '/report', '/report/s-1', '/replay/s-1']) {
       expect(await go(router, url)).toBe('/history');
     }
@@ -56,7 +56,7 @@ describe('маршруты по режимам', () => {
 
   it('настоящий режим: подключённый раздел открывается', async () => {
     const router = await setup(false);
-    REAL_FEATURES.report = true;
+    Object.assign(REAL_FEATURES, { arena: false, report: true, replay: false });
     expect(await go(router, '/report/s-1')).toBe('/report/s-1');
     expect(await go(router, '/replay/s-1')).toBe('/history');
   });

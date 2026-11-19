@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
@@ -6,8 +13,9 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import { DivergenceType, EquityCurvePoint, REPORT_API } from './data/report.models';
-import { ApiConfiguration } from '../../api/api-configuration';
 import { STUB_MODE } from '../../core/api-mode';
+import { errorMessage } from '../../core/api-problem';
+import { ReportExportFormat, ReportExportService } from './data/report-export.service';
 import { REPORT_API_IMPL } from '../../api-impls';
 import {
   DIVERGENCE_TYPE_LABELS,
@@ -64,9 +72,11 @@ export class ReportPage implements OnInit {
   protected readonly store = inject(ReportStore);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly apiConfig = inject(ApiConfiguration);
+  private readonly exportService = inject(ReportExportService);
 
   protected readonly stubMode = inject(STUB_MODE);
+  protected readonly exporting = signal(false);
+  protected readonly exportError = signal<string | null>(null);
 
   protected readonly tabs = REPORT_TABS;
   protected readonly divergenceFilters = DIVERGENCE_FILTERS;
@@ -90,9 +100,16 @@ export class ReportPage implements OnInit {
     });
   }
 
-  /** Выгрузка — обычная загрузка файла по ссылке: cookie сессии браузер подставит сам. */
-  protected exportUrl(sessionId: string, format: 'xlsx' | 'csv'): string {
-    return `${this.apiConfig.rootUrl}/sessions/${sessionId}/report/export?format=${format}`;
+  protected async download(sessionId: string, format: ReportExportFormat): Promise<void> {
+    this.exporting.set(true);
+    this.exportError.set(null);
+    try {
+      await this.exportService.download(sessionId, format);
+    } catch (error) {
+      this.exportError.set(errorMessage(error, 'Не удалось выгрузить отчёт.'));
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   protected equityCurveSubtitle(points: readonly EquityCurvePoint[]): string {

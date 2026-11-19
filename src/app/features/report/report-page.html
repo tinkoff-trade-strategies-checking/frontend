@@ -117,24 +117,29 @@
             </button>
             <span class="tui-text_body-xs muted">Выгрузка отчёта пока недоступна</span>
           } @else {
-            <a
+            <button
               tuiButton
+              type="button"
               size="s"
               appearance="outline"
-              download
-              [attr.href]="exportUrl(rep.sessionId, 'xlsx')"
+              [disabled]="exporting()"
+              (click)="download(rep.sessionId, 'xlsx')"
             >
               Скачать XLSX
-            </a>
-            <a
+            </button>
+            <button
               tuiButton
+              type="button"
               size="s"
               appearance="outline"
-              download
-              [attr.href]="exportUrl(rep.sessionId, 'csv')"
+              [disabled]="exporting()"
+              (click)="download(rep.sessionId, 'csv')"
             >
               Скачать CSV
-            </a>
+            </button>
+            @if (exportError(); as message) {
+              <span class="tui-text_body-xs export-error" role="alert">{{ message }}</span>
+            }
           }
         </div>
       </header>
