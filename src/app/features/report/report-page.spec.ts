@@ -120,6 +120,75 @@ describe('ReportPage', () => {
     expect(csvBtn?.disabled).toBe(true);
   });
 
+  it('stopTakeSameBarCount > 0 — предупреждение; 0 или нет поля — без предупреждения', async () => {
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY') {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+    const withCount = (count: number | undefined): SessionReportResult => ({
+      status: 'READY',
+      report: {
+        ...base.report,
+        humanMetrics: { ...base.report.humanMetrics, stopTakeSameBarCount: count },
+      },
+    });
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce(withCount(3));
+    let fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('.same-bar-warning')?.textContent,
+    ).toContain('В 3 случаях стоп и тейк сработали на одном баре');
+
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce(withCount(0));
+    fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.same-bar-warning')).toBeNull();
+  });
+
+  it('«Результаты сделок»: пары FIFO с результатом по сделке; без поля (заглушки) блока нет', async () => {
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY') {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        roundTrips: [
+          {
+            paperTicker: 'SBER',
+            entryStep: 3,
+            exitStep: 20,
+            entryDateLabel: '02.03.2020',
+            exitDateLabel: '23.03.2020',
+            lots: 80,
+            entryPriceRub: 234.4,
+            exitPriceRub: 240,
+            grossPnlRub: 448,
+            costsRub: 48,
+            netPnlRub: 400,
+          },
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    fixture.componentInstance['store'].setTab('fills');
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(text).toContain('Результаты сделок');
+    const row = root.querySelector('table.round-trips tbody tr');
+    expect(row?.textContent).toContain('SBER');
+    expect(row?.textContent).toContain('+400');
+  });
+
   it('отчёт с null в полях контракта открывается: блоки скрываются или показывают «нет данных»', async () => {
     paramMap$.next(convertToParamMap({ id: 'S-NO-ALGO' }));
 

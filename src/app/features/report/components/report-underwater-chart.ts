@@ -167,10 +167,10 @@ export class ReportUnderwaterChart {
       time: toChartTime(p.step),
       value: p.humanDrawdownPct,
     }));
-    const algoData: LineData<Time>[] = pts.map((p) => ({
-      time: toChartTime(p.step),
-      value: p.algoDrawdownPct,
-    }));
+    // Просадка алгоритма — null, пока фонового прогона нет (ФТ-18…20 отложены): точек линии нет.
+    const algoData: LineData<Time>[] = pts.flatMap((p) =>
+      p.algoDrawdownPct === null ? [] : [{ time: toChartTime(p.step), value: p.algoDrawdownPct }],
+    );
 
     this.humanSeries.setData(humanData);
     this.algoSeries.setData(algoData);
