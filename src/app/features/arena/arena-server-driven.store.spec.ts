@@ -220,6 +220,20 @@ describe('ArenaStore при серверном времени', () => {
     expect(store.step()).toBe(6);
   });
 
+  it('несколько событий с пропуском номера подряд дают одно чтение снимка, а не по одному на событие', async () => {
+    const api = new FakeServerApi();
+    api.snapshots = [snapshot({ lastEventId: 10 }), snapshot({ step: 5, lastEventId: 20 })];
+    const store = setup(api);
+    await store.init();
+    const subject = api.events$;
+    subject.next(stepEvent(13, stepResult(3)));
+    subject.next(stepEvent(14, stepResult(4)));
+    subject.next(stepEvent(15, stepResult(5)));
+    await vi.waitFor(() => expect(store.step()).toBe(5));
+    expect(api.getSnapshot).toHaveBeenCalledTimes(2);
+    expect(api.opened).toEqual([10, 20]);
+  });
+
   it('INV-1/8: пачка свечей не по порядку (первая свеча дальше step + 1) — не применяется, снимок', async () => {
     const api = new FakeServerApi();
     api.snapshots = [snapshot(), snapshot({ step: 6, lastEventId: 11 })];
