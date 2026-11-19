@@ -32,12 +32,37 @@ class FakeUnderwaterChart {
   readonly points = input.required<readonly UnderwaterPoint[]>();
 }
 
+describe('сохранение файла по умолчанию', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('ссылка вставляется в DOM на время клика, затем удаляется; URL отзывается позже', () => {
+    vi.useFakeTimers();
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    const inDomAtClick: boolean[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      inDomAtClick.push(document.body.contains(this));
+    });
+    TestBed.inject(FILE_SAVER)(new Blob(['x']), 'report.xlsx');
+    expect(inDomAtClick).toEqual([true]);
+    expect(document.querySelector('a[download]')).toBeNull();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:x');
+  });
+});
+
 describe('exportFileName', () => {
   it('берёт имя из Content-Disposition, иначе по умолчанию', () => {
     expect(exportFileName('attachment; filename="report-s1.xlsx"', 's1', 'xlsx')).toBe(
       'report-s1.xlsx',
     );
     expect(exportFileName(null, 's1', 'xlsx')).toBe('report-s1.xlsx');
+    expect(exportFileName('attachment; filename="bad%name.xlsx"', 's1', 'xlsx')).toBe(
+      'report-s1.xlsx',
+    );
     expect(exportFileName(null, 's1', 'csv')).toBe('report-s1.zip');
   });
 });

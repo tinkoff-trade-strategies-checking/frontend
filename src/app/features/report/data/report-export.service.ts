@@ -16,8 +16,11 @@ export const FILE_SAVER = new InjectionToken<FileSaver>('FILE_SAVER', {
     const link = document.createElement('a');
     link.href = url;
     link.download = fileName;
+    // Firefox не скачивает по ссылке вне DOM; URL отзываем не сразу, иначе загрузка может не начаться.
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   },
 });
 
@@ -28,9 +31,16 @@ export function exportFileName(
   format: ReportExportFormat,
 ): string {
   const match = header === null ? null : /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header);
-  return match
-    ? decodeURIComponent(match[1])
-    : `report-${sessionId}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
+  const fallback = `report-${sessionId}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
+  if (!match) {
+    return fallback;
+  }
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    // Некорректная %-последовательность в имени: не роняем скачивание.
+    return fallback;
+  }
 }
 
 /** Тело ошибки при `responseType: blob` приходит Blob-ом: разбираем JSON, чтобы работало ветвление по `code`. */
