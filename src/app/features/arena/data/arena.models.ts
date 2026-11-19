@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { Observable } from 'rxjs';
 
 export type ArenaSpeed = 1 | 5 | 10 | 100;
 
@@ -117,6 +118,9 @@ export interface ArenaSnapshot {
   readonly portfolio: ArenaPortfolio;
   readonly orders: readonly ArenaOrder[];
   readonly fills: readonly ArenaFill[];
+  /** Состояние плеера на сервере (INV-8); у заглушек и воспроизведения не задано. */
+  readonly playing?: boolean;
+  readonly speed?: ArenaSpeed;
 }
 
 export interface ArenaPaperStat {
@@ -128,7 +132,10 @@ export interface ArenaStepResult {
   readonly step: number;
   readonly day: number;
   readonly finished: boolean;
+  /** Последняя свеча пачки по бумаге. */
   readonly bars: Readonly<Record<string, ArenaCandle>>;
+  /** Все свечи пачки по бумаге (на ×10 и ×100 за такт проходит несколько); у заглушек не задано. */
+  readonly batches?: Readonly<Record<string, readonly ArenaCandle[]>>;
   readonly paperStats: Readonly<Record<string, ArenaPaperStat>>;
   readonly portfolio: ArenaPortfolio;
   readonly orders: readonly ArenaOrder[];
@@ -179,6 +186,8 @@ export interface ArenaCommandResult {
   readonly field?: string;
   readonly order?: ArenaOrder;
   readonly orders: readonly ArenaOrder[];
+  /** `orders` — только затронутые заявки (их надо влить в список по id), а не весь список. */
+  readonly partial?: boolean;
   readonly portfolio: ArenaPortfolio;
 }
 
@@ -188,9 +197,45 @@ export interface ArenaFinishResult {
   readonly finishedAtDay: number;
   readonly portfolio: ArenaPortfolio;
   readonly orders?: readonly ArenaOrder[];
+  readonly partial?: boolean;
 }
 
+export interface ArenaPlayerState {
+  readonly playing: boolean;
+  readonly speed: ArenaSpeed;
+  readonly step: number;
+  readonly day: number;
+  readonly finished: boolean;
+  readonly stepResult: ArenaStepResult | null;
+}
+
+export type PlayerAction = 'play' | 'pause' | 'step' | 'speed';
+
+export type ArenaPauseReason = 'user' | 'disconnect' | 'worker_failure' | 'restart';
+
+/** События SSE (`SessionEvent`), приведённые к моделям экрана, плюс служебные события соединения. */
+export type ArenaEvent =
+  | { readonly type: 'step'; readonly result: ArenaStepResult }
+  | {
+      readonly type: 'order_updated';
+      readonly order: ArenaOrder;
+      readonly portfolio: ArenaPortfolio;
+    }
+  | { readonly type: 'paused'; readonly reason: ArenaPauseReason }
+  | { readonly type: 'player'; readonly playing: boolean; readonly speed: ArenaSpeed }
+  | { readonly type: 'finished'; readonly result: ArenaFinishResult }
+  | { readonly type: 'report_ready' }
+  /** Соединение (пере)установлено после обрыва: события могли потеряться — перечитать снимок (INV-8). */
+  | { readonly type: 'resync' };
+
 export interface ArenaApi {
+  /**
+   * Время ведёт сервер: плеер управляется командами, шаги приходят потоком событий.
+   * Без флага (заглушки, воспроизведение) шаги по таймеру делает клиент.
+   */
+  readonly serverDriven?: boolean;
+  control?(action: PlayerAction, speed?: ArenaSpeed): Promise<ArenaPlayerState>;
+  events?(): Observable<ArenaEvent>;
   getSnapshot(sessionId?: string): Promise<ArenaSnapshot>;
   step(): Promise<ArenaStepResult>;
   estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;

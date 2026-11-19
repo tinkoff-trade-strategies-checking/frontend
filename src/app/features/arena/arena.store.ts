@@ -1,14 +1,21 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
+import { errorMessage, toProblem } from '../../core/api-problem';
 import { formatRejectReason } from './arena.format';
 import {
   ARENA_API,
   ArenaApi,
+  ArenaCandle,
   ArenaCommandResult,
+  ArenaEvent,
   ArenaFill,
   ArenaOrder,
   ArenaPaper,
   ArenaPortfolio,
+  ArenaSnapshot,
   ArenaSpeed,
+  ArenaStepResult,
   isOrderActive,
   isOrderClosed,
   OrderSide,
@@ -51,6 +58,7 @@ export class ArenaStore {
   private queue: Promise<void> = Promise.resolve();
   private estimateSeq = 0;
   private stepping = false;
+  private eventsSub: Subscription | null = null;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
@@ -70,6 +78,8 @@ export class ArenaStore {
   readonly speed = signal<ArenaSpeed>(1);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
+  /** Отчёт готов (событие `report_ready`). */
+  readonly reportReady = signal(false);
   readonly editingOrder = signal<ArenaOrder | null>(null);
   readonly estimatedPct = signal<number | null>(null);
 
@@ -93,7 +103,10 @@ export class ArenaStore {
   readonly canStep = computed(() => !this.finished() && this.step() < this.totalSteps());
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.stopTimer());
+    this.destroyRef.onDestroy(() => {
+      this.stopTimer();
+      this.closeEvents();
+    });
   }
 
   init(customApi?: ArenaApi, sessionId?: string): Promise<void> {
@@ -102,29 +115,29 @@ export class ArenaStore {
       this.loading.set(true);
       this.error.set(null);
       this.notice.set(null);
-      this.pause();
+      this.reportReady.set(false);
+      this.stopLocal();
+      this.closeEvents();
 
       try {
         // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
-        const snap = await this.api.getSnapshot(sessionId);
-        this.sessionId.set(snap.sessionId);
-        this.blind.set(snap.blind);
-        this.step.set(snap.step);
-        this.totalSteps.set(snap.totalSteps);
-        this.day.set(snap.day);
-        this.totalDays.set(snap.totalDays);
-        this.finished.set(snap.finished);
-        this.papers.set(snap.papers);
-        this.portfolio.set(snap.portfolio);
-        this.orders.set(snap.orders);
-        this.fills.set(snap.fills);
-        if (snap.papers.length > 0 && !snap.papers.some((p) => p.id === this.selectedPaperId())) {
-          this.selectedPaperId.set(snap.papers[0].id);
-        }
+        this.applySnapshot(await this.api.getSnapshot(sessionId));
+        this.openEvents();
       } catch (err) {
-        this.error.set(err instanceof Error ? err.message : 'Не удалось загрузить сессию.');
+        this.error.set(messageOf(err, 'Не удалось загрузить сессию.'));
       } finally {
         this.loading.set(false);
+      }
+    });
+  }
+
+  /** Перечитать снимок без сброса экрана: после обрыва потока и конфликтов команд (INV-8). */
+  resync(): Promise<void> {
+    return this.enqueue(async () => {
+      try {
+        this.applySnapshot(await this.api.getSnapshot(this.sessionId() || undefined));
+      } catch (err) {
+        this.error.set(messageOf(err, 'Не удалось обновить сессию.'));
       }
     });
   }
@@ -134,6 +147,10 @@ export class ArenaStore {
   }
 
   setSpeed(speed: ArenaSpeed): void {
+    if (this.serverDriven) {
+      void this.command('speed', speed);
+      return;
+    }
     this.speed.set(speed);
     if (this.playing()) {
       this.startTimer();
@@ -144,14 +161,23 @@ export class ArenaStore {
     if (this.playing()) {
       this.pause();
     } else if (this.canStep()) {
+      if (this.serverDriven) {
+        void this.command('play');
+        return;
+      }
       this.playing.set(true);
       this.startTimer();
     }
   }
 
+  /** Пауза по команде пользователя; при серверном времени отправляется на сервер. */
   pause(): void {
-    this.playing.set(false);
-    this.stopTimer();
+    if (this.serverDriven && this.playing()) {
+      this.playing.set(false);
+      void this.command('pause');
+      return;
+    }
+    this.stopLocal();
   }
 
   async estimateOrder(paperId: string, lots: number | null): Promise<void> {
@@ -183,38 +209,14 @@ export class ArenaStore {
 
       try {
         const res = await this.api.step();
-        this.step.set(res.step);
-        this.day.set(res.day);
-        this.finished.update((was) => was || res.finished);
-        this.portfolio.set(res.portfolio);
-        this.orders.set(res.orders);
-        this.fills.set(res.fills);
-
-        this.papers.update((current) =>
-          current.map((paper) => {
-            const bar = res.bars[paper.id];
-            const stat = res.paperStats[paper.id];
-            if (!bar) {
-              return paper;
-            }
-            const alreadyHas = paper.candles.some((c) => c.step === bar.step);
-            return {
-              ...paper,
-              candles: alreadyHas ? paper.candles : [...paper.candles, bar],
-              changePct: stat ? stat.changePct : paper.changePct,
-              lastPrice: stat ? stat.lastPrice : bar.close,
-            };
-          }),
-        );
-
+        this.applyStepResult(res);
         if (this.finished()) {
-          this.pause();
+          this.stopLocal();
         }
       } catch (err) {
-        this.pause();
-        this.error.set(
-          err instanceof Error ? err.message : 'Ошибка при переходе к следующей свече.',
-        );
+        this.stopLocal();
+        this.error.set(messageOf(err, 'Ошибка при переходе к следующей свече.'));
+        await this.recoverFromConflict(err);
       } finally {
         this.stepping = false;
       }
@@ -243,7 +245,7 @@ export class ArenaStore {
         this.applyCommandResult(result, 'Заявка выставлена.');
         return result;
       } catch (err) {
-        this.error.set(err instanceof Error ? err.message : 'Не удалось выставить заявку.');
+        this.error.set(messageOf(err, 'Не удалось выставить заявку.'));
         return null;
       }
     });
@@ -266,7 +268,7 @@ export class ArenaStore {
         this.applyCommandResult(result, 'Заявка отменена.');
         return result;
       } catch (err) {
-        this.error.set(err instanceof Error ? err.message : 'Не удалось отменить заявку.');
+        this.error.set(messageOf(err, 'Не удалось отменить заявку.'));
         return null;
       }
     });
@@ -303,10 +305,20 @@ export class ArenaStore {
         });
         this.editingOrder.set(null);
         this.applyCommandResult(result, 'Заявка заменена.');
+        if (result.partial && result.accepted) {
+          // Замена — отмена старой заявки и новая (журнал): старая в ответе не приходит.
+          this.orders.update((list) =>
+            list.map((order) =>
+              order.id === orderId && !result.orders.some((o) => o.id === orderId)
+                ? { ...order, status: 'cancelled', rejectReason: 'REPLACED' }
+                : order,
+            ),
+          );
+        }
         return result;
       } catch (err) {
         this.editingOrder.set(null);
-        this.error.set(err instanceof Error ? err.message : 'Не удалось заменить заявку.');
+        this.error.set(messageOf(err, 'Не удалось заменить заявку.'));
         return null;
       }
     });
@@ -314,21 +326,191 @@ export class ArenaStore {
 
   finishSession(): Promise<void> {
     return this.enqueue(async () => {
-      this.pause();
+      this.stopLocal();
       this.error.set(null);
       try {
         const res = await this.api.finishSession();
         this.finished.set(true);
         this.portfolio.set(res.portfolio);
         if (res.orders) {
-          this.orders.set(res.orders);
+          this.orders.set(res.partial ? mergeById(this.orders(), res.orders) : res.orders);
         }
         this.editingOrder.set(null);
         this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
       } catch (err) {
-        this.error.set(err instanceof Error ? err.message : 'Не удалось завершить сессию.');
+        this.error.set(messageOf(err, 'Не удалось завершить сессию.'));
       }
     });
+  }
+
+  private get serverDriven(): boolean {
+    return this.api.serverDriven === true;
+  }
+
+  /** Остановить таймер и сбросить флаг на экране, не трогая сервер. */
+  private stopLocal(): void {
+    this.playing.set(false);
+    this.stopTimer();
+  }
+
+  /** Команда плеера на сервер; ответ — актуальное состояние плеера. */
+  private command(action: 'play' | 'pause' | 'step' | 'speed', speed?: ArenaSpeed): Promise<void> {
+    return this.enqueue(async () => {
+      if (!this.api.control) {
+        return;
+      }
+      this.error.set(null);
+      try {
+        const state = await this.api.control(action, speed);
+        this.playing.set(state.playing);
+        this.speed.set(state.speed);
+        if (state.stepResult) {
+          this.applyStepResult(state.stepResult);
+        }
+        if (state.finished) {
+          this.finished.set(true);
+        }
+      } catch (err) {
+        this.error.set(messageOf(err, 'Не удалось выполнить команду плеера.'));
+        await this.recoverFromConflict(err);
+      }
+    });
+  }
+
+  /** 409 (состояние плеера разошлось с сервером) и неактивная сессия — перечитать снимок. */
+  private async recoverFromConflict(err: unknown): Promise<void> {
+    if (!this.serverDriven) {
+      return;
+    }
+    const problem = toProblem(err);
+    if (problem.status === 409 || problem.code === 'SESSION_NOT_ACTIVE') {
+      try {
+        this.applySnapshot(await this.api.getSnapshot(this.sessionId() || undefined));
+      } catch {
+        // Ошибка остаётся прежней: пользователь может обновить страницу.
+      }
+    }
+  }
+
+  private applySnapshot(snap: ArenaSnapshot): void {
+    // INV-7: пока слепая сессия идёт, даты не показываем, даже если пришли. Воспроизведение (customApi) —
+    // всегда завершённая сессия, её даты раскрыты.
+    const hideDates = snap.blind && !snap.finished && !this.customApi;
+    this.sessionId.set(snap.sessionId);
+    this.blind.set(snap.blind);
+    this.step.set(snap.step);
+    this.totalSteps.set(snap.totalSteps);
+    this.day.set(snap.day);
+    this.totalDays.set(snap.totalDays);
+    this.finished.set(snap.finished);
+    this.papers.set(
+      snap.papers.map((paper) => ({
+        ...paper,
+        candles: hideDates ? paper.candles.map(stripCandleDates) : paper.candles,
+      })),
+    );
+    this.portfolio.set(snap.portfolio);
+    this.orders.set(snap.orders);
+    this.fills.set(hideDates ? snap.fills.map(stripFillDate) : snap.fills);
+    if (snap.playing !== undefined) {
+      this.playing.set(snap.playing && !snap.finished);
+    }
+    if (snap.speed !== undefined) {
+      this.speed.set(snap.speed);
+    }
+    if (snap.papers.length > 0 && !snap.papers.some((p) => p.id === this.selectedPaperId())) {
+      this.selectedPaperId.set(snap.papers[0].id);
+    }
+  }
+
+  /** Применить результат шага (ответ на команду или событие SSE); уже виденный шаг пропускаем. */
+  private applyStepResult(res: ArenaStepResult): void {
+    if (this.serverDriven && res.step <= this.step()) {
+      return;
+    }
+    const hideDates = this.blind() && !this.finished() && !res.finished && !this.customApi;
+    const strip = (c: ArenaCandle): ArenaCandle => (hideDates ? stripCandleDates(c) : c);
+    this.step.set(res.step);
+    this.day.set(res.day);
+    this.finished.update((was) => was || res.finished);
+    this.portfolio.set(res.portfolio);
+    this.orders.set(this.serverDriven ? mergeById(this.orders(), res.orders) : res.orders);
+    const fills = hideDates ? res.fills.map(stripFillDate) : res.fills;
+    this.fills.set(this.serverDriven ? mergeById(this.fills(), fills) : fills);
+
+    this.papers.update((current) =>
+      current.map((paper) => {
+        const batch = res.batches?.[paper.id] ?? (res.bars[paper.id] ? [res.bars[paper.id]] : []);
+        const stat = res.paperStats[paper.id];
+        if (batch.length === 0) {
+          return paper;
+        }
+        const known = new Set(paper.candles.map((c) => c.step));
+        const fresh = batch.filter((c) => !known.has(c.step)).map(strip);
+        const last = batch[batch.length - 1];
+        return {
+          ...paper,
+          candles: fresh.length > 0 ? [...paper.candles, ...fresh] : paper.candles,
+          changePct: stat ? stat.changePct : paper.changePct,
+          lastPrice: stat ? stat.lastPrice : last.close,
+        };
+      }),
+    );
+  }
+
+  private openEvents(): void {
+    if (!this.api.events) {
+      return;
+    }
+    this.eventsSub = this.api.events().subscribe((event) => this.handleEvent(event));
+  }
+
+  private closeEvents(): void {
+    this.eventsSub?.unsubscribe();
+    this.eventsSub = null;
+  }
+
+  private handleEvent(event: ArenaEvent): void {
+    switch (event.type) {
+      case 'resync':
+        void this.resync();
+        break;
+      case 'step':
+        this.applyStepResult(event.result);
+        if (this.finished()) {
+          this.stopLocal();
+        }
+        break;
+      case 'order_updated':
+        this.orders.update((list) => mergeById(list, [event.order]));
+        this.portfolio.set(event.portfolio);
+        break;
+      case 'player':
+        this.playing.set(event.playing);
+        this.speed.set(event.speed);
+        break;
+      case 'paused':
+        this.playing.set(false);
+        if (event.reason === 'disconnect') {
+          this.notice.set('Время остановлено: соединение с сервером прерывалось.');
+        } else if (event.reason === 'worker_failure') {
+          this.error.set('Время остановлено: сбой расчёта на сервере. Нажмите «Пуск».');
+        } else if (event.reason === 'restart') {
+          this.notice.set('Время остановлено: сервер перезапускался.');
+        }
+        break;
+      case 'finished':
+        this.finished.set(true);
+        this.stopLocal();
+        this.portfolio.set(event.result.portfolio);
+        if (event.result.orders) {
+          this.orders.update((list) => mergeById(list, event.result.orders ?? []));
+        }
+        break;
+      case 'report_ready':
+        this.reportReady.set(true);
+        break;
+    }
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
@@ -341,7 +523,7 @@ export class ArenaStore {
   }
 
   private applyCommandResult(result: ArenaCommandResult, successText: string): void {
-    this.orders.set(result.orders);
+    this.orders.set(result.partial ? mergeById(this.orders(), result.orders) : result.orders);
     this.portfolio.set(result.portfolio);
     if (result.accepted) {
       this.notice.set(successText);
@@ -367,4 +549,35 @@ export class ArenaStore {
       this.timerId = null;
     }
   }
+}
+
+function messageOf(err: unknown, fallback: string): string {
+  if (err instanceof HttpErrorResponse) {
+    return errorMessage(err, fallback);
+  }
+  return err instanceof Error ? err.message : fallback;
+}
+
+/** Влить изменённые элементы в список по `id`: существующие заменить, новые добавить в конец. */
+function mergeById<T extends { readonly id: string }>(
+  current: readonly T[],
+  incoming: readonly T[],
+): readonly T[] {
+  const byId = new Map(incoming.map((item) => [item.id, item]));
+  const merged = current.map((item) => byId.get(item.id) ?? item);
+  const known = new Set(current.map((item) => item.id));
+  return [...merged, ...incoming.filter((item) => !known.has(item.id))];
+}
+
+function stripCandleDates(candle: ArenaCandle): ArenaCandle {
+  const { dateLabel, fullDateLabel, ...rest } = candle;
+  void dateLabel;
+  void fullDateLabel;
+  return rest;
+}
+
+function stripFillDate(fill: ArenaFill): ArenaFill {
+  const { dateLabel, ...rest } = fill;
+  void dateLabel;
+  return rest;
 }
