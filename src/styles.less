@@ -1,1 +1,12 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Увеличиваем внутренние отступы и высоту бейджей-капсул единообразно по всему приложению */
+:root [tuiBadge][data-size='s'] {
+  --t-padding: 0.5rem;
+  --t-size: 1.5rem;
+}
+
+:root [tuiBadge][data-size='m'] {
+  --t-padding: 0.625rem;
+  --t-size: 1.75rem;
+}

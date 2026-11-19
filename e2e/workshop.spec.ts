@@ -38,7 +38,7 @@ test('фильтры, карточка алгоритма, неизменяем�
   await expect(detail).toContainText('Breakout ATR');
   await expect(detail).toContainText('MAGIC_CONST');
   await expect(detail).toContainText('неизменяема');
-  await expect(detail).toContainText('после решения по DSL');
+  await expect(detail).toContainText('в следующем обновлении');
 
   await expect(detail.getByRole('button', { name: 'Форк' })).toBeDisabled();
   await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toBeDisabled();

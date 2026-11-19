@@ -7,7 +7,8 @@
           tuiButton
           size="s"
           appearance="flat"
-          routerLinkActive="active"
+          [class.active]="isSectionActive(section.activePrefix)"
+          [attr.aria-current]="isSectionActive(section.activePrefix) ? 'page' : null"
           [routerLink]="section.path"
         >
           {{ section.title }}

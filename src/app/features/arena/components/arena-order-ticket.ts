@@ -59,17 +59,19 @@ function round2(value: number): number {
       </div>
 
       <div class="ticket-body">
-        <tui-textfield tuiTextfieldSize="s" [stringify]="paperStringify">
-          <label tuiLabel for="arena-paper">Бумага</label>
-          <select
-            id="arena-paper"
-            tuiSelect
-            [items]="paperIds()"
-            [disabled]="Boolean(editingOrder())"
-            [ngModel]="selectedPaperId()"
-            (ngModelChange)="paperSelect.emit($event)"
-          ></select>
-        </tui-textfield>
+        <label tuiLabel for="arena-paper">
+          Бумага
+          <tui-textfield tuiTextfieldSize="s" [stringify]="paperStringify">
+            <select
+              id="arena-paper"
+              tuiSelect
+              [items]="paperIds()"
+              [disabled]="Boolean(editingOrder())"
+              [ngModel]="selectedPaperId()"
+              (ngModelChange)="paperSelect.emit($event)"
+            ></select>
+          </tui-textfield>
+        </label>
 
         <tui-segmented
           size="s"
@@ -81,130 +83,150 @@ function round2(value: number): number {
           <button type="button">Продать</button>
         </tui-segmented>
 
-        <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
-          <label tuiLabel for="arena-order-type">Тип заявки</label>
-          <select
-            id="arena-order-type"
-            tuiSelect
-            [items]="orderTypes"
-            [disabled]="Boolean(editingOrder())"
-            [ngModel]="orderType()"
-            (ngModelChange)="onOrderTypeChange($event)"
-          ></select>
-        </tui-textfield>
+        <label tuiLabel for="arena-order-type">
+          Тип заявки
+          <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
+            <select
+              id="arena-order-type"
+              tuiSelect
+              [items]="orderTypes"
+              [disabled]="Boolean(editingOrder())"
+              [ngModel]="orderType()"
+              (ngModelChange)="onOrderTypeChange($event)"
+            ></select>
+          </tui-textfield>
+        </label>
 
         @if (orderType() === 'limit') {
-          <tui-textfield tuiTextfieldSize="s">
-            <label tuiLabel for="arena-limit-price">Цена лимита</label>
-            <input
-              id="arena-limit-price"
-              tuiInputNumber
-              [min]="0.01"
-              [ngModel]="limitPrice()"
-              (ngModelChange)="limitPrice.set($event ?? 0)"
-            />
-          </tui-textfield>
-        }
-
-        @if (orderType() === 'stop') {
-          <tui-textfield tuiTextfieldSize="s">
-            <label tuiLabel for="arena-stop-price">Цена стопа</label>
-            <input
-              id="arena-stop-price"
-              tuiInputNumber
-              [min]="0.01"
-              [ngModel]="stopPrice()"
-              (ngModelChange)="stopPrice.set($event ?? 0)"
-            />
-          </tui-textfield>
-        }
-
-        @if (orderType() === 'stop_limit') {
-          <div class="grid-2">
+          <label tuiLabel for="arena-limit-price">
+            Цена лимита
             <tui-textfield tuiTextfieldSize="s">
-              <label tuiLabel for="arena-sl-stop">Стоп</label>
               <input
-                id="arena-sl-stop"
-                tuiInputNumber
-                [min]="0.01"
-                [ngModel]="stopPrice()"
-                (ngModelChange)="stopPrice.set($event ?? 0)"
-              />
-            </tui-textfield>
-            <tui-textfield tuiTextfieldSize="s">
-              <label tuiLabel for="arena-sl-limit">Лимит</label>
-              <input
-                id="arena-sl-limit"
+                id="arena-limit-price"
                 tuiInputNumber
                 [min]="0.01"
                 [ngModel]="limitPrice()"
                 (ngModelChange)="limitPrice.set($event ?? 0)"
               />
             </tui-textfield>
-          </div>
+          </label>
         }
 
-        @if (orderType() === 'take_profit') {
-          <tui-textfield tuiTextfieldSize="s">
-            <label tuiLabel for="arena-tp-price">Цена тейк-профита</label>
-            <input
-              id="arena-tp-price"
-              tuiInputNumber
-              [min]="0.01"
-              [ngModel]="takeProfitPrice()"
-              (ngModelChange)="takeProfitPrice.set($event ?? 0)"
-            />
-          </tui-textfield>
-        }
-
-        @if (orderType() === 'trailing') {
-          <tui-textfield tuiTextfieldSize="s">
-            <label tuiLabel for="arena-trailing-pct">Отступ от пика, % (до 50 %)</label>
-            <input
-              id="arena-trailing-pct"
-              tuiInputNumber
-              [min]="0.1"
-              [max]="50"
-              [ngModel]="trailingPct()"
-              (ngModelChange)="trailingPct.set($event ?? 0)"
-            />
-          </tui-textfield>
-        }
-
-        @if (orderType() === 'oco') {
-          <div class="grid-2">
+        @if (orderType() === 'stop') {
+          <label tuiLabel for="arena-stop-price">
+            Цена стопа
             <tui-textfield tuiTextfieldSize="s">
-              <label tuiLabel for="arena-oco-stop">Стоп</label>
               <input
-                id="arena-oco-stop"
+                id="arena-stop-price"
                 tuiInputNumber
                 [min]="0.01"
                 [ngModel]="stopPrice()"
                 (ngModelChange)="stopPrice.set($event ?? 0)"
               />
             </tui-textfield>
+          </label>
+        }
+
+        @if (orderType() === 'stop_limit') {
+          <div class="grid-2">
+            <label tuiLabel for="arena-sl-stop">
+              Стоп
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="arena-sl-stop"
+                  tuiInputNumber
+                  [min]="0.01"
+                  [ngModel]="stopPrice()"
+                  (ngModelChange)="stopPrice.set($event ?? 0)"
+                />
+              </tui-textfield>
+            </label>
+            <label tuiLabel for="arena-sl-limit">
+              Лимит
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="arena-sl-limit"
+                  tuiInputNumber
+                  [min]="0.01"
+                  [ngModel]="limitPrice()"
+                  (ngModelChange)="limitPrice.set($event ?? 0)"
+                />
+              </tui-textfield>
+            </label>
+          </div>
+        }
+
+        @if (orderType() === 'take_profit') {
+          <label tuiLabel for="arena-tp-price">
+            Цена тейк-профита
             <tui-textfield tuiTextfieldSize="s">
-              <label tuiLabel for="arena-oco-tp">Тейк-профит</label>
               <input
-                id="arena-oco-tp"
+                id="arena-tp-price"
                 tuiInputNumber
                 [min]="0.01"
                 [ngModel]="takeProfitPrice()"
                 (ngModelChange)="takeProfitPrice.set($event ?? 0)"
               />
             </tui-textfield>
+          </label>
+        }
+
+        @if (orderType() === 'trailing') {
+          <label tuiLabel for="arena-trailing-pct">
+            Отступ от пика, % (до 50 %)
+            <tui-textfield tuiTextfieldSize="s">
+              <input
+                id="arena-trailing-pct"
+                tuiInputNumber
+                [min]="0.1"
+                [max]="50"
+                [ngModel]="trailingPct()"
+                (ngModelChange)="trailingPct.set($event ?? 0)"
+              />
+            </tui-textfield>
+          </label>
+        }
+
+        @if (orderType() === 'oco') {
+          <div class="grid-2">
+            <label tuiLabel for="arena-oco-stop">
+              Стоп
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="arena-oco-stop"
+                  tuiInputNumber
+                  [min]="0.01"
+                  [ngModel]="stopPrice()"
+                  (ngModelChange)="stopPrice.set($event ?? 0)"
+                />
+              </tui-textfield>
+            </label>
+            <label tuiLabel for="arena-oco-tp">
+              Тейк-профит
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="arena-oco-tp"
+                  tuiInputNumber
+                  [min]="0.01"
+                  [ngModel]="takeProfitPrice()"
+                  (ngModelChange)="takeProfitPrice.set($event ?? 0)"
+                />
+              </tui-textfield>
+            </label>
           </div>
         }
 
-        <tui-textfield tuiTextfieldSize="s">
-          <label tuiLabel for="arena-lots">Количество, лотов</label>
-          <input
-            id="arena-lots"
-            tuiInputNumber
-            [ngModel]="lots()"
-            (ngModelChange)="onLotsChange($event)"
-          />
-        </tui-textfield>
+        <label tuiLabel for="arena-lots">
+          Количество, лотов
+          <tui-textfield tuiTextfieldSize="s">
+            <input
+              id="arena-lots"
+              tuiInputNumber
+              [ngModel]="lots()"
+              (ngModelChange)="onLotsChange($event)"
+            />
+          </tui-textfield>
+        </label>
 
         <div class="hint-row tui-text_body-xs">
           <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>

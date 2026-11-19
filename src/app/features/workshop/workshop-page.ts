@@ -39,7 +39,7 @@ export class WorkshopPage implements OnInit {
 
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
-  protected readonly dslPendingHint = 'Доступно после решения по DSL';
+  protected readonly dslPendingHint = 'Будет доступно в следующем обновлении';
   protected readonly authorOptions = computed<readonly (string | null)[]>(() => [
     null,
     ...this.store.authors().map((author) => author.id),

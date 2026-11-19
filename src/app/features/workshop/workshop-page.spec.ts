@@ -112,7 +112,7 @@ describe('WorkshopPage', () => {
     expect(detailText).toContain('v3');
     expect(detailText).toContain('v2');
     expect(detailText).toContain('v1');
-    expect(detailText).toContain('после решения по DSL');
+    expect(detailText).toContain('в следующем обновлении');
 
     const forkBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
       (b) => b.textContent?.trim() === 'Форк',
@@ -122,9 +122,9 @@ describe('WorkshopPage', () => {
     ) as HTMLButtonElement | undefined;
 
     expect(forkBtn?.disabled).toBe(true);
-    expect(forkBtn?.title).toContain('после решения по DSL');
+    expect(forkBtn?.title).toContain('в следующем обновлении');
     expect(runBtn?.disabled).toBe(true);
-    expect(runBtn?.title).toContain('после решения по DSL');
+    expect(runBtn?.title).toContain('в следующем обновлении');
   });
 
   it('ограничивает добавление в сравнение максимум 5 алгоритмами', async () => {

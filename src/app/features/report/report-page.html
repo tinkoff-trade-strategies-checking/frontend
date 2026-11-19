@@ -100,7 +100,7 @@
             size="s"
             appearance="outline"
             [disabled]="true"
-            title="Доступно после подключения API"
+            title="Выгрузка отчёта скоро появится"
           >
             Скачать XLSX
           </button>
@@ -110,11 +110,11 @@
             size="s"
             appearance="outline"
             [disabled]="true"
-            title="Доступно после подключения API"
+            title="Выгрузка отчёта скоро появится"
           >
             Скачать CSV
           </button>
-          <span class="tui-text_body-xs muted">Выгрузка — после подключения API</span>
+          <span class="tui-text_body-xs muted">Выгрузка отчёта скоро появится</span>
         </div>
       </header>
 
@@ -506,7 +506,7 @@
                       <th>Вы</th>
                       <th>Алгоритм</th>
                       <th class="num">Цена ошибки</th>
-                      <th>Горизонт e</th>
+                      <th class="num col-horizon">Горизонт e</th>
                       <th>Причина (because)</th>
                       <th></th>
                     </tr>
@@ -571,7 +571,7 @@
                               size="xs"
                               appearance="outline"
                               [disabled]="true"
-                              title="Воспроизведение недоступно для этой заглушки"
+                              title="Воспроизведение недоступно для этой сессии"
                             >
                               Посмотреть в воспроизведении
                             </button>
@@ -589,7 +589,7 @@
             <div tuiNotification appearance="info" size="s">
               Закрытые прибыльные сделки человека (FIFO, прибыль после издержек &gt; 0), вход в
               которые — «лишнее действие» для алгоритма «{{ rep.backgroundAlgorithmName }}». Если за
-              ними стоит правило, его можно будет оформить на DSL в мастерской.
+              ними стоит правило, его можно будет оформить в мастерской.
             </div>
 
             @if (rep.reverseCheckTrades.length === 0) {
@@ -636,7 +636,7 @@
                             size="xs"
                             appearance="outline"
                             [disabled]="true"
-                            title="Недоступно: DSL правил в разработке"
+                            title="Редактор правил скоро появится"
                           >
                             Написать правило
                           </button>

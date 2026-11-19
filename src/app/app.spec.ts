@@ -1,11 +1,19 @@
 import { Location } from '@angular/common';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { App } from './app';
 import { routes } from './app.routes';
 import { StubSessionRegistry } from './shared/stub-session-registry';
+
+@Component({
+  selector: 'app-dummy-route',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+class DummyRoute {}
 
 describe('App', () => {
   beforeEach(async () => {
@@ -27,7 +35,7 @@ describe('App', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('nav a'),
     ) as HTMLAnchorElement[];
     const reportLink = navLinks.find((a) => a.textContent?.trim() === 'Отчёт');
-    expect(reportLink?.getAttribute('href')).toBe('/history');
+    expect(reportLink?.getAttribute('href')).toBe('/report/S-0103');
 
     TestBed.inject(StubSessionRegistry).markFinished('S-0106', {
       playedDays: 5,
@@ -36,6 +44,44 @@ describe('App', () => {
     });
     fixture.detectChanges();
     expect(reportLink?.getAttribute('href')).toBe('/report/S-0106');
+  });
+
+  it('подсвечивает пункт «Отчёт» на любом маршруте /report/:id и не подсвечивает на /history', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([
+          { path: 'report/:id', component: DummyRoute },
+          { path: 'history', component: DummyRoute },
+          { path: '**', component: DummyRoute },
+        ]),
+        provideTaiga(),
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    fixture.detectChanges();
+
+    const findNavLink = (title: string): HTMLAnchorElement | undefined =>
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).find(
+        (a) => a.textContent?.trim() === title,
+      ) as HTMLAnchorElement | undefined;
+
+    await router.navigateByUrl('/report/S-0105');
+    fixture.detectChanges();
+    expect(findNavLink('Отчёт')?.classList.contains('active')).toBe(true);
+    expect(findNavLink('История')?.classList.contains('active')).toBe(false);
+
+    await router.navigateByUrl('/report/S-0103');
+    fixture.detectChanges();
+    expect(findNavLink('Отчёт')?.classList.contains('active')).toBe(true);
+
+    await router.navigateByUrl('/history');
+    fixture.detectChanges();
+    expect(findNavLink('Отчёт')?.classList.contains('active')).toBe(false);
+    expect(findNavLink('История')?.classList.contains('active')).toBe(true);
   });
 
   describe('маршруты', () => {
