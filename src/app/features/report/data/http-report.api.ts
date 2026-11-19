@@ -77,6 +77,7 @@ export function mapMetrics(m: ApiReportMetrics): ReportMetrics {
     winRatePct: numOrNull(m.winRatePct),
     rejectedOrdersCount: m.rejectedOrdersCount,
     partialFillsCount: m.partialFillsCount,
+    stopTakeSameBarCount: m.stopTakeSameBarCount,
     hhi: num(m.hhi),
     largestPositionPct: num(m.largestPositionPct),
     bankrupt: m.bankrupt,
@@ -258,6 +259,19 @@ export function mapReport(r: ApiSessionReport): SessionReport {
     divergences: r.divergences === null ? null : r.divergences.map(mapDivergence),
     reverseCheckTrades: r.reverseCheckTrades === null ? null : r.reverseCheckTrades.map(mapReverse),
     fills: r.fills.map(mapFill),
+    roundTrips: r.roundTrips.map((t) => ({
+      paperTicker: t.paperTicker,
+      entryStep: t.entryStep,
+      exitStep: t.exitStep,
+      entryDateLabel: dateLabel(t.entryDate),
+      exitDateLabel: dateLabel(t.exitDate),
+      lots: t.lots,
+      entryPriceRub: num(t.entryPrice),
+      exitPriceRub: num(t.exitPrice),
+      grossPnlRub: num(t.grossPnl),
+      costsRub: num(t.costs),
+      netPnlRub: num(t.netPnl),
+    })),
   };
 }
 

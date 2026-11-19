@@ -13,7 +13,10 @@ export class ReportStore {
   private loadSeq = 0;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Пока отчёт собирается (`BUILDING`), перечитываем его раз в `pollIntervalMs`. */
+  /**
+   * Опрос, а не событие `report_ready`: на странице отчёта нет потока событий (он живёт на арене), и
+   * открывать SSE ради одного события дороже, чем перечитывать отчёт раз в 2 с.
+   * Пока отчёт собирается (`BUILDING`), перечитываем его раз в `pollIntervalMs`. */
   pollIntervalMs = 2000;
   private static readonly MAX_POLLS = 90;
   /** Сбоев сети подряд, после которых опрос останавливается. */

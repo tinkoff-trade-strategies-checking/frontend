@@ -50,6 +50,8 @@ export interface ReportMetrics {
   readonly winRatePct: number | null;
   readonly rejectedOrdersCount: number;
   readonly partialFillsCount: number;
+  /** Сделки, где стоп и тейк задеты одной свечой (исполнен стоп, INV-3); у заглушек не задано. */
+  readonly stopTakeSameBarCount?: number;
   readonly hhi: number;
   readonly largestPositionPct: number;
   readonly bankrupt: boolean;
@@ -152,6 +154,21 @@ export interface ReportFill {
   readonly note: string | null;
 }
 
+/** Закрытая сделка «покупка → продажа» по FIFO (`round_trips` ядра). */
+export interface ReportRoundTrip {
+  readonly paperTicker: string;
+  readonly entryStep: number;
+  readonly exitStep: number;
+  readonly entryDateLabel: string;
+  readonly exitDateLabel: string;
+  readonly lots: number;
+  readonly entryPriceRub: number;
+  readonly exitPriceRub: number;
+  readonly grossPnlRub: number;
+  readonly costsRub: number;
+  readonly netPnlRub: number;
+}
+
 export interface SessionReport {
   readonly sessionId: string;
   readonly blind: boolean;
@@ -175,6 +192,8 @@ export interface SessionReport {
   readonly divergences: readonly ReportDivergence[] | null;
   readonly reverseCheckTrades: readonly ReverseCheckTrade[] | null;
   readonly fills: readonly ReportFill[];
+  /** Закрытые сделки; у заглушек не задано. */
+  readonly roundTrips?: readonly ReportRoundTrip[];
 }
 
 export type SessionReportResult =

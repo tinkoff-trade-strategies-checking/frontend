@@ -117,6 +117,8 @@ describe('mapReportResult', () => {
     expect(rep.equityCurve[0]).toMatchObject({ dateLabel: '26.02.2020', algoCapitalRub: null });
     expect(rep.underwaterCurve?.[0].algoDrawdownPct).toBeNull();
     expect(rep.fills[0]).toMatchObject({ priceRub: 234.4, costRub: 2120, paperTicker: 'SBER' });
+    expect(rep.humanMetrics.stopTakeSameBarCount).toBe(0);
+    expect(rep.roundTrips).toEqual([]);
   });
 
   it('расхождения: действия собираются в текст, «лишнее» без because', () => {
