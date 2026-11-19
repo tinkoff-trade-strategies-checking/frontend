@@ -34,8 +34,9 @@ export class ReportStore {
     if (!rep) {
       return counts;
     }
-    counts.all = rep.divergences.length;
-    for (const d of rep.divergences) {
+    const divergences = rep.divergences ?? [];
+    counts.all = divergences.length;
+    for (const d of divergences) {
       counts[d.type] += 1;
     }
     return counts;
@@ -46,9 +47,10 @@ export class ReportStore {
     if (!rep) {
       return [];
     }
+    const divergences = rep.divergences ?? [];
     const filter = this.divergenceFilter();
     const filtered =
-      filter === 'all' ? [...rep.divergences] : rep.divergences.filter((d) => d.type === filter);
+      filter === 'all' ? [...divergences] : divergences.filter((d) => d.type === filter);
     const sort = this.divergenceSort();
     filtered.sort((a, b) => {
       if (sort === 'errorCost') {

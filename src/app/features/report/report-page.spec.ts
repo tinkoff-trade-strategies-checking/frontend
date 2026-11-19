@@ -69,6 +69,9 @@ describe('ReportPage', () => {
       throw new Error('Ожидался готовый отчёт S-0103');
     }
 
+    if (!base.report.comparison) {
+      throw new Error('Ожидалось сравнение в S-0103');
+    }
     const sentinel: SessionReportResult = {
       status: 'READY',
       report: {
@@ -114,6 +117,47 @@ describe('ReportPage', () => {
     const csvBtn = buttons.find((b) => b.textContent?.includes('Скачать CSV'));
     expect(xlsxBtn?.disabled).toBe(true);
     expect(csvBtn?.disabled).toBe(true);
+  });
+
+  it('отчёт с null в полях контракта открывается: блоки скрываются или показывают «нет данных»', async () => {
+    paramMap$.next(convertToParamMap({ id: 'S-NO-ALGO' }));
+
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(text).toContain('Отчёт сессии S-NO-ALGO');
+    expect(text).toContain('Сравнение с алгоритмом недоступно');
+    expect(text).not.toContain('Алгоритм впереди');
+    expect(text).toContain('Нет данных');
+    expect(root.querySelector('.stub-underwater')).toBeNull();
+    expect(root.querySelector('.stub-equity')).not.toBeNull();
+    expect(text).toContain('— дн.');
+
+    const tabButton = (label: string): HTMLButtonElement => {
+      const btn = Array.from(root.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes(label),
+      );
+      if (!btn) {
+        throw new Error(`Нет вкладки ${label}`);
+      }
+      return btn;
+    };
+
+    tabButton('Расхождения').click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Разбор расхождений недоступен');
+
+    tabButton('Обратная проверка').click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Обратная проверка недоступна');
+
+    tabButton('Сделки').click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('tbody tr').length).toBeGreaterThan(0);
   });
 
   it('INV-7: отчёт незавершённой слепой сессии S-0104 не открывается и не раскрывает период и тикеры', async () => {
