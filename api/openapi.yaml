@@ -302,7 +302,9 @@ paths:
       tags: [sessions]
       operationId: cancelOrder
       summary: Отменить заявку
-      description: Для OCO `orderId` — id любой из двух ног, отмена действует на всю пару «стоп + тейк-профит».
+      description: |
+        Для OCO `orderId` — id любой из двух ног, отмена действует на всю пару «стоп + тейк-профит».
+        В ответе `orderIds` пуст (созданных заявок нет), `order` и `orders` — отменённые ноги.
       security:
         - sessionCookie: []
           xsrfToken: []
@@ -330,6 +332,7 @@ paths:
       description: |
         Атомарная замена: в журнал пишутся отмена и новая заявка с одним номером шага.
         Для OCO `orderId` — id любой ноги, заменяется вся пара «стоп + тейк-профит».
+        В ответе `orderIds`, `order` и `orders` — новые заявки (у OCO — обе ноги, `order` — стоп).
       security:
         - sessionCookie: []
           xsrfToken: []
@@ -854,7 +857,7 @@ components:
         lots: { type: integer, minimum: 1 }
         price: { $ref: '#/components/schemas/Price' }
         amountPct: { $ref: '#/components/schemas/Pct' }
-        costPct: { $ref: '#/components/schemas/Pct' }
+        costPct: { $ref: '#/components/schemas/PctOrNull', description: 'Общие издержки сделки в % капитала считает core (core#54); null, пока core не отдаёт' }
         stopAndTakeSameBar: { type: boolean, description: Стоп и тейк задеты одной свечой — исполнен стоп (INV-3) }
     OpenFill:
       type: object
@@ -877,7 +880,7 @@ components:
         amountPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
         costPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
         amount: { $ref: '#/components/schemas/Money' }
-        cost: { $ref: '#/components/schemas/Money' }
+        cost: { $ref: '#/components/schemas/MoneyOrNull', description: 'Общие издержки сделки считает core (core#54); null, пока core не отдаёт' }
         stopAndTakeSameBar: { type: boolean, description: Стоп и тейк задеты одной свечой — исполнен стоп (INV-3) }
     BlindPosition:
       type: object
@@ -936,7 +939,9 @@ components:
       required: [changePct, lastPrice]
       properties:
         changePct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
-        lastPrice: { $ref: '#/components/schemas/Price' }
+        lastPrice:
+          $ref: '#/components/schemas/PriceOrNull'
+          description: 'Close последнего бара до курсора; `null` только у бумаги раскрытой сессии без бара до курсора (заявку на неё ядро отклоняет до первого бара), в слепой сессии такой бумаги в списке нет'
     BlindPaper:
       type: object
       description: |
@@ -1205,23 +1210,66 @@ components:
         commissionPct: { $ref: '#/components/schemas/Pct' }
         exchangeFeePct: { $ref: '#/components/schemas/Pct' }
         requiredCashPct: { $ref: '#/components/schemas/Pct' }
+    OrderEstimateLegBase:
+      type: object
+      description: Оценка одной ноги заявки; у OCO — отдельно стоп и тейк-профит
+      required: [type, canPlace, reason, field, amountPct, commissionPct, exchangeFeePct, requiredCashPct]
+      properties:
+        type: { $ref: '#/components/schemas/OrderLegType' }
+        canPlace: { type: boolean }
+        reason:
+          oneOf: [{ $ref: '#/components/schemas/RejectReason' }, { type: 'null' }]
+        field: { type: [string, 'null'] }
+        amountPct: { $ref: '#/components/schemas/Pct' }
+        commissionPct: { $ref: '#/components/schemas/Pct' }
+        exchangeFeePct: { $ref: '#/components/schemas/Pct' }
+        requiredCashPct: { $ref: '#/components/schemas/Pct' }
+    BlindOrderEstimateLeg:
+      description: Нога оценки в слепом режиме — только проценты (INV-7)
+      unevaluatedProperties: false
+      allOf:
+        - $ref: '#/components/schemas/OrderEstimateLegBase'
+    OpenOrderEstimateLeg:
+      description: Нога оценки в раскрытом режиме — проценты и рублёвые суммы
+      allOf:
+        - $ref: '#/components/schemas/OrderEstimateLegBase'
+        - type: object
+          required: [referencePrice, amount, commission, exchangeFee, requiredCash]
+          properties:
+            referencePrice: { $ref: '#/components/schemas/Price' }
+            amount: { $ref: '#/components/schemas/Money' }
+            commission: { $ref: '#/components/schemas/Money' }
+            exchangeFee: { $ref: '#/components/schemas/Money' }
+            requiredCash: { $ref: '#/components/schemas/Money' }
     BlindOrderEstimate:
-      description: Оценка заявки в слепом режиме — только проценты от начального капитала, без рублей и рублёвых цен (INV-7)
+      description: |
+        Оценка заявки в слепом режиме — только проценты от начального капитала, без рублей и рублёвых цен (INV-7).
+        Суммы верхнего уровня — первой ноги (у OCO — стоп), `canPlace`, `reason` и `field` — по всем ногам.
       unevaluatedProperties: false
       allOf:
         - $ref: '#/components/schemas/OrderEstimateBase'
         - type: object
-          required: [mode]
+          required: [mode, legs]
           properties:
             mode: { type: string, const: BLIND }
+            legs:
+              type: array
+              description: 'Оценка каждой ноги: одна нога, у OCO — стоп и тейк-профит; пусто, если оценки нет (отказ до расчёта, сессия не активна)'
+              items: { $ref: '#/components/schemas/BlindOrderEstimateLeg' }
     OpenOrderEstimate:
-      description: Оценка заявки в раскрытом режиме — проценты и рублёвые суммы (`EstimateOrderResponse`)
+      description: |
+        Оценка заявки в раскрытом режиме — проценты и рублёвые суммы (`EstimateOrderResponse`).
+        Суммы верхнего уровня — первой ноги (у OCO — стоп), `canPlace`, `reason` и `field` — по всем ногам.
       allOf:
         - $ref: '#/components/schemas/OrderEstimateBase'
         - type: object
-          required: [mode, referencePrice, amount, commission, exchangeFee, requiredCash]
+          required: [mode, legs, referencePrice, amount, commission, exchangeFee, requiredCash]
           properties:
             mode: { type: string, const: OPEN }
+            legs:
+              type: array
+              description: 'Оценка каждой ноги: одна нога, у OCO — стоп и тейк-профит; пусто, если оценки нет (отказ до расчёта, сессия не активна)'
+              items: { $ref: '#/components/schemas/OpenOrderEstimateLeg' }
             referencePrice: { $ref: '#/components/schemas/Price' }
             amount: { $ref: '#/components/schemas/Money' }
             commission: { $ref: '#/components/schemas/Money' }
