@@ -22,6 +22,7 @@ function blindSnapshot(overrides: Record<string, unknown> = {}) {
   return {
     mode: 'BLIND',
     sessionId: SESSION,
+    blind: true,
     regime: 'calm',
     step: 1,
     totalSteps: 100,
@@ -316,7 +317,8 @@ describe('HttpArenaApi', () => {
       },
     });
     expect(snap.finished).toBe(true);
-    expect(snap.blind).toBe(false);
+    // данные раскрыты (mode OPEN), но сессия запускалась слепой
+    expect(snap.blind).toBe(true);
     expect(snap.papers[0]).toMatchObject({ id: PAPER, label: 'YDEX' });
     expect(snap.papers[0].candles[0].fullDateLabel).toBe('26.02.2020 10:00');
     expect(snap.portfolio.equityRub).toBe(1000000);

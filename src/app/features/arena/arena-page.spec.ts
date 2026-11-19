@@ -66,6 +66,21 @@ describe('ArenaPage', () => {
     expect(finishButton()).toBeUndefined();
   });
 
+  it('завершённая слепая сессия подписана «Слепая (раскрыта)»', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Слепая сессия');
+    expect(root.textContent).not.toContain('Слепая (раскрыта)');
+
+    fixture.componentInstance['store'].finished.set(true);
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Слепая (раскрыта)');
+  });
+
   it('INV-6/INV-7: отображает оценку из ArenaApi, русские типы заявок, подписи портфеля и вкладку Снятые без ₽', async () => {
     const fixture = TestBed.createComponent(ArenaPage);
     fixture.detectChanges();

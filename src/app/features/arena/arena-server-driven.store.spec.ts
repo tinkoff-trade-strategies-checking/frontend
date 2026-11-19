@@ -423,7 +423,7 @@ describe('ArenaStore при серверном времени', () => {
     api.snapshots = [
       snapshot({ lastEventId: 10 }),
       snapshot({
-        blind: false,
+        blind: true,
         finished: true,
         playing: false,
         lastEventId: 11,
@@ -456,8 +456,9 @@ describe('ArenaStore при серверном времени', () => {
         partial: true,
       },
     });
-    await vi.waitFor(() => expect(store.blind()).toBe(false));
-    expect(store.finished()).toBe(true);
+    await vi.waitFor(() => expect(store.finished()).toBe(true));
+    await vi.waitFor(() => expect(store.selectedPaper()!.label).toBe('SBER'));
+    expect(store.blind()).toBe(true);
     expect(store.selectedPaper()!.label).toBe('SBER');
     expect(store.selectedPaper()!.candles[0].dateLabel).toBe('26.02.2020');
   });

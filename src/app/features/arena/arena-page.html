@@ -4,7 +4,7 @@
       <h1 class="tui-text_h3">{{ headerTitle() }}</h1>
       @if (store.blind()) {
         <span tuiBadge appearance="neutral" size="m">
-          {{ readOnly() ? 'Слепая (раскрыта)' : 'Слепая сессия' }}
+          {{ readOnly() || store.finished() ? 'Слепая (раскрыта)' : 'Слепая сессия' }}
         </span>
       }
       @if (readOnly()) {
