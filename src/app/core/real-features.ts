@@ -8,7 +8,7 @@ import { STUB_MODE } from './api-mode';
  * включает свои разделы.
  */
 export const REAL_FEATURES: Record<'arena' | 'report' | 'replay', boolean> = {
-  arena: false,
+  arena: true,
   report: false,
   replay: false,
 };

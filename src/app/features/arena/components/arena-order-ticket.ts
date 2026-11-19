@@ -10,17 +10,23 @@ import {
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
-import { formatPct, formatPrice } from '../arena.format';
+import { formatPct, formatPrice, formatRejectReason } from '../arena.format';
 import { OrderDraft } from '../arena.store';
 import {
   ArenaOrder,
   ArenaPaper,
   ArenaPortfolio,
+  EstimateOrderCommand,
   ORDER_TYPE_LABELS,
   OrderSide,
+  OrderEstimateLeg,
+  OrderEstimateResult,
   OrderType,
   TimeInForce,
 } from '../data/arena.models';
+
+/** Параметры формы для оценки заявки ядром; `lots` может быть ещё не введён. */
+export type EstimateDraft = Omit<EstimateOrderCommand, 'lots'> & { lots: number | null };
 
 const ORDER_TYPES: readonly OrderType[] = [
   'market',
@@ -232,6 +238,25 @@ function round2(value: number): number {
           <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>
           <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
         </div>
+        @if (estimateRejection(); as rejection) {
+          <p class="tui-text_body-xs estimate-warning" role="status">
+            Заявка не будет принята: {{ rejection }}
+          </p>
+        }
+        @if (estimate()?.legs; as legs) {
+          @if (legs.length > 1) {
+            <ul class="tui-text_body-xs estimate-legs">
+              @for (leg of legs; track $index) {
+                <li>
+                  {{ legLabel(leg.type) }}: {{ formatPct(leg.amountPct) }}
+                  @if (!leg.canPlace) {
+                    — {{ legRejection(leg) }}
+                  }
+                </li>
+              }
+            </ul>
+          }
+        }
 
         <tui-segmented
           size="s"
@@ -304,6 +329,16 @@ function round2(value: number): number {
       gap: 0.5rem;
     }
 
+    .estimate-warning {
+      margin: 0;
+      color: var(--tui-text-negative);
+    }
+
+    .estimate-legs {
+      margin: 0;
+      padding-left: 1rem;
+    }
+
     .hint-row {
       display: flex;
       justify-content: space-between;
@@ -328,11 +363,16 @@ export class ArenaOrderTicket {
   readonly portfolio = input.required<ArenaPortfolio>();
   readonly finished = input.required<boolean>();
   readonly editingOrder = input<ArenaOrder | null>(null);
-  readonly estimatedPct = input<number | null>(null);
+  readonly estimate = input<OrderEstimateResult | null>(null);
+  protected readonly estimatedPct = computed(() => this.estimate()?.amountPct ?? null);
+  protected readonly estimateRejection = computed(() => {
+    const est = this.estimate();
+    return est && est.canPlace === false ? formatRejectReason(est.reason, est.field) : null;
+  });
   readonly error = input<string | null>(null);
 
   readonly paperSelect = output<string>();
-  readonly estimateRequest = output<{ paperId: string; lots: number | null }>();
+  readonly estimateRequest = output<EstimateDraft>();
   readonly submitOrder = output<OrderDraft>();
   readonly submitReplace = output<{
     orderId: string;
@@ -358,7 +398,7 @@ export class ArenaOrderTicket {
   protected readonly trailingPct = signal(5);
 
   private lastPaperId: string | null = null;
-  private lastEstimatedLots: number | null | undefined;
+  private estimateRequested = false;
 
   protected readonly paperIds = computed(() => this.papers().map((p) => p.id));
   protected readonly isSellOnly = computed(() => SELL_ONLY_TYPES.has(this.orderType()));
@@ -426,23 +466,44 @@ export class ArenaOrderTicket {
     });
 
     effect((onCleanup) => {
-      // INV-6: оценка суммы запрашивается у источника, клиент не считает.
-      const paperId = this.selectedPaperId();
-      const lots = this.lots();
+      // INV-6: оценка запрашивается у источника по параметрам формы (сторона, тип, цены), клиент не считает.
+      const type = this.orderType();
+      const draft: EstimateDraft = {
+        paperId: this.selectedPaperId(),
+        side: this.side(),
+        type,
+        lots: this.lots(),
+        tif: this.tif(),
+        limitPrice:
+          type === 'limit' || type === 'stop_limit' ? (this.limitPrice() ?? undefined) : undefined,
+        stopPrice:
+          type === 'stop' || type === 'stop_limit' || type === 'oco'
+            ? (this.stopPrice() ?? undefined)
+            : undefined,
+        takeProfitPrice:
+          type === 'take_profit' || type === 'oco'
+            ? (this.takeProfitPrice() ?? undefined)
+            : undefined,
+        trailingPct: type === 'trailing' ? (this.trailingPct() ?? undefined) : undefined,
+      };
       this.step();
-      const lotsChanged = this.lastEstimatedLots !== undefined && this.lastEstimatedLots !== lots;
-      this.lastEstimatedLots = lots;
-
-      if (!lotsChanged) {
-        this.estimateRequest.emit({ paperId, lots });
+      const first = !this.estimateRequested;
+      this.estimateRequested = true;
+      if (first) {
+        this.estimateRequest.emit(draft);
         return;
       }
-
-      const timer = setTimeout(() => {
-        this.estimateRequest.emit({ paperId, lots });
-      }, 200);
+      const timer = setTimeout(() => this.estimateRequest.emit(draft), 200);
       onCleanup(() => clearTimeout(timer));
     });
+  }
+
+  protected legLabel(type: OrderType): string {
+    return ORDER_TYPE_LABELS[type];
+  }
+
+  protected legRejection(leg: OrderEstimateLeg): string {
+    return formatRejectReason(leg.reason, leg.field);
   }
 
   protected onSideIndexChange(index: number): void {

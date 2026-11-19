@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { Observable } from 'rxjs';
 
 export type ArenaSpeed = 1 | 5 | 10 | 100;
 
@@ -64,6 +65,8 @@ export interface ArenaOrder {
   readonly peakPrice?: number;
   readonly rejectReason?: ArenaRejectReason;
   readonly rejectField?: string;
+  /** Вторая нога OCO («стоп + тейк»). */
+  readonly ocoSiblingId?: string;
 }
 
 export interface ArenaFill {
@@ -117,6 +120,11 @@ export interface ArenaSnapshot {
   readonly portfolio: ArenaPortfolio;
   readonly orders: readonly ArenaOrder[];
   readonly fills: readonly ArenaFill[];
+  /** Состояние плеера на сервере (INV-8); у заглушек и воспроизведения не задано. */
+  readonly playing?: boolean;
+  readonly speed?: ArenaSpeed;
+  /** Номер последнего события потока, учтённого в снимке (INV-8); `null` — сервер не сообщил. */
+  readonly lastEventId?: number | null;
 }
 
 export interface ArenaPaperStat {
@@ -128,7 +136,10 @@ export interface ArenaStepResult {
   readonly step: number;
   readonly day: number;
   readonly finished: boolean;
+  /** Последняя свеча пачки по бумаге. */
   readonly bars: Readonly<Record<string, ArenaCandle>>;
+  /** Все свечи пачки по бумаге (на ×10 и ×100 за такт проходит несколько); у заглушек не задано. */
+  readonly batches?: Readonly<Record<string, readonly ArenaCandle[]>>;
   readonly paperStats: Readonly<Record<string, ArenaPaperStat>>;
   readonly portfolio: ArenaPortfolio;
   readonly orders: readonly ArenaOrder[];
@@ -166,11 +177,36 @@ export interface ReplaceOrderCommand {
 
 export interface EstimateOrderCommand {
   readonly paperId: string;
+  readonly side: OrderSide;
+  readonly type: OrderType;
   readonly lots: number;
+  readonly tif: TimeInForce;
+  readonly limitPrice?: number;
+  readonly stopPrice?: number;
+  readonly takeProfitPrice?: number;
+  readonly trailingPct?: number;
+}
+
+export interface OrderEstimateLeg {
+  readonly type: OrderType;
+  readonly canPlace: boolean;
+  readonly reason?: ArenaRejectReason;
+  readonly field?: string;
+  readonly amountPct: number;
+  readonly commissionPct: number;
+  readonly requiredCashPct: number;
 }
 
 export interface OrderEstimateResult {
   readonly amountPct: number;
+  /** Известный заранее отказ: `false` — заявку ядро не примет (причина в `reason`). */
+  readonly canPlace?: boolean;
+  readonly reason?: ArenaRejectReason;
+  readonly field?: string;
+  readonly commissionPct?: number;
+  readonly requiredCashPct?: number;
+  /** Оценка по ногам: у OCO — стоп и тейк-профит отдельно. */
+  readonly legs?: readonly OrderEstimateLeg[];
 }
 
 export interface ArenaCommandResult {
@@ -179,6 +215,8 @@ export interface ArenaCommandResult {
   readonly field?: string;
   readonly order?: ArenaOrder;
   readonly orders: readonly ArenaOrder[];
+  /** `orders` — только затронутые заявки (их надо влить в список по id), а не весь список. */
+  readonly partial?: boolean;
   readonly portfolio: ArenaPortfolio;
 }
 
@@ -188,9 +226,56 @@ export interface ArenaFinishResult {
   readonly finishedAtDay: number;
   readonly portfolio: ArenaPortfolio;
   readonly orders?: readonly ArenaOrder[];
+  readonly partial?: boolean;
 }
 
+export interface ArenaPlayerState {
+  readonly playing: boolean;
+  readonly speed: ArenaSpeed;
+  readonly step: number;
+  readonly day: number;
+  readonly finished: boolean;
+  readonly stepResult: ArenaStepResult | null;
+}
+
+export type PlayerAction = 'play' | 'pause' | 'step' | 'speed';
+
+export type ArenaPauseReason = 'user' | 'disconnect' | 'worker_failure' | 'restart';
+
+/** События SSE (`SessionEvent`), приведённые к моделям экрана. `eventId` — номер события в сессии. */
+export type ArenaEvent =
+  | { readonly type: 'step'; readonly eventId: number | null; readonly result: ArenaStepResult }
+  | {
+      readonly type: 'order_updated';
+      readonly eventId: number | null;
+      readonly order: ArenaOrder;
+      readonly portfolio: ArenaPortfolio;
+    }
+  | { readonly type: 'paused'; readonly eventId: number | null; readonly reason: ArenaPauseReason }
+  | {
+      readonly type: 'player';
+      readonly eventId: number | null;
+      readonly playing: boolean;
+      readonly speed: ArenaSpeed;
+    }
+  | {
+      readonly type: 'finished';
+      readonly eventId: number | null;
+      readonly result: ArenaFinishResult;
+    }
+  | { readonly type: 'report_ready'; readonly eventId: number | null }
+  /** Поток закрыт сервером окончательно (401, 404…): состояние и причину покажет перечитанный снимок. */
+  | { readonly type: 'stream_failed'; readonly status: number };
+
 export interface ArenaApi {
+  /**
+   * Время ведёт сервер: плеер управляется командами, шаги приходят потоком событий.
+   * Без флага (заглушки, воспроизведение) шаги по таймеру делает клиент.
+   */
+  readonly serverDriven?: boolean;
+  control?(action: PlayerAction, speed?: ArenaSpeed): Promise<ArenaPlayerState>;
+  /** Поток событий с номера `lastEventId` (из снимка): сервер досылает всё, что было после него. */
+  events?(lastEventId: number | null): Observable<ArenaEvent>;
   getSnapshot(sessionId?: string): Promise<ArenaSnapshot>;
   step(): Promise<ArenaStepResult>;
   estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;

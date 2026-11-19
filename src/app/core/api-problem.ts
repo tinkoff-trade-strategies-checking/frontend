@@ -83,6 +83,8 @@ export const PROBLEM_MESSAGES: Readonly<Record<ProblemCode, string | null>> = {
   TOO_MANY_REQUESTS: 'Слишком много попыток.',
   SERVICE_UNAVAILABLE: 'Сервис временно недоступен. Попробуйте позже.',
   INTERNAL_ERROR: 'Внутренняя ошибка сервера. Попробуйте позже.',
+  NOT_FINISHED: 'Сессия ещё не завершена.',
+  REPORT_BUILDING: 'Отчёт ещё собирается. Повторите чуть позже.',
   NO_MATCHING_PERIOD: null,
   TOO_MANY_BARS: null,
   CORPORATE_ACTION_ON_PERIOD: null,
