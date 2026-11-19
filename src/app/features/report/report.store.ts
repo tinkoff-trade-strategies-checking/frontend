@@ -1,4 +1,5 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { errorMessage } from '../../core/api-problem';
 import { DivergenceType, REPORT_API, SessionReportResult } from './data/report.models';
 
 export type ReportTab = 'metrics' | 'divergences' | 'reverse' | 'fills';
@@ -8,7 +9,13 @@ export type DivergenceSort = 'time' | 'errorCost';
 @Injectable()
 export class ReportStore {
   private readonly api = inject(REPORT_API);
+  private readonly destroyRef = inject(DestroyRef);
   private loadSeq = 0;
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Пока отчёт собирается (`BUILDING`), перечитываем его раз в `pollIntervalMs`. */
+  pollIntervalMs = 2000;
+  private static readonly MAX_POLLS = 90;
 
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -66,6 +73,7 @@ export class ReportStore {
     this.loading.set(true);
     this.error.set(null);
     this.result.set(null);
+    this.stopPolling();
     this.activeTab.set('metrics');
     this.divergenceFilter.set('all');
     this.divergenceSort.set('time');
@@ -76,15 +84,55 @@ export class ReportStore {
         return;
       }
       this.result.set(res);
-    } catch {
+      if (res.status === 'BUILDING') {
+        this.schedulePoll(sessionId, seq, 1);
+      }
+    } catch (err) {
       if (seq !== this.loadSeq) {
         return;
       }
-      this.error.set('Не удалось загрузить отчёт.');
+      this.error.set(errorMessage(err, 'Не удалось загрузить отчёт.'));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
+    }
+  }
+
+  constructor() {
+    this.destroyRef.onDestroy(() => this.stopPolling());
+  }
+
+  private schedulePoll(sessionId: string, seq: number, attempt: number): void {
+    if (attempt > ReportStore.MAX_POLLS) {
+      this.error.set('Отчёт собирается дольше обычного. Обновите страницу позже.');
+      return;
+    }
+    this.pollTimer = setTimeout(async () => {
+      if (seq !== this.loadSeq) {
+        return;
+      }
+      try {
+        const res = await this.api.getReport(sessionId);
+        if (seq !== this.loadSeq) {
+          return;
+        }
+        this.result.set(res);
+        if (res.status === 'BUILDING') {
+          this.schedulePoll(sessionId, seq, attempt + 1);
+        }
+      } catch (err) {
+        if (seq === this.loadSeq) {
+          this.error.set(errorMessage(err, 'Не удалось загрузить отчёт.'));
+        }
+      }
+    }, this.pollIntervalMs);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearTimeout(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 

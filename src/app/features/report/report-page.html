@@ -94,27 +94,48 @@
         </div>
 
         <div class="export-group">
-          <button
-            tuiButton
-            type="button"
-            size="s"
-            appearance="outline"
-            [disabled]="true"
-            title="Выгрузка отчёта пока недоступна"
-          >
-            Скачать XLSX
-          </button>
-          <button
-            tuiButton
-            type="button"
-            size="s"
-            appearance="outline"
-            [disabled]="true"
-            title="Выгрузка отчёта пока недоступна"
-          >
-            Скачать CSV
-          </button>
-          <span class="tui-text_body-xs muted">Выгрузка отчёта пока недоступна</span>
+          @if (stubMode) {
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              [disabled]="true"
+              title="Выгрузка отчёта пока недоступна"
+            >
+              Скачать XLSX
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              [disabled]="true"
+              title="Выгрузка отчёта пока недоступна"
+            >
+              Скачать CSV
+            </button>
+            <span class="tui-text_body-xs muted">Выгрузка отчёта пока недоступна</span>
+          } @else {
+            <a
+              tuiButton
+              size="s"
+              appearance="outline"
+              download
+              [attr.href]="exportUrl(rep.sessionId, 'xlsx')"
+            >
+              Скачать XLSX
+            </a>
+            <a
+              tuiButton
+              size="s"
+              appearance="outline"
+              download
+              [attr.href]="exportUrl(rep.sessionId, 'csv')"
+            >
+              Скачать CSV
+            </a>
+          }
         </div>
       </header>
 

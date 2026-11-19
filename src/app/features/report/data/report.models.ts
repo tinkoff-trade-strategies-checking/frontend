@@ -91,7 +91,7 @@ export interface UnderwaterPoint {
   readonly step: number;
   readonly dateLabel: string;
   readonly humanDrawdownPct: number;
-  readonly algoDrawdownPct: number;
+  readonly algoDrawdownPct: number | null;
 }
 
 export interface ReportDivergence {

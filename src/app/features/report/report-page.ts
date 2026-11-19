@@ -6,6 +6,8 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import { DivergenceType, EquityCurvePoint, REPORT_API } from './data/report.models';
+import { ApiConfiguration } from '../../api/api-configuration';
+import { STUB_MODE } from '../../core/api-mode';
 import { REPORT_API_IMPL } from '../../api-impls';
 import {
   DIVERGENCE_TYPE_LABELS,
@@ -62,6 +64,9 @@ export class ReportPage implements OnInit {
   protected readonly store = inject(ReportStore);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly apiConfig = inject(ApiConfiguration);
+
+  protected readonly stubMode = inject(STUB_MODE);
 
   protected readonly tabs = REPORT_TABS;
   protected readonly divergenceFilters = DIVERGENCE_FILTERS;
@@ -83,6 +88,11 @@ export class ReportPage implements OnInit {
       const id = params.get('id') ?? 'S-0103';
       void this.store.load(id);
     });
+  }
+
+  /** Выгрузка — обычная загрузка файла по ссылке: cookie сессии браузер подставит сам. */
+  protected exportUrl(sessionId: string, format: 'xlsx' | 'csv'): string {
+    return `${this.apiConfig.rootUrl}/sessions/${sessionId}/report/export?format=${format}`;
   }
 
   protected equityCurveSubtitle(points: readonly EquityCurvePoint[]): string {
