@@ -1,94 +1,148 @@
 import { vi } from 'vitest';
-import { EventSourceLike, SessionStreamItem, sessionEventStream } from './session-events';
+import { SessionFetch, SessionStreamItem, sessionEventStream } from './session-events';
 
-class FakeSource implements EventSourceLike {
-  readyState = 0;
-  onopen: ((event: Event) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
-  closed = false;
-  private readonly listeners = new Map<string, (event: MessageEvent<string>) => void>();
+const encoder = new TextEncoder();
 
-  addEventListener(type: string, listener: (event: MessageEvent<string>) => void): void {
-    this.listeners.set(type, listener);
-  }
+function sse(...blocks: string[]): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      for (const block of blocks) {
+        controller.enqueue(encoder.encode(block));
+      }
+      controller.close();
+    },
+  });
+}
 
-  close(): void {
-    this.closed = true;
-    this.readyState = 2;
-  }
+function event(id: number, type: string, extra: Record<string, unknown> = {}): string {
+  return `id: ${id}\nevent: ${type}\ndata: ${JSON.stringify({ type, eventId: String(id), ...extra })}\n\n`;
+}
 
-  emit(type: string, data: string): void {
-    this.listeners.get(type)?.({ data } as MessageEvent<string>);
-  }
+function response(status: number, body: ReadableStream<Uint8Array> | null = null) {
+  return { ok: status >= 200 && status < 300, status, body };
 }
 
 describe('sessionEventStream', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('отдаёт события контракта по именам и пропускает битый JSON', () => {
-    const sources: FakeSource[] = [];
+  it('начинается с Last-Event-ID из снимка и отдаёт события по порядку, комментарии пропускает', async () => {
+    const calls: Record<string, string>[] = [];
+    const fetchFn: SessionFetch = vi.fn(async (_url, init) => {
+      calls.push(init.headers);
+      return response(
+        200,
+        sse(
+          ': heartbeat\n\n',
+          event(8, 'player', { playing: true, speed: 1 }),
+          // событие разорвано по границе чанков и пришло CRLF-ом
+          'id: 9\r\nevent: paused\r\ndata: {"type":"paused","eventId":"9",',
+          '"reason":"user"}\r\n\r\n',
+        ),
+      );
+    });
     const items: SessionStreamItem[] = [];
-    const sub = sessionEventStream('/api/v1/sessions/s/events', () => {
-      const source = new FakeSource();
-      sources.push(source);
-      return source;
-    }).subscribe((item) => items.push(item));
-
-    sources[0].emit(
-      'player',
-      JSON.stringify({ type: 'player', eventId: '1', playing: true, speed: 1 }),
+    const sub = sessionEventStream('/api/v1/sessions/s/events', 7, fetchFn).subscribe((i) =>
+      items.push(i),
     );
-    sources[0].emit('step', '{не json');
-    expect(items).toEqual([{ type: 'player', eventId: '1', playing: true, speed: 1 }]);
-
+    await vi.waitFor(() => expect(items).toHaveLength(2));
     sub.unsubscribe();
-    expect(sources[0].closed).toBe(true);
+    expect(calls[0]).toMatchObject({ 'Last-Event-ID': '7', Accept: 'text/event-stream' });
+    expect(items.map((i) => (i.type === 'stream_failed' ? i.type : i.eventId))).toEqual(['8', '9']);
   });
 
-  it('после обрыва и нового открытия просит перечитать снимок, на первом открытии — нет', () => {
-    let source!: FakeSource;
-    const items: SessionStreamItem[] = [];
-    sessionEventStream('/x', () => (source = new FakeSource())).subscribe((i) => items.push(i));
-
-    source.onopen?.(new Event('open'));
-    expect(items).toEqual([]);
-    source.readyState = 0; // браузер сам переподключается
-    source.onerror?.(new Event('error'));
-    source.onopen?.(new Event('open'));
-    expect(items).toEqual([{ type: 'resync' }]);
-  });
-
-  it('если браузер закрыл соединение, открывает новое с паузой и затем просит снимок', () => {
-    vi.useFakeTimers();
-    const sources: FakeSource[] = [];
-    const items: SessionStreamItem[] = [];
-    sessionEventStream('/x', () => {
-      const source = new FakeSource();
-      sources.push(source);
-      return source;
-    }).subscribe((i) => items.push(i));
-
-    sources[0].readyState = 2;
-    sources[0].onerror?.(new Event('error'));
-    expect(sources).toHaveLength(1);
-    vi.advanceTimersByTime(1000);
-    expect(sources).toHaveLength(2);
-    sources[1].onopen?.(new Event('open'));
-    expect(items).toEqual([{ type: 'resync' }]);
-  });
-
-  it('отписка останавливает переподключение', () => {
-    vi.useFakeTimers();
-    const sources: FakeSource[] = [];
-    const sub = sessionEventStream('/x', () => {
-      const source = new FakeSource();
-      sources.push(source);
-      return source;
-    }).subscribe();
-    sources[0].readyState = 2;
-    sources[0].onerror?.(new Event('error'));
+  it('без номера в снимке заголовка нет', async () => {
+    const fetchFn: SessionFetch = vi.fn(async () => response(200, sse(event(1, 'report_ready'))));
+    const sub = sessionEventStream('/x', null, fetchFn).subscribe();
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalled());
     sub.unsubscribe();
-    vi.advanceTimersByTime(20_000);
-    expect(sources).toHaveLength(1);
+    expect(vi.mocked(fetchFn).mock.calls[0][1].headers).not.toHaveProperty('Last-Event-ID');
+  });
+
+  it('битый JSON пропускается, поток живёт', async () => {
+    const fetchFn: SessionFetch = vi.fn(async () =>
+      response(200, sse('id: 1\ndata: {не json\n\n', event(2, 'report_ready'))),
+    );
+    const items: SessionStreamItem[] = [];
+    const sub = sessionEventStream('/x', null, fetchFn).subscribe((i) => items.push(i));
+    await vi.waitFor(() => expect(items).toHaveLength(1));
+    sub.unsubscribe();
+    expect(items[0]).toMatchObject({ type: 'report_ready', eventId: '2' });
+  });
+
+  it.each([400, 401, 403, 404])(
+    'ответ %i закрывает поток окончательно, без переподключения',
+    async (status) => {
+      const fetchFn: SessionFetch = vi.fn(async () => response(status));
+      const items: SessionStreamItem[] = [];
+      let completed = false;
+      sessionEventStream('/x', 5, fetchFn).subscribe({
+        next: (i) => items.push(i),
+        complete: () => (completed = true),
+      });
+      await vi.waitFor(() => expect(completed).toBe(true));
+      expect(items).toEqual([{ type: 'stream_failed', status }]);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('обрыв потока: переподключение с номером последнего события и паузой', async () => {
+    vi.useFakeTimers();
+    const headers: Record<string, string>[] = [];
+    let n = 0;
+    const fetchFn: SessionFetch = vi.fn(async (_url, init) => {
+      headers.push(init.headers);
+      n++;
+      return n === 1
+        ? response(200, sse(event(3, 'player', { playing: true, speed: 1 })))
+        : response(200, new ReadableStream({ start: () => undefined }));
+    });
+    const items: SessionStreamItem[] = [];
+    const sub = sessionEventStream('/x', 2, fetchFn).subscribe((i) => items.push(i));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(items).toHaveLength(1);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(headers[1]['Last-Event-ID']).toBe('3');
+    sub.unsubscribe();
+  });
+
+  it('сбой сети (fetch отклонён) — повтор с нарастающей паузой, 5xx — тоже повтор', async () => {
+    vi.useFakeTimers();
+    let n = 0;
+    const fetchFn: SessionFetch = vi.fn(async () => {
+      n++;
+      if (n === 1) {
+        throw new TypeError('network');
+      }
+      return n === 2
+        ? response(503)
+        : response(200, new ReadableStream({ start: () => undefined }));
+    });
+    const sub = sessionEventStream('/x', null, fetchFn).subscribe();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    sub.unsubscribe();
+  });
+
+  it('отписка останавливает переподключение и прерывает запрос', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    const fetchFn: SessionFetch = vi.fn(async (_url, init) => {
+      signal = init.signal;
+      throw new TypeError('network');
+    });
+    const sub = sessionEventStream('/x', null, fetchFn).subscribe();
+    await vi.advanceTimersByTimeAsync(0);
+    sub.unsubscribe();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(signal?.aborted).toBe(true);
   });
 });

@@ -29,6 +29,7 @@ describe('LaunchStore: переход после запуска', () => {
   }
 
   it('настоящий режим, арена не подключена: в историю, а не на заглушку арены', async () => {
+    REAL_FEATURES.arena = false;
     const navigate = await launch(false);
     expect(navigate).toHaveBeenCalledWith(['/history']);
   });

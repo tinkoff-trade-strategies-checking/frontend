@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { EVENT_SOURCE_FACTORY } from '../../../core/session-events';
+import { SESSION_FETCH } from '../../../core/session-events';
 import { HttpArenaApi } from './http-arena.api';
 
 const SESSION = '0190aaaa-0000-7000-8000-000000000001';
@@ -61,6 +61,7 @@ function blindSnapshot(overrides: Record<string, unknown> = {}) {
 }
 
 describe('HttpArenaApi', () => {
+  const sessionFetch = vi.fn();
   let api: HttpArenaApi;
   let controller: HttpTestingController;
 
@@ -70,7 +71,7 @@ describe('HttpArenaApi', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         HttpArenaApi,
-        { provide: EVENT_SOURCE_FACTORY, useValue: vi.fn() },
+        { provide: SESSION_FETCH, useValue: sessionFetch },
       ],
     });
     api = TestBed.inject(HttpArenaApi);
@@ -167,22 +168,128 @@ describe('HttpArenaApi', () => {
         positions: [],
       },
     });
-    const pending = api.estimateOrder({ paperId: PAPER, lots: 2 });
+    const pending = api.estimateOrder({
+      paperId: PAPER,
+      side: 'sell',
+      type: 'oco',
+      lots: 2,
+      tif: 'gtc',
+      stopPrice: 90,
+      takeProfitPrice: 120.5,
+    });
     const req = controller.expectOne(`/api/v1/sessions/${SESSION}/order-estimate`);
-    expect(req.request.body).toMatchObject({ paperId: PAPER, lots: 2 });
+    // Оценка по параметрам формы, а не по «рыночной покупке»: сторона, тип, обе цены OCO.
+    expect(req.request.body).toMatchObject({
+      paperId: PAPER,
+      side: 'sell',
+      type: 'oco',
+      lots: 2,
+      tif: 'gtc',
+      stopPrice: '90',
+      takeProfitPrice: '120.5',
+    });
     expect(req.request.body).not.toHaveProperty('paperIndex');
     req.flush({
-      mode: 'BLIND',
-      canPlace: true,
-      reason: null,
+      mode: 'OPEN',
+      canPlace: false,
+      reason: 'INSUFFICIENT_POSITION',
       field: null,
       amountPct: '1.25',
       commissionPct: '0.01',
       exchangeFeePct: '0',
       requiredCashPct: '1.3',
-      legs: [],
+      referencePrice: '100',
+      amount: '1.00',
+      commission: '0.01',
+      exchangeFee: '0',
+      requiredCash: '1.00',
+      legs: [
+        {
+          type: 'stop',
+          canPlace: false,
+          reason: 'INSUFFICIENT_POSITION',
+          field: null,
+          amountPct: '0.6',
+          commissionPct: '0.01',
+          exchangeFeePct: '0',
+          requiredCashPct: '0.6',
+          referencePrice: '90',
+          amount: '1',
+          commission: '0',
+          exchangeFee: '0',
+          requiredCash: '1',
+        },
+        {
+          type: 'take_profit',
+          canPlace: true,
+          reason: null,
+          field: null,
+          amountPct: '0.65',
+          commissionPct: '0.01',
+          exchangeFeePct: '0',
+          requiredCashPct: '0.65',
+          referencePrice: '120.5',
+          amount: '1',
+          commission: '0',
+          exchangeFee: '0',
+          requiredCash: '1',
+        },
+      ],
     });
-    expect(await pending).toEqual({ amountPct: 1.25 });
+    const estimate = await pending;
+    expect(estimate).toMatchObject({
+      amountPct: 1.25,
+      canPlace: false,
+      reason: 'INSUFFICIENT_POSITION',
+    });
+    expect(estimate.legs?.map((l) => [l.type, l.canPlace])).toEqual([
+      ['stop', false],
+      ['take_profit', true],
+    ]);
+  });
+
+  it('поток событий открывается с Last-Event-ID из снимка и не использует EventSource', async () => {
+    await load();
+    sessionFetch.mockResolvedValue({ ok: false, status: 404, body: null });
+    const items: unknown[] = [];
+    api.events(41).subscribe((e) => items.push(e));
+    await vi.waitFor(() => expect(items).toEqual([{ type: 'stream_failed', status: 404 }]));
+    expect(sessionFetch).toHaveBeenCalledWith(
+      `/api/v1/sessions/${SESSION}/events`,
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'Last-Event-ID': '41' }),
+        credentials: 'include',
+      }),
+    );
+  });
+
+  it('снимок передаёт lastEventId (null, пока сервер не отдаёт поле)', async () => {
+    expect((await load()).lastEventId).toBeNull();
+    const snap = await load(blindSnapshot({ lastEventId: '17' }));
+    expect(snap.lastEventId).toBe(17);
+  });
+
+  it('повтор команды после обрыва сети идёт с тем же Idempotency-Key', async () => {
+    await load();
+    const pending = api.control('play');
+    const first = controller.expectOne(`/api/v1/sessions/${SESSION}/player`);
+    const key = first.request.headers.get('Idempotency-Key');
+    first.error(new ProgressEvent('error'), { status: 0 });
+    const second = await vi.waitFor(() =>
+      controller.expectOne(`/api/v1/sessions/${SESSION}/player`),
+    );
+    expect(second.request.headers.get('Idempotency-Key')).toBe(key);
+    second.flush({
+      mode: 'BLIND',
+      sessionId: SESSION,
+      playing: true,
+      speed: 1,
+      step: 1,
+      day: 1,
+      finished: false,
+      stepResult: null,
+    });
+    expect(await pending).toMatchObject({ playing: true });
   });
 
   it('отмена: DELETE с seenStep и ключом; замена: PUT', async () => {

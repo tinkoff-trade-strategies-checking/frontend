@@ -7,6 +7,7 @@ import { OpenCandle } from '../../../api/models/open-candle';
 import { OpenFill } from '../../../api/models/open-fill';
 import { OpenOrder } from '../../../api/models/open-order';
 import { OpenPortfolio } from '../../../api/models/open-portfolio';
+import { OrderEstimate } from '../../../api/models/order-estimate';
 import { OrderCommandResult } from '../../../api/models/order-command-result';
 import { PaperStat } from '../../../api/models/paper-stat';
 import { PlayerState } from '../../../api/models/player-state';
@@ -20,6 +21,7 @@ import {
   ArenaFinishResult,
   ArenaOrder,
   ArenaPaper,
+  OrderEstimateResult,
   ArenaPlayerState,
   ArenaPortfolio,
   ArenaPosition,
@@ -114,6 +116,7 @@ export function mapOrder(order: BlindOrder | OpenOrder): ArenaOrder {
     peakPrice: opt(order.trailingStopLevel),
     rejectReason: order.reason ?? undefined,
     rejectField: order.rejectField ?? undefined,
+    ocoSiblingId: order.ocoSiblingId ?? undefined,
   };
 }
 
@@ -187,6 +190,15 @@ function mapStat(stat: PaperStat, fallbackPrice: number): ArenaPaperStat {
   };
 }
 
+/** Номер события потока: строка `eventId`/`id:` или число; не число — `null`. */
+export function parseEventId(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 export function mapSnapshot(snapshot: Snapshot): ArenaSnapshot {
   const papers: ArenaPaper[] =
     snapshot.mode === 'BLIND'
@@ -222,6 +234,7 @@ export function mapSnapshot(snapshot: Snapshot): ArenaSnapshot {
     portfolio: mapPortfolio(snapshot.portfolio),
     orders: (snapshot.orders as (BlindOrder | OpenOrder)[]).map(mapOrder),
     fills: (snapshot.fills as (BlindFill | OpenFill)[]).map(mapFill),
+    lastEventId: parseEventId((snapshot as { lastEventId?: string | number | null }).lastEventId),
     playing: snapshot.playing ?? undefined,
     speed: (snapshot.speed ?? undefined) as ArenaSpeed | undefined,
   };
@@ -294,25 +307,47 @@ export function mapFinishResult(result: FinishResult): ArenaFinishResult {
   };
 }
 
+export function mapEstimate(estimate: OrderEstimate): OrderEstimateResult {
+  return {
+    amountPct: num(estimate.amountPct),
+    canPlace: estimate.canPlace,
+    reason: estimate.reason ?? undefined,
+    field: estimate.field ?? undefined,
+    commissionPct: num(estimate.commissionPct),
+    requiredCashPct: num(estimate.requiredCashPct),
+    legs: estimate.legs.map((leg) => ({
+      type: leg.type,
+      canPlace: leg.canPlace,
+      reason: leg.reason ?? undefined,
+      field: leg.field ?? undefined,
+      amountPct: num(leg.amountPct),
+      commissionPct: num(leg.commissionPct),
+      requiredCashPct: num(leg.requiredCashPct),
+    })),
+  };
+}
+
 /** SSE `SessionEvent` → событие экрана; неизвестный тип пропускаем (контракт может расти). */
 export function mapEvent(event: SessionEvent): ArenaEvent | null {
+  const eventId = parseEventId(event.eventId);
   switch (event.type) {
     case 'step':
-      return { type: 'step', result: mapStepResult(event.result) };
+      return { type: 'step', eventId, result: mapStepResult(event.result) };
     case 'order_updated':
       return {
         type: 'order_updated',
+        eventId,
         order: mapOrder(event.order),
         portfolio: mapPortfolio(event.portfolio),
       };
     case 'paused':
-      return { type: 'paused', reason: event.reason };
+      return { type: 'paused', eventId, reason: event.reason };
     case 'player':
-      return { type: 'player', playing: event.playing, speed: event.speed as ArenaSpeed };
+      return { type: 'player', eventId, playing: event.playing, speed: event.speed as ArenaSpeed };
     case 'finished':
-      return { type: 'finished', result: mapFinishResult(event.result) };
+      return { type: 'finished', eventId, result: mapFinishResult(event.result) };
     case 'report_ready':
-      return { type: 'report_ready' };
+      return { type: 'report_ready', eventId };
     default:
       return null;
   }

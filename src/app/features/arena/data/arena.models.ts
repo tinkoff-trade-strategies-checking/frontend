@@ -65,6 +65,8 @@ export interface ArenaOrder {
   readonly peakPrice?: number;
   readonly rejectReason?: ArenaRejectReason;
   readonly rejectField?: string;
+  /** Вторая нога OCO («стоп + тейк»). */
+  readonly ocoSiblingId?: string;
 }
 
 export interface ArenaFill {
@@ -121,6 +123,8 @@ export interface ArenaSnapshot {
   /** Состояние плеера на сервере (INV-8); у заглушек и воспроизведения не задано. */
   readonly playing?: boolean;
   readonly speed?: ArenaSpeed;
+  /** Номер последнего события потока, учтённого в снимке (INV-8); `null` — сервер не сообщил. */
+  readonly lastEventId?: number | null;
 }
 
 export interface ArenaPaperStat {
@@ -173,11 +177,36 @@ export interface ReplaceOrderCommand {
 
 export interface EstimateOrderCommand {
   readonly paperId: string;
+  readonly side: OrderSide;
+  readonly type: OrderType;
   readonly lots: number;
+  readonly tif: TimeInForce;
+  readonly limitPrice?: number;
+  readonly stopPrice?: number;
+  readonly takeProfitPrice?: number;
+  readonly trailingPct?: number;
+}
+
+export interface OrderEstimateLeg {
+  readonly type: OrderType;
+  readonly canPlace: boolean;
+  readonly reason?: ArenaRejectReason;
+  readonly field?: string;
+  readonly amountPct: number;
+  readonly commissionPct: number;
+  readonly requiredCashPct: number;
 }
 
 export interface OrderEstimateResult {
   readonly amountPct: number;
+  /** Известный заранее отказ: `false` — заявку ядро не примет (причина в `reason`). */
+  readonly canPlace?: boolean;
+  readonly reason?: ArenaRejectReason;
+  readonly field?: string;
+  readonly commissionPct?: number;
+  readonly requiredCashPct?: number;
+  /** Оценка по ногам: у OCO — стоп и тейк-профит отдельно. */
+  readonly legs?: readonly OrderEstimateLeg[];
 }
 
 export interface ArenaCommandResult {
@@ -213,20 +242,30 @@ export type PlayerAction = 'play' | 'pause' | 'step' | 'speed';
 
 export type ArenaPauseReason = 'user' | 'disconnect' | 'worker_failure' | 'restart';
 
-/** События SSE (`SessionEvent`), приведённые к моделям экрана, плюс служебные события соединения. */
+/** События SSE (`SessionEvent`), приведённые к моделям экрана. `eventId` — номер события в сессии. */
 export type ArenaEvent =
-  | { readonly type: 'step'; readonly result: ArenaStepResult }
+  | { readonly type: 'step'; readonly eventId: number | null; readonly result: ArenaStepResult }
   | {
       readonly type: 'order_updated';
+      readonly eventId: number | null;
       readonly order: ArenaOrder;
       readonly portfolio: ArenaPortfolio;
     }
-  | { readonly type: 'paused'; readonly reason: ArenaPauseReason }
-  | { readonly type: 'player'; readonly playing: boolean; readonly speed: ArenaSpeed }
-  | { readonly type: 'finished'; readonly result: ArenaFinishResult }
-  | { readonly type: 'report_ready' }
-  /** Соединение (пере)установлено после обрыва: события могли потеряться — перечитать снимок (INV-8). */
-  | { readonly type: 'resync' };
+  | { readonly type: 'paused'; readonly eventId: number | null; readonly reason: ArenaPauseReason }
+  | {
+      readonly type: 'player';
+      readonly eventId: number | null;
+      readonly playing: boolean;
+      readonly speed: ArenaSpeed;
+    }
+  | {
+      readonly type: 'finished';
+      readonly eventId: number | null;
+      readonly result: ArenaFinishResult;
+    }
+  | { readonly type: 'report_ready'; readonly eventId: number | null }
+  /** Поток закрыт сервером окончательно (401, 404…): состояние и причину покажет перечитанный снимок. */
+  | { readonly type: 'stream_failed'; readonly status: number };
 
 export interface ArenaApi {
   /**
@@ -235,7 +274,8 @@ export interface ArenaApi {
    */
   readonly serverDriven?: boolean;
   control?(action: PlayerAction, speed?: ArenaSpeed): Promise<ArenaPlayerState>;
-  events?(): Observable<ArenaEvent>;
+  /** Поток событий с номера `lastEventId` (из снимка): сервер досылает всё, что было после него. */
+  events?(lastEventId: number | null): Observable<ArenaEvent>;
   getSnapshot(sessionId?: string): Promise<ArenaSnapshot>;
   step(): Promise<ArenaStepResult>;
   estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult>;

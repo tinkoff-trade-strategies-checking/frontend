@@ -48,6 +48,7 @@ describe('маршруты по режимам', () => {
 
   it('настоящий режим: арена, отчёт и воспроизведение закрыты, пока не подключены, и ведут в историю', async () => {
     const router = await setup(false);
+    REAL_FEATURES.arena = false;
     for (const url of ['/arena', '/arena/s-1', '/report', '/report/s-1', '/replay/s-1']) {
       expect(await go(router, url)).toBe('/history');
     }

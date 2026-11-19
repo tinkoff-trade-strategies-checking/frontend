@@ -13,18 +13,14 @@ import { OrderParams } from '../../../api/models/order-params';
 import { PlaceOrderRequest } from '../../../api/models/place-order-request';
 import { EstimateOrderRequest } from '../../../api/models/estimate-order-request';
 import { withIdempotency } from '../../../core/idempotency';
-import {
-  EVENT_SOURCE_FACTORY,
-  SessionStreamItem,
-  sessionEventStream,
-} from '../../../core/session-events';
+import { SESSION_FETCH, SessionStreamItem, sessionEventStream } from '../../../core/session-events';
 import {
   mapCommandResult,
+  mapEstimate,
   mapEvent,
   mapFinishResult,
   mapPlayerState,
   mapSnapshot,
-  num,
   toPctString,
   toPriceString,
 } from './arena.mappers';
@@ -72,7 +68,7 @@ export class HttpArenaApi implements ArenaApi {
 
   private readonly api = inject(Api);
   private readonly config = inject(ApiConfiguration);
-  private readonly eventSourceFactory = inject(EVENT_SOURCE_FACTORY);
+  private readonly sessionFetch = inject(SESSION_FETCH);
 
   private sessionId: string | null = null;
   private blind = true;
@@ -105,25 +101,32 @@ export class HttpArenaApi implements ArenaApi {
     return state.stepResult;
   }
 
-  events(): Observable<ArenaEvent> {
+  events(lastEventId: number | null): Observable<ArenaEvent> {
     const sessionId = this.requireSession();
     const url = `${this.config.rootUrl}/sessions/${sessionId}/events`;
-    return sessionEventStream(url, this.eventSourceFactory).pipe(
+    return sessionEventStream(url, lastEventId, this.sessionFetch).pipe(
       map((item: SessionStreamItem): ArenaEvent | null =>
-        item.type === 'resync' ? { type: 'resync' } : mapEvent(item),
+        item.type === 'stream_failed' ? item : mapEvent(item),
       ),
       filter((event): event is ArenaEvent => event !== null),
     );
   }
 
+  /** Оценка по параметрам формы: сторона, тип, цены (в том числе обе ноги OCO) — ядро считает издержки и отказ. */
   async estimateOrder(command: EstimateOrderCommand): Promise<OrderEstimateResult> {
     const sessionId = this.requireSession();
-    const common = { side: 'buy', type: 'market', lots: command.lots, tif: 'day' } as const;
+    const common = {
+      ...priceParams(command),
+      side: command.side,
+      type: command.type,
+      lots: command.lots,
+      tif: command.tif,
+    };
     const body: EstimateOrderRequest = this.blind
       ? { ...common, paperIndex: Number(command.paperId) }
       : { ...common, paperId: command.paperId };
     const estimate = await this.api.invoke(estimateOrder, { sessionId, body });
-    return { amountPct: num(estimate.amountPct) };
+    return mapEstimate(estimate);
   }
 
   async placeOrder(command: PlaceOrderCommand): Promise<ArenaCommandResult> {

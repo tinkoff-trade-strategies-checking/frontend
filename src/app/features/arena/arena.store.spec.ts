@@ -4,6 +4,8 @@ import { ArenaStore } from './arena.store';
 import { ARENA_API, ArenaApi, ArenaSnapshot } from './data/arena.models';
 import { StubArenaApi } from './data/stub-arena.api';
 
+const DRAFT = { paperId: 'A', side: 'buy', type: 'market', tif: 'day' } as const;
+
 describe('ArenaStore', () => {
   function setup(api: ArenaApi = new StubArenaApi()): { store: ArenaStore; api: ArenaApi } {
     TestBed.configureTestingModule({
@@ -136,7 +138,7 @@ describe('ArenaStore', () => {
     await store.init();
     expect(store.portfolio()).toEqual(customSnapshot.portfolio);
 
-    await store.estimateOrder('A', 7);
+    await store.estimateOrder({ ...DRAFT, lots: 7 });
     expect(store.estimatedPct()).toBe(42.42);
   });
 
@@ -286,8 +288,8 @@ describe('ArenaStore', () => {
     const { store } = setup(stub);
     await store.init();
 
-    const pending = store.estimateOrder('A', 5);
-    await store.estimateOrder('A', null);
+    const pending = store.estimateOrder({ ...DRAFT, lots: 5 });
+    await store.estimateOrder({ ...DRAFT, lots: null });
     resolveEstimate({ amountPct: 55.55 });
     await pending;
 

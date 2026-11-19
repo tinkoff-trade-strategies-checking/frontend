@@ -9,6 +9,8 @@ import {
   ArenaCandle,
   ArenaCommandResult,
   ArenaEvent,
+  EstimateOrderCommand,
+  OrderEstimateResult,
   ArenaFill,
   ArenaOrder,
   ArenaPaper,
@@ -35,6 +37,11 @@ export interface OrderDraft {
   readonly trailingPct?: number;
 }
 
+/** Столько раз перечитываем снимок, если он старее уже применённых событий. */
+const MAX_STALE_SNAPSHOT_RETRIES = 3;
+/** Сколько ждём `report_ready` после `finished`, прежде чем закрыть поток. */
+const FINISHED_STREAM_GRACE_MS = 30_000;
+
 const EMPTY_PORTFOLIO: ArenaPortfolio = {
   equityPct: 100,
   cashPct: 100,
@@ -59,6 +66,10 @@ export class ArenaStore {
   private estimateSeq = 0;
   private stepping = false;
   private eventsSub: Subscription | null = null;
+  private finishedCloseTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Номер последнего события потока, учтённого на экране (INV-8); `null` — ещё не знаем. */
+  private lastEventId: number | null = null;
+  private snapshotRetries = 0;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
@@ -81,7 +92,8 @@ export class ArenaStore {
   /** Отчёт готов (событие `report_ready`). */
   readonly reportReady = signal(false);
   readonly editingOrder = signal<ArenaOrder | null>(null);
-  readonly estimatedPct = signal<number | null>(null);
+  readonly estimate = signal<OrderEstimateResult | null>(null);
+  readonly estimatedPct = computed(() => this.estimate()?.amountPct ?? null);
 
   readonly selectedPaper = computed<ArenaPaper | null>(() => {
     const id = this.selectedPaperId();
@@ -118,11 +130,16 @@ export class ArenaStore {
       this.reportReady.set(false);
       this.stopLocal();
       this.closeEvents();
+      this.lastEventId = null;
 
       try {
         // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
-        this.applySnapshot(await this.api.getSnapshot(sessionId));
-        this.openEvents();
+        const snap = await this.api.getSnapshot(sessionId);
+        this.applySnapshot(snap);
+        this.lastEventId = snap.lastEventId ?? null;
+        if (!snap.finished) {
+          this.openEvents(this.lastEventId);
+        }
       } catch (err) {
         this.error.set(messageOf(err, 'Не удалось загрузить сессию.'));
       } finally {
@@ -131,15 +148,38 @@ export class ArenaStore {
     });
   }
 
-  /** Перечитать снимок без сброса экрана: после обрыва потока и конфликтов команд (INV-8). */
-  resync(): Promise<void> {
-    return this.enqueue(async () => {
+  /**
+   * Перечитать снимок без сброса экрана и переоткрыть поток с его номера (INV-8). Снимок старее уже
+   * применённых событий отбрасываем и читаем заново: иначе экран откатился бы назад.
+   */
+  resync(reopenEvents = true): Promise<void> {
+    return this.enqueue(() => this.refreshSnapshot(reopenEvents, true));
+  }
+
+  private async refreshSnapshot(reopenEvents: boolean, reportErrors: boolean): Promise<void> {
+    for (let attempt = 0; attempt < MAX_STALE_SNAPSHOT_RETRIES; attempt++) {
       try {
-        this.applySnapshot(await this.api.getSnapshot(this.sessionId() || undefined));
+        const snap = await this.api.getSnapshot(this.sessionId() || undefined);
+        const snapId = snap.lastEventId ?? null;
+        if (snapId !== null && this.lastEventId !== null && snapId < this.lastEventId) {
+          continue;
+        }
+        this.applySnapshot(snap);
+        if (snapId !== null) {
+          this.lastEventId = snapId;
+        }
+        if (reopenEvents && this.serverDriven && !snap.finished) {
+          this.closeEvents();
+          this.openEvents(this.lastEventId);
+        }
+        return;
       } catch (err) {
-        this.error.set(messageOf(err, 'Не удалось обновить сессию.'));
+        if (reportErrors) {
+          this.error.set(messageOf(err, 'Не удалось обновить сессию.'));
+        }
+        return;
       }
-    });
+    }
   }
 
   selectPaper(paperId: string): void {
@@ -180,20 +220,24 @@ export class ArenaStore {
     this.stopLocal();
   }
 
-  async estimateOrder(paperId: string, lots: number | null): Promise<void> {
+  /** INV-6: оценку по параметрам формы считает ядро; клиент её не пересчитывает. */
+  async estimateOrder(
+    command: Omit<EstimateOrderCommand, 'lots'> & { lots: number | null },
+  ): Promise<void> {
     const seq = ++this.estimateSeq;
+    const { lots } = command;
     if (lots === null || !Number.isInteger(lots) || lots < 1) {
-      this.estimatedPct.set(null);
+      this.estimate.set(null);
       return;
     }
     try {
-      const res = await this.api.estimateOrder({ paperId, lots });
+      const res = await this.api.estimateOrder({ ...command, lots });
       if (seq === this.estimateSeq) {
-        this.estimatedPct.set(res.amountPct);
+        this.estimate.set(res);
       }
     } catch {
       if (seq === this.estimateSeq) {
-        this.estimatedPct.set(null);
+        this.estimate.set(null);
       }
     }
   }
@@ -209,7 +253,9 @@ export class ArenaStore {
 
       try {
         const res = await this.api.step();
-        this.applyStepResult(res);
+        if (this.applyStepResult(res) === 'gap') {
+          await this.refreshSnapshot(true, false);
+        }
         if (this.finished()) {
           this.stopLocal();
         }
@@ -306,14 +352,9 @@ export class ArenaStore {
         this.editingOrder.set(null);
         this.applyCommandResult(result, 'Заявка заменена.');
         if (result.partial && result.accepted) {
-          // Замена — отмена старой заявки и новая (журнал): старая в ответе не приходит.
-          this.orders.update((list) =>
-            list.map((order) =>
-              order.id === orderId && !result.orders.some((o) => o.id === orderId)
-                ? { ...order, status: 'cancelled', rejectReason: 'REPLACED' }
-                : order,
-            ),
-          );
+          // Замена снимает старую заявку (у OCO — обе ноги) и создаёт новые, а в ответе только новые:
+          // состояние берём с сервера (INV-8), а не додумываем на экране.
+          await this.refreshSnapshot(false, false);
         }
         return result;
       } catch (err) {
@@ -365,14 +406,17 @@ export class ArenaStore {
         this.playing.set(state.playing);
         this.speed.set(state.speed);
         if (state.stepResult) {
-          this.applyStepResult(state.stepResult);
+          if (this.applyStepResult(state.stepResult) === 'gap') {
+            await this.refreshSnapshot(true, false);
+          }
         }
         if (state.finished) {
           this.finished.set(true);
         }
       } catch (err) {
         this.error.set(messageOf(err, 'Не удалось выполнить команду плеера.'));
-        await this.recoverFromConflict(err);
+        // Сервер мог и не принять команду, и принять: экран показывает то, что на сервере (INV-8).
+        await this.refreshSnapshot(false, false);
       }
     });
   }
@@ -384,11 +428,7 @@ export class ArenaStore {
     }
     const problem = toProblem(err);
     if (problem.status === 409 || problem.code === 'SESSION_NOT_ACTIVE') {
-      try {
-        this.applySnapshot(await this.api.getSnapshot(this.sessionId() || undefined));
-      } catch {
-        // Ошибка остаётся прежней: пользователь может обновить страницу.
-      }
+      await this.refreshSnapshot(false, false);
     }
   }
 
@@ -423,10 +463,17 @@ export class ArenaStore {
     }
   }
 
-  /** Применить результат шага (ответ на команду или событие SSE); уже виденный шаг пропускаем. */
-  private applyStepResult(res: ArenaStepResult): void {
+  /**
+   * Применить результат шага (ответ на команду или событие SSE). Шаг, который уже виден, пропускаем;
+   * если первая свеча пачки не следует за последней известной (пропущены события), ничего не применяем
+   * и возвращаем `gap`: состояние тогда берётся снимком (INV-8).
+   */
+  private applyStepResult(res: ArenaStepResult): 'applied' | 'duplicate' | 'gap' {
     if (this.serverDriven && res.step <= this.step()) {
-      return;
+      return 'duplicate';
+    }
+    if (this.serverDriven && this.hasGap(res)) {
+      return 'gap';
     }
     const hideDates = this.blind() && !this.finished() && !res.finished && !this.customApi;
     const strip = (c: ArenaCandle): ArenaCandle => (hideDates ? stripCandleDates(c) : c);
@@ -456,27 +503,64 @@ export class ArenaStore {
         };
       }),
     );
+    return 'applied';
   }
 
-  private openEvents(): void {
+  private hasGap(res: ArenaStepResult): boolean {
+    return this.papers().some((paper) => {
+      const batch = res.batches?.[paper.id] ?? (res.bars[paper.id] ? [res.bars[paper.id]] : []);
+      const lastKnown = paper.candles.at(-1)?.step;
+      return batch.length > 0 && lastKnown !== undefined && batch[0].step > lastKnown + 1;
+    });
+  }
+
+  private openEvents(lastEventId: number | null): void {
     if (!this.api.events) {
       return;
     }
-    this.eventsSub = this.api.events().subscribe((event) => this.handleEvent(event));
+    this.eventsSub = this.api.events(lastEventId).subscribe((event) => this.handleEvent(event));
   }
 
   private closeEvents(): void {
     this.eventsSub?.unsubscribe();
     this.eventsSub = null;
+    if (this.finishedCloseTimer !== null) {
+      clearTimeout(this.finishedCloseTimer);
+      this.finishedCloseTimer = null;
+    }
   }
 
+  /**
+   * Номера событий в сессии идут подряд. Событие с номером не больше учтённого — повтор, пропускаем;
+   * с пропуском номера — часть событий потеряна, перечитываем снимок и переоткрываем поток с его номера.
+   */
   private handleEvent(event: ArenaEvent): void {
-    switch (event.type) {
-      case 'resync':
+    if (event.type === 'stream_failed') {
+      // Поток закрыт сервером (401, 404…): снимок покажет причину, переподключения нет.
+      this.closeEvents();
+      this.error.set('Поток событий недоступен. Обновите страницу.');
+      void this.resync(false);
+      return;
+    }
+    const id = event.eventId;
+    if (id !== null && this.lastEventId !== null) {
+      if (id <= this.lastEventId) {
+        return;
+      }
+      if (id !== this.lastEventId + 1) {
         void this.resync();
-        break;
+        return;
+      }
+    }
+    if (event.type === 'step' && this.applyStepResult(event.result) === 'gap') {
+      void this.resync();
+      return;
+    }
+    if (id !== null) {
+      this.lastEventId = id;
+    }
+    switch (event.type) {
       case 'step':
-        this.applyStepResult(event.result);
         if (this.finished()) {
           this.stopLocal();
         }
@@ -506,9 +590,12 @@ export class ArenaStore {
         if (event.result.orders) {
           this.orders.update((list) => mergeById(list, event.result.orders ?? []));
         }
+        // После `finished` приходит только `report_ready`; не дождёмся — закроем поток сами.
+        this.finishedCloseTimer = setTimeout(() => this.closeEvents(), FINISHED_STREAM_GRACE_MS);
         break;
       case 'report_ready':
         this.reportReady.set(true);
+        this.closeEvents();
         break;
     }
   }
