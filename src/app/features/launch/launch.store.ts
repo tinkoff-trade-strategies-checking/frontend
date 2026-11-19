@@ -12,6 +12,7 @@ import {
   StartMode,
   TraderKind,
 } from './data/launch.models';
+import { errorMessage } from '../../core/api-problem';
 import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 
 @Injectable()
@@ -141,8 +142,8 @@ export class LaunchStore {
       this.regime.set(opts.defaultRegime);
       this.initialCapitalRub.set(opts.defaultCapitalRub);
       this.paperCount.set(opts.defaultPaperCount);
-    } catch {
-      this.error.set('Не удалось загрузить параметры запуска.');
+    } catch (error) {
+      this.error.set(errorMessage(error, 'Не удалось загрузить параметры запуска.'));
     } finally {
       this.loading.set(false);
     }
@@ -196,9 +197,9 @@ export class LaunchStore {
       const minCount = this.options()?.minPapers ?? 1;
       const defaultSelection = Math.max(minCount, Math.min(this.paperCount(), papers.length));
       this.selectedPaperIds.set(papers.slice(0, defaultSelection).map((p) => p.id));
-    } catch {
+    } catch (error) {
       if (seq === this.customPapersLoadSeq) {
-        this.error.set('Не удалось загрузить список бумаг.');
+        this.error.set(errorMessage(error, 'Не удалось загрузить список бумаг.'));
       }
     } finally {
       if (seq === this.customPapersLoadSeq) {
@@ -279,8 +280,8 @@ export class LaunchStore {
 
       await this.router.navigate(['/arena', result.sessionId]);
       return true;
-    } catch {
-      this.error.set('Не удалось запустить сессию. Попробуйте ещё раз.');
+    } catch (error) {
+      this.error.set(errorMessage(error, 'Не удалось запустить сессию. Попробуйте ещё раз.'));
       return false;
     } finally {
       this.submitting.set(false);

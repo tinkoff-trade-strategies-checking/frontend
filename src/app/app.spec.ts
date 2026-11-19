@@ -1,10 +1,14 @@
 import { Location } from '@angular/common';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { App } from './app';
+import { STUB_MODE } from './core/api-mode';
+import { AuthService } from './core/auth/auth.service';
 import { routes } from './app.routes';
 import { StubSessionRegistry } from './shared/stub-session-registry';
 
@@ -19,7 +23,12 @@ describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideRouter(routes), provideTaiga()],
+      providers: [
+        provideRouter(routes),
+        provideTaiga(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
   });
 
@@ -57,6 +66,8 @@ describe('App', () => {
           { path: '**', component: DummyRoute },
         ]),
         provideTaiga(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
       ],
     }).compileComponents();
 
@@ -129,5 +140,28 @@ describe('App', () => {
     it('неизвестный путь ведёт на арену', async () => {
       expect(await open('/nope/nothing')).toEqual({ path: '/arena', heading: 'Арена' });
     });
+  });
+
+  it('настоящий режим: без арены и отчёта в навигации, с почтой и кнопкой выхода', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([]),
+        provideTaiga(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: STUB_MODE, useValue: false },
+      ],
+    }).compileComponents();
+    TestBed.inject(AuthService).user.set({ id: 'u', email: 'a@b.c', role: 'USER' });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const links = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
+    expect(links).toEqual(['Новая сессия', 'Мастерская', 'История']);
+    expect(root.querySelector('.user')?.textContent).toContain('a@b.c');
+    expect(root.querySelector('.user button')?.textContent).toContain('Выйти');
   });
 });

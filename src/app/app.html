@@ -15,6 +15,14 @@
         </a>
       }
     </nav>
+    @if (user(); as currentUser) {
+      <div class="user">
+        <span class="tui-text_body-s">{{ currentUser.email }}</span>
+        <button tuiButton type="button" size="s" appearance="outline" (click)="logout()">
+          Выйти
+        </button>
+      </div>
+    }
   </header>
   <main class="content">
     <router-outlet />

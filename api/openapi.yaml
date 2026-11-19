@@ -14,9 +14,10 @@ info:
     В слепом режиме бумага адресуется только `paperIndex` (индекс бумаги в сессии, как `instrument_index` ядра),
     никаких `paperId`, ключа или тикера (INV-7); в раскрытом режиме — `paperId` из каталога (`LaunchPaper.id`).
     Необязательные поля отчёта и истории — `null`, а не пропуск.
-    Производные величины (проценты портфеля и позиций, `changePct`, длительность просадки в днях, разбор
-    расхождений, обратная проверка, сравнение) считает core (core#54), backend только передаёт результат;
-    пока core их не отдаёт, поле `null`.
+    Производные величины (проценты портфеля, позиций и сделок, издержки, `changePct`, кривая просадки, длительность
+    просадки в днях) считает core (core#54), backend только передаёт результат без арифметики; проценты уже ×100.
+    Они есть всегда. `null` остаётся только у отложенного (разбор расхождений, обратная проверка, сравнение,
+    фоновый алгоритм — ФТ-18…20) и у `changePct` бумаги без бара на курсоре.
 
     CSRF (Spring Security, cookie-токен). Токен — cookie `XSRF-TOKEN` (без HttpOnly, его читает Angular),
     клиент без токена получает его из ответа `GET /me`, в том числе из `401`. Заголовок `X-XSRF-TOKEN`
@@ -417,8 +418,8 @@ paths:
       summary: Воспроизведение завершённой сессии на заданном шаге (INV-8)
       description: |
         Без серверного состояния: курсор воспроизведения хранит клиент и передаёт явный `step`.
-        Без `fromStep` ответ — полный снимок `snapshot` на шаге `step`; с `fromStep` — приращение
-        `increment` (`OpenStepResult` за `(fromStep; step]` без истории свечей). `step` больше `totalSteps`
+        Ответ `READY` различается по `kind`: `SNAPSHOT` (запрос без `fromStep`) — полный снимок `snapshot` на шаге `step`;
+        `INCREMENT` (с `fromStep`) — приращение `increment` (`OpenStepResult` за `(fromStep; step]` без истории свечей). `step` больше `totalSteps`
         ограничивается последним шагом (ответ содержит фактический шаг); `fromStep` больше `step` — 400, равный — пустое приращение.
         Всегда 200 с `status` (`READY`, `NOT_FINISHED`, `NOT_FOUND`).
       parameters:
@@ -591,14 +592,38 @@ components:
     Problem:
       type: object
       description: RFC 9457. Для слепой сессии `detail` и `instance` не содержат дат, тикеров и названий (INV-7)
-      required: [type, title, status]
+      required: [type, title, status, code]
       properties:
         type: { type: string, format: uri-reference }
         title: { type: string }
         status: { type: integer }
         detail: { type: [string, 'null'] }
         instance: { type: [string, 'null'] }
-        code: { type: [string, 'null'], description: Машинный код причины }
+        code: { $ref: '#/components/schemas/ProblemCode' }
+    ProblemCode:
+      type: string
+      description: Машинный код любой ошибки API (enum `ErrorCode` в backend); клиент ветвится по нему, а не по `status` и `detail`
+      enum:
+        - IDEMPOTENCY_KEY_REUSED
+        - IDEMPOTENCY_KEY_IN_PROGRESS
+        - SESSION_NOT_ACTIVE
+        - PLAYER_STATE_CONFLICT
+        - NO_MATCHING_PERIOD
+        - TOO_MANY_BARS
+        - INVALID_PARAMS
+        - CORPORATE_ACTION_ON_PERIOD
+        - BAD_REQUEST
+        - UNAUTHENTICATED
+        - INVALID_CREDENTIALS
+        - CSRF_INVALID
+        - FORBIDDEN
+        - NOT_FOUND
+        - METHOD_NOT_ALLOWED
+        - NOT_ACCEPTABLE
+        - UNSUPPORTED_MEDIA_TYPE
+        - TOO_MANY_REQUESTS
+        - INTERNAL_ERROR
+        - SERVICE_UNAVAILABLE
     LaunchProblem:
       allOf:
         - $ref: '#/components/schemas/Problem'
@@ -866,7 +891,7 @@ components:
         lots: { type: integer, minimum: 1 }
         price: { $ref: '#/components/schemas/Price' }
         amountPct: { $ref: '#/components/schemas/Pct' }
-        costPct: { $ref: '#/components/schemas/PctOrNull', description: 'Общие издержки сделки в % капитала считает core (core#54); null, пока core не отдаёт' }
+        costPct: { $ref: '#/components/schemas/Pct', description: 'Общие издержки сделки в % начального капитала, считает core (core#54)' }
         stopAndTakeSameBar: { type: boolean, description: Стоп и тейк задеты одной свечой — исполнен стоп (INV-3) }
     OpenFill:
       type: object
@@ -886,10 +911,10 @@ components:
         type: { $ref: '#/components/schemas/OrderLegType' }
         lots: { type: integer, minimum: 1 }
         price: { $ref: '#/components/schemas/Price' }
-        amountPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
-        costPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        amountPct: { $ref: '#/components/schemas/Pct', description: 'Сумма сделки в % начального капитала, считает core (core#54)' }
+        costPct: { $ref: '#/components/schemas/Pct', description: 'Общие издержки сделки в % начального капитала, считает core (core#54)' }
         amount: { $ref: '#/components/schemas/Money' }
-        cost: { $ref: '#/components/schemas/MoneyOrNull', description: 'Общие издержки сделки считает core (core#54); null, пока core не отдаёт' }
+        cost: { $ref: '#/components/schemas/Money', description: 'Общие издержки сделки (комиссия, сбор, спред, проскальзывание), считает core (core#54)' }
         stopAndTakeSameBar: { type: boolean, description: Стоп и тейк задеты одной свечой — исполнен стоп (INV-3) }
     BlindPosition:
       type: object
@@ -900,7 +925,7 @@ components:
         paperIndex: { $ref: '#/components/schemas/PaperIndex' }
         lots: { type: integer }
         avgPrice: { $ref: '#/components/schemas/PriceOrNull' }
-        pnlPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        pnlPct: { $ref: '#/components/schemas/Pct', description: 'Нереализованный P&L в % начального капитала, считает core (core#54)' }
         valuePct: { $ref: '#/components/schemas/Pct' }
     OpenPosition:
       type: object
@@ -910,8 +935,8 @@ components:
         paperId: { $ref: '#/components/schemas/Uuid' }
         lots: { type: integer }
         avgPrice: { $ref: '#/components/schemas/PriceOrNull' }
-        pnlPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
-        valuePct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        pnlPct: { $ref: '#/components/schemas/Pct', description: 'Нереализованный P&L в % начального капитала, считает core (core#54)' }
+        valuePct: { $ref: '#/components/schemas/Pct', description: 'Стоимость позиции в % начального капитала, считает core (core#54)' }
         marketValue: { $ref: '#/components/schemas/Money' }
     BlindPortfolio:
       type: object
@@ -921,33 +946,33 @@ components:
         mode: { type: string, const: BLIND }
         equityPct: { $ref: '#/components/schemas/Pct' }
         cashPct: { $ref: '#/components/schemas/Pct' }
-        investedPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        investedPct: { $ref: '#/components/schemas/Pct', description: 'equityPct − cashPct, считает core (core#54)' }
         pnlPct: { $ref: '#/components/schemas/Pct' }
-        costsPct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        costsPct: { $ref: '#/components/schemas/Pct', description: 'Накопленные издержки сделок в % начального капитала, считает core (core#54)' }
         positions: { type: array, items: { $ref: '#/components/schemas/BlindPosition' } }
     OpenPortfolio:
       type: object
-      description: Раскрытый портфель; проценты и `invested`/`pnl`/`costs` считает core, `null`, пока core не отдаёт
+      description: Раскрытый портфель; проценты (от начального капитала) и `invested`/`pnl`/`costs` считает core (core#54)
       required: [mode, equityPct, cashPct, investedPct, pnlPct, costsPct, equity, cash, invested, pnl, costs, positions]
       properties:
         mode: { type: string, const: OPEN }
-        equityPct: { $ref: '#/components/schemas/PctOrNull' }
-        cashPct: { $ref: '#/components/schemas/PctOrNull' }
-        investedPct: { $ref: '#/components/schemas/PctOrNull' }
-        pnlPct: { $ref: '#/components/schemas/PctOrNull' }
-        costsPct: { $ref: '#/components/schemas/PctOrNull' }
+        equityPct: { $ref: '#/components/schemas/Pct' }
+        cashPct: { $ref: '#/components/schemas/Pct' }
+        investedPct: { $ref: '#/components/schemas/Pct' }
+        pnlPct: { $ref: '#/components/schemas/Pct' }
+        costsPct: { $ref: '#/components/schemas/Pct' }
         equity: { $ref: '#/components/schemas/Money' }
         cash: { $ref: '#/components/schemas/Money' }
-        invested: { $ref: '#/components/schemas/MoneyOrNull' }
-        pnl: { $ref: '#/components/schemas/MoneyOrNull' }
-        costs: { $ref: '#/components/schemas/MoneyOrNull' }
+        invested: { $ref: '#/components/schemas/Money' }
+        pnl: { $ref: '#/components/schemas/Money' }
+        costs: { $ref: '#/components/schemas/Money' }
         positions: { type: array, items: { $ref: '#/components/schemas/OpenPosition' } }
     PaperStat:
       type: object
       unevaluatedProperties: false
       required: [changePct, lastPrice]
       properties:
-        changePct: { $ref: '#/components/schemas/PctOrNull', description: 'Считает core; null, пока core не отдаёт' }
+        changePct: { $ref: '#/components/schemas/PctOrNull', description: 'Изменение цены с начала сессии в % (`period_pct` core, core#54); `null` только у бумаги без бара на курсоре' }
         lastPrice:
           $ref: '#/components/schemas/PriceOrNull'
           description: 'Close последнего бара до курсора; `null` только у бумаги раскрытой сессии без бара до курсора (заявку на неё ядро отклоняет до первого бара), в слепой сессии такой бумаги в списке нет'
@@ -1437,6 +1462,7 @@ components:
         mapping: { BLIND: '#/components/schemas/BlindOrderUpdatedEvent', OPEN: '#/components/schemas/OpenOrderUpdatedEvent' }
     PausedEvent:
       type: object
+      description: 'Причина паузы. Пауза всегда публикуется парой: сначала `player` (`playing: false`), затем `paused` с причиной'
       unevaluatedProperties: false
       required: [type, eventId, reason]
       properties:
@@ -1446,7 +1472,7 @@ components:
     PlayerEvent:
       type: object
       unevaluatedProperties: false
-      description: Смена состояния плеера (play, пауза, скорость) — для других вкладок
+      description: 'Смена состояния плеера (play, пауза, скорость) — для других вкладок. `playing: false` без следующего `paused` — завершение сессии (затем `finished`)'
       required: [type, eventId, playing, speed]
       properties:
         type: { type: string, const: player }
@@ -1488,17 +1514,37 @@ components:
         totalSteps: { type: integer }
         lastStep: { type: integer, description: 'Итоговый шаг: у досрочно завершённой и обанкротившейся сессии меньше `totalSteps`, дальше него воспроизведение не идёт' }
         totalDays: { type: integer }
-    ReplayReady:
+    ReplayReadyBase:
       type: object
-      description: 'Заполнен ровно один из `snapshot` (запрос без `fromStep`) и `increment` (с `fromStep`)'
-      required: [status, session, snapshot, increment]
+      required: [status, session]
       properties:
         status: { type: string, const: READY }
         session: { $ref: '#/components/schemas/ReplayMeta' }
-        snapshot:
-          oneOf: [{ $ref: '#/components/schemas/OpenSnapshot' }, { type: 'null' }]
-        increment:
-          oneOf: [{ $ref: '#/components/schemas/OpenStepResult' }, { type: 'null' }]
+    ReplaySnapshotReady:
+      description: Ответ на запрос без `fromStep` — полный снимок на шаге `step`
+      allOf:
+        - $ref: '#/components/schemas/ReplayReadyBase'
+        - type: object
+          required: [kind, snapshot]
+          properties:
+            kind: { type: string, const: SNAPSHOT }
+            snapshot: { $ref: '#/components/schemas/OpenSnapshot' }
+    ReplayIncrementReady:
+      description: Ответ на запрос с `fromStep` — приращение за `(fromStep; step]`
+      allOf:
+        - $ref: '#/components/schemas/ReplayReadyBase'
+        - type: object
+          required: [kind, increment]
+          properties:
+            kind: { type: string, const: INCREMENT }
+            increment: { $ref: '#/components/schemas/OpenStepResult' }
+    ReplayReady:
+      oneOf:
+        - $ref: '#/components/schemas/ReplaySnapshotReady'
+        - $ref: '#/components/schemas/ReplayIncrementReady'
+      discriminator:
+        propertyName: kind
+        mapping: { SNAPSHOT: '#/components/schemas/ReplaySnapshotReady', INCREMENT: '#/components/schemas/ReplayIncrementReady' }
     NotFinished:
       type: object
       description: Незавершённая сессия — без бумаг, периода и итога (INV-1, INV-7)
@@ -1546,7 +1592,7 @@ components:
       type: object
       required: [total, commission, exchangeFee, spread, slippage]
       properties:
-        total: { $ref: '#/components/schemas/MoneyOrNull', description: 'Сумму издержек считает core (core#54); null, пока core не отдаёт' }
+        total: { $ref: '#/components/schemas/Money', description: 'Сумма четырёх видов издержек, считает core (core#54)' }
         commission: { $ref: '#/components/schemas/Money' }
         exchangeFee: { $ref: '#/components/schemas/Money' }
         spread: { $ref: '#/components/schemas/Money' }
@@ -1563,7 +1609,7 @@ components:
         grossReturnPct: { $ref: '#/components/schemas/Pct' }
         netReturnPct: { $ref: '#/components/schemas/Pct' }
         maxDrawdownPct: { $ref: '#/components/schemas/Pct' }
-        maxDrawdownDurationDays: { type: [integer, 'null'], description: 'Считает core; null, пока core не отдаёт' }
+        maxDrawdownDurationDays: { type: integer, description: 'Число разных торговых дней в самой длинной серии шагов ниже пика, считает core (core#54)' }
         maxDrawdownDurationSteps: { type: integer }
         volatilityPct: { $ref: '#/components/schemas/PctOrNull' }
         sharpe: { $ref: '#/components/schemas/RatioOrNull' }
@@ -1621,8 +1667,8 @@ components:
       properties:
         step: { type: integer }
         date: { type: string, format: date-time }
-        humanDrawdownPct: { $ref: '#/components/schemas/Pct' }
-        algoDrawdownPct: { $ref: '#/components/schemas/Pct' }
+        humanDrawdownPct: { $ref: '#/components/schemas/Pct', description: 'Глубина просадки от пика в %, считает core (core#54)' }
+        algoDrawdownPct: { $ref: '#/components/schemas/PctOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
     DivergenceType:
       type: string
       enum: [extra, missed, size, timing]
@@ -1716,7 +1762,7 @@ components:
         orderType: { $ref: '#/components/schemas/OrderLegType' }
         lots: { type: integer }
         price: { $ref: '#/components/schemas/Price' }
-        cost: { $ref: '#/components/schemas/MoneyOrNull', description: 'Общие издержки исполнения считает core (core#54); null, пока core не отдаёт' }
+        cost: { $ref: '#/components/schemas/Money', description: 'Общие издержки исполнения, считает core (core#54)' }
         partial: { type: boolean }
     SessionReport:
       type: object
@@ -1739,7 +1785,7 @@ components:
         algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         equityCurve: { type: array, items: { $ref: '#/components/schemas/EquityPoint' } }
-        underwaterCurve: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' } }, { type: 'null' }], description: 'Считает core (core#54); null, пока core не отдаёт' }
+        underwaterCurve: { type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' }, description: 'Кривая просадки: точка на каждую точку `equityCurve`, считает core (core#54)' }
         divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }

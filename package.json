@@ -4,7 +4,10 @@
   "scripts": {
     "prestart": "npm run api:gen",
     "start": "ng serve",
+    "prestart:stub": "npm run api:gen",
+    "start:stub": "ng serve --configuration development-stub",
     "build": "npm run api:gen && ng build",
+    "build:stub": "npm run api:gen && ng build --configuration stub",
     "pretest": "npm run api:gen",
     "test": "ng test --watch=false",
     "e2e": "tsc -p tsconfig.e2e.json --noEmit && playwright test",
@@ -14,7 +17,7 @@
     "api:sync": "node scripts/api.mjs sync",
     "api:check": "node scripts/api.mjs check",
     "api:gen": "node scripts/api.mjs gen",
-    "check": "npm run format:check && npm run lint && npm run api:check && npm run test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run api:check && npm run test && npm run build && npm run build:stub"
   },
   "private": true,
   "packageManager": "npm@11.21.2",

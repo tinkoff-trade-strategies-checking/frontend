@@ -49,7 +49,8 @@ export interface HistoryEntryFinished extends HistoryEntryBase {
   readonly title: string;
   readonly papers: readonly string[];
   readonly periodLabel: string;
-  readonly netReturnPct: number;
+  /** `null` — сервер не отдал итог (поле контракта необязательное). */
+  readonly netReturnPct: number | null;
 }
 
 export type HistoryEntry =
