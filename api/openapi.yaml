@@ -460,6 +460,38 @@ paths:
               schema: { $ref: '#/components/schemas/ReportResult' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
+  /sessions/{sessionId}/report/export:
+    get:
+      tags: [analysis]
+      operationId: exportReport
+      summary: Выгрузка отчёта (ФТ-17)
+      description: |
+        Файл из сохранённого отчёта завершённой сессии, без повторного расчёта. `xlsx` — листы «Сводка», «Метрики»,
+        «Сделки», «Заявки», «Издержки», «Кривая капитала», «Параметры и версии» и, если есть в отчёте, «Сравнение»,
+        «Расхождения»; `csv` — ZIP с файлом на каждый лист (UTF-8 с BOM, разделитель `;`, десятичная запятая,
+        RFC 4180). Даты `ДД.ММ.ГГГГ`, время МСК `ЧЧ:ММ:СС`. Имя файла — в `Content-Disposition`:
+        `report-<sessionId>.xlsx` или `report-<sessionId>.zip`.
+        Чужая или несуществующая сессия — 404. Идущая сессия (в том числе слепая, INV-7) и отчёт, который ещё
+        строится, — 409 без данных сессии; во втором случае запрос повторяют позже.
+      parameters:
+        - { $ref: '#/components/parameters/SessionId' }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [xlsx, csv] } }
+      responses:
+        '200':
+          description: Файл выгрузки
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="report-<sessionId>.xlsx"` или `.zip` для csv'
+              schema: { type: string }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
   /history:
     get:
       tags: [analysis]
@@ -608,6 +640,8 @@ components:
         - IDEMPOTENCY_KEY_IN_PROGRESS
         - SESSION_NOT_ACTIVE
         - PLAYER_STATE_CONFLICT
+        - NOT_FINISHED
+        - REPORT_BUILDING
         - NO_MATCHING_PERIOD
         - TOO_MANY_BARS
         - INVALID_PARAMS
