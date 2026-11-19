@@ -33,6 +33,7 @@ export interface LaunchOptions {
   readonly durations: readonly SessionDurationDays[];
   readonly defaultDuration: SessionDurationDays;
   readonly availableTimeframes: readonly CandleTimeframe[];
+  readonly maxDurationDaysByTimeframe: Readonly<Record<CandleTimeframe, number>>;
   readonly defaultTimeframe: CandleTimeframe;
   readonly regimes: readonly MarketRegime[];
   readonly defaultRegime: MarketRegime;

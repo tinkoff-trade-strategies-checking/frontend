@@ -9,6 +9,14 @@ describe('StubLaunchApi', () => {
     expect(opts.defaultDuration).toBe(60);
     expect(opts.defaultTimeframe).toBe('1d');
     expect(opts.availableTimeframes).toEqual(['1m', '5m', '10m', '15m', '1h', '1d']);
+    expect(opts.maxDurationDaysByTimeframe).toEqual({
+      '1m': 6,
+      '5m': 30,
+      '10m': 60,
+      '15m': 90,
+      '1h': 357,
+      '1d': 5000,
+    });
     expect(opts.regimes).toEqual(['calm', 'medium', 'stress']);
     expect(opts.capitalPresetsRub.length).toBeGreaterThan(0);
     expect(opts.backgroundAlgorithmName).toBe('Эталон платформы');

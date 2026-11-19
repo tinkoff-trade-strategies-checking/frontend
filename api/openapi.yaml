@@ -122,6 +122,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LaunchOptions' }
         '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/ArchiveUnavailable' }
   /papers:
     get:
       tags: [marketdata]
@@ -136,6 +137,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/LaunchPaper' }
         '401': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/ArchiveUnavailable' }
   /sessions:
     post:
       tags: [sessions]
@@ -145,7 +147,11 @@ paths:
         Подбор периода выбранной категории (`regime`) выполняет backend через `ClassifyPeriods` ядра.
         Поля `sigma`, `mdd`, `p33`, `p80`, а в слепом режиме также даты окна клиенту не передаются (INV-1, INV-7).
         Отказ — 422 с `LaunchProblem`, у которого `code` из `LaunchRejectReason`.
-        Для `TOO_MANY_BARS` заполнены `barsCount` и `maxBars`.
+        Для `TOO_MANY_BARS` `maxBars` заполнен всегда. `barsCount` — число шагов шкалы сессии: точное по архиву для
+        `custom`; при раннем отказе по длительности и шагу — нижняя оценка `durationDays × минимум свечей за день`;
+        в слепом режиме (`random`), если лимит превышен у всех подобранных окон, `barsCount = null`: свойства скрытого
+        периода не раскрываются (INV-7).
+        Если бумаг с сектором меньше `paperCount` (слепой режим), отказ — `INVALID_PARAMS` с `field = paperCount`.
         `startMode: random` создаёт слепую сессию, `custom` (своя дата) — неслепую.
         Подбор идёт через воркер: при его недоступности — 503.
       security:
@@ -531,6 +537,11 @@ components:
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
+    ArchiveUnavailable:
+      description: Архив данных не готов (нет готового снапшота) или недоступен (ClickHouse, воркер ядра)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
     TooManyRequests:
       description: Слишком много попыток входа
       content:
@@ -584,7 +595,7 @@ components:
           properties:
             code: { $ref: '#/components/schemas/LaunchRejectReason' }
             field: { type: [string, 'null'] }
-            barsCount: { type: [integer, 'null'] }
+            barsCount: { type: [integer, 'null'], description: 'Только для `TOO_MANY_BARS`; в слепом режиме `null`, если лимит превышен у всех подобранных окон (INV-7)' }
             maxBars: { type: [integer, 'null'] }
     Money:
       type: string
@@ -694,11 +705,20 @@ components:
         maxBars: { type: integer }
     LaunchOptions:
       type: object
-      required: [durations, defaultDuration, availableTimeframes, defaultTimeframe, regimes, defaultRegime, capitalPresets, defaultCapital, backgroundAlgorithmName, minPapers, maxPapers, defaultPaperCount, executionRules]
+      required: [durations, defaultDuration, availableTimeframes, maxDurationDaysByTimeframe, defaultTimeframe, regimes, defaultRegime, capitalPresets, defaultCapital, backgroundAlgorithmName, minPapers, maxPapers, defaultPaperCount, executionRules]
       properties:
         durations: { type: array, items: { type: integer, enum: [20, 60, 120, 250] } }
         defaultDuration: { type: integer, enum: [20, 60, 120, 250] }
         availableTimeframes: { type: array, items: { $ref: '#/components/schemas/Timeframe' } }
+        maxDurationDaysByTimeframe:
+          type: object
+          description: |
+            Для каждого шага из `availableTimeframes` — наибольшая длительность в торговых днях, при которой шагов
+            шкалы сессии заведомо не больше `executionRules.maxBars`. Оценка консервативная, по наибольшему числу
+            шагов за день в архиве. Длительности из `durations` больше этого значения экран выключает; пограничные
+            случаи решает отказ `TOO_MANY_BARS` при запуске.
+          propertyNames: { $ref: '#/components/schemas/Timeframe' }
+          additionalProperties: { type: integer, minimum: 0 }
         defaultTimeframe: { $ref: '#/components/schemas/Timeframe' }
         regimes: { type: array, items: { $ref: '#/components/schemas/Regime' } }
         defaultRegime: { $ref: '#/components/schemas/Regime' }
