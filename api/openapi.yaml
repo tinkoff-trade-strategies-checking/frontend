@@ -184,7 +184,8 @@ paths:
       operationId: getSessionSnapshot
       summary: Снимок сессии на текущем шаге
       description: |
-        В слепом режиме — `BlindSnapshot`, иначе `OpenSnapshot`; различаются по `mode`.
+        Идущая слепая сессия — `BlindSnapshot`; неслепая и завершённая слепая (данные раскрыты, INV-7) —
+        `OpenSnapshot`; различаются по `mode`.
         После обрыва SSE или перезагрузки страницы клиент перечитывает снимок (INV-8).
       parameters: [{ $ref: '#/components/parameters/SessionId' }]
       responses:
@@ -250,7 +251,8 @@ paths:
         Без подписчиков дольше `lab.session.disconnect-pause-after` (5 с) ручная сессия встаёт на паузу.
         Данные каждого события — JSON соответствующей схемы; имя события (`event:`) равно значению `type`.
         Строка `id:` равна `eventId` и монотонно возрастает в рамках сессии: по ней клиент сопоставляет
-        снимок (`step`) с догоняющими событиями и убирает дубли. Смена состояния плеера (play, пауза,
+        снимок (`step`) с догоняющими событиями и убирает дубли. Чтобы получить ровно события после снимка,
+        откройте поток с `Last-Event-ID`, равным `lastEventId` снимка (`"0"` — событий ещё не было). Смена состояния плеера (play, пауза,
         скорость) публикуется событием `player`, так вторая вкладка узнаёт о ней без снимка.
         На скоростях ×10 и ×100 за такт часов (не чаще 200 мс) проходит несколько свечей: событие `step` одно на такт,
         `result.bars` содержит все свечи пачки, а `step` — последний шаг. Событие никогда не опережает курсор сессии (INV-1).
@@ -1041,7 +1043,7 @@ components:
         stat: { $ref: '#/components/schemas/PaperStat' }
     SnapshotBase:
       type: object
-      required: [sessionId, regime, step, totalSteps, warmupSteps, day, totalDays, finished, playing, speed]
+      required: [sessionId, regime, step, totalSteps, warmupSteps, day, totalDays, finished, playing, speed, lastEventId]
       properties:
         sessionId: { $ref: '#/components/schemas/Uuid' }
         regime: { $ref: '#/components/schemas/Regime' }
@@ -1051,6 +1053,13 @@ components:
         day: { type: integer }
         totalDays: { type: integer }
         finished: { type: boolean }
+        lastEventId:
+          type: [string, 'null']
+          description: |
+            Номер последнего события сессии (как `eventId`, строка) на момент снимка; `"0"` — событий ещё не было.
+            Прочитан под той же блокировкой сессии, что и состояние. `null` — только в снимке воспроизведения
+            (потока у него нет). Клиент открывает `GET /sessions/{sessionId}/events` с `Last-Event-ID: <lastEventId>`
+            и получает ровно то, что случилось после снимка.
         playing: { type: [boolean, 'null'], description: 'null в снимке воспроизведения' }
         speed:
           oneOf: [{ $ref: '#/components/schemas/PlayerSpeed' }, { type: 'null' }]
