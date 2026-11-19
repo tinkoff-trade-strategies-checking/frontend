@@ -4,11 +4,13 @@ import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented } from '@taiga-ui/kit';
 import {
+  CandleTimeframe,
   LAUNCH_API,
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
   REGIME_HINTS,
   REGIME_LABELS,
+  SessionDurationDays,
   TIMEFRAME_LABELS,
 } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
@@ -61,6 +63,18 @@ export class LaunchPage implements OnInit {
   protected readonly formatExecutionPct = formatExecutionPct;
   protected readonly formatDecimalRu = formatDecimalRu;
   protected readonly formatDisplayDate = formatDisplayDate;
+
+  protected disabledDurations(durations: readonly SessionDurationDays[]): SessionDurationDays[] {
+    return durations.filter((d) => this.store.isPairDisabled(d, this.store.timeframe()));
+  }
+
+  protected disabledTimeframes(timeframes: readonly CandleTimeframe[]): CandleTimeframe[] {
+    return timeframes.filter((tf) => this.store.isPairDisabled(this.store.durationDays(), tf));
+  }
+
+  protected labelsOf(timeframes: readonly CandleTimeframe[]): string {
+    return timeframes.map((tf) => this.timeframeLabels[tf]).join(', ');
+  }
 
   protected limitHint(maxBars: number): string {
     return `больше ${maxBars.toLocaleString('ru-RU')} свечей`;

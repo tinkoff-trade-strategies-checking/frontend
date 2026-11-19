@@ -203,6 +203,10 @@ describe('LaunchPage', () => {
     expect(button('1 д').disabled).toBe(false);
     expect(button('1 мин').title.replace(/\u00a0/g, ' ')).toBe('больше 5 000 свечей');
     expect(button('1 д').title).toBe('');
+    // Причина выключения видна без наведения и связана с кнопкой через aria-describedby.
+    const note = root.querySelector('#launch-timeframe-note');
+    expect(note?.textContent).toContain('1 мин, 5 мин');
+    expect(button('1 мин').getAttribute('aria-describedby')).toBe('launch-timeframe-note');
 
     // Шаг 5 мин (максимум 30 дн.) при 20 дн.: длительности больше 30 выключены.
     store.setDuration(20);
