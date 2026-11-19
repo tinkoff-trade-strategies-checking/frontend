@@ -44,7 +44,7 @@ describe('StubLaunchApi', () => {
       customStartDate: null,
       paperCount: 3,
       paperIds: null,
-      initialCapitalRub: 1_000_000,
+      initialCapital: '1000000.00',
     });
     expect(blindRes.accepted).toBe(true);
 
@@ -60,7 +60,7 @@ describe('StubLaunchApi', () => {
       customStartDate: '2020-02-26',
       paperCount: null,
       paperIds: ['SBER'],
-      initialCapitalRub: 500_000,
+      initialCapital: '500000.00',
     });
     expect(customRes.accepted).toBe(true);
   });
@@ -78,16 +78,16 @@ describe('StubLaunchApi', () => {
       paperIds: null,
     } as const;
 
-    for (const initialCapitalRub of [9_999.99, 100_000_000.01, 1_000.123, Number.NaN]) {
-      const res = await api.startSession({ ...base, initialCapitalRub });
+    for (const initialCapital of ['9999.99', '100000000.01', '1000.123', 'abc', '']) {
+      const res = await api.startSession({ ...base, initialCapital });
       expect(res).toMatchObject({
         accepted: false,
         reason: 'INVALID_PARAMS',
-        field: 'initialCapitalRub',
+        field: 'initialCapital',
       });
     }
-    for (const initialCapitalRub of [10_000, 12_345.67, 100_000_000]) {
-      const res = await api.startSession({ ...base, initialCapitalRub });
+    for (const initialCapital of ['10000.00', '12345.67', '100000000']) {
+      const res = await api.startSession({ ...base, initialCapital });
       expect(res.accepted).toBe(true);
     }
   });
@@ -103,7 +103,7 @@ describe('StubLaunchApi', () => {
       customStartDate: null,
       paperCount: 2,
       paperIds: null,
-      initialCapitalRub: 1_000_000,
+      initialCapital: '1000000.00',
     });
 
     expect(res.accepted).toBe(false);
@@ -126,7 +126,7 @@ describe('StubLaunchApi', () => {
       customStartDate: null,
       paperCount: 4,
       paperIds: null,
-      initialCapitalRub: 1_000_000,
+      initialCapital: '1000000.00',
     });
     expect(noPeriod).toEqual({
       accepted: false,
@@ -145,7 +145,7 @@ describe('StubLaunchApi', () => {
       customStartDate: '2020-07-10',
       paperCount: null,
       paperIds: ['SBER'],
-      initialCapitalRub: 1_000_000,
+      initialCapital: '1000000.00',
     });
     expect(corpAction).toEqual({
       accepted: false,
@@ -164,7 +164,7 @@ describe('StubLaunchApi', () => {
       customStartDate: null,
       paperCount: 0,
       paperIds: null,
-      initialCapitalRub: 1_000_000,
+      initialCapital: '1000000.00',
     });
     expect(badCount).toEqual({
       accepted: false,

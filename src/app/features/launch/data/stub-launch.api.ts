@@ -78,7 +78,9 @@ export class StubLaunchApi implements LaunchApi {
   }
 
   async startSession(command: StartSessionCommand): Promise<LaunchCommandResult> {
-    const capital = command.initialCapitalRub;
+    const capital = /^\d+(\.\d{1,2})?$/.test(command.initialCapital)
+      ? Number(command.initialCapital)
+      : Number.NaN;
     if (
       !Number.isFinite(capital) ||
       capital < MIN_INITIAL_CAPITAL_RUB ||
@@ -88,7 +90,7 @@ export class StubLaunchApi implements LaunchApi {
       return {
         accepted: false,
         reason: 'INVALID_PARAMS',
-        field: 'initialCapitalRub',
+        field: 'initialCapital',
         barsCount: null,
         maxBars: null,
       };
@@ -183,7 +185,7 @@ export class StubLaunchApi implements LaunchApi {
       finished: false,
       finishedEarly: false,
       createdAt: new Date().toISOString(),
-      initialCapitalRub: command.initialCapitalRub,
+      initialCapitalRub: capital,
       paperIds: blind ? null : (command.paperIds ?? null),
       paperCount: papersCount,
       customStartDate: blind ? null : (command.customStartDate ?? null),

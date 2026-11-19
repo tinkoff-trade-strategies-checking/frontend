@@ -173,9 +173,8 @@ describe('LaunchPage', () => {
 
     store.setInitialCapital(12_345.67);
     expect(await store.launch()).toBe(true);
-    expect(startSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ initialCapitalRub: 12_345.67 }),
-    );
+    // INV-6: деньги уходят строкой, как Money в контракте, без плавающей запятой.
+    expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ initialCapital: '12345.67' }));
   });
 
   it('показывает кнопку «Повторить» при ошибке загрузки параметров', async () => {

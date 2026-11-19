@@ -239,7 +239,7 @@ export class LaunchStore {
         customStartDate: blind ? null : this.customStartDate(),
         paperCount: blind ? this.paperCount() : null,
         paperIds: blind ? null : this.selectedPaperIds(),
-        initialCapitalRub,
+        initialCapital: initialCapitalRub.toFixed(2),
       });
 
       if (!result.accepted) {
