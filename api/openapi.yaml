@@ -551,7 +551,11 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     TooManyRequests:
-      description: Слишком много попыток входа
+      description: Слишком много попыток входа; повторить можно через `Retry-After` секунд
+      headers:
+        Retry-After:
+          description: Через сколько секунд можно повторить попытку
+          schema: { type: integer, minimum: 1 }
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -691,7 +695,7 @@ components:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email }
+        email: { type: string, format: email, maxLength: 254, description: 'Не длиннее 254 символов (RFC 5321); длиннее — 400' }
         password: { type: string, format: password, description: 'Не длиннее 72 байт в UTF-8 (предел bcrypt, кириллица — 2 байта на символ); длиннее — 400. maxLength не задан, так как считает символы, а не байты' }
     CurrentUser:
       type: object
