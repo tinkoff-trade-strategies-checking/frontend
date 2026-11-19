@@ -109,6 +109,7 @@ describe('ReportPage', () => {
     expect(text).toContain('3,14');
     expect(text).toContain('4,21');
     expect(text).toContain('rf = RUONIA');
+    expect(text).toContain('Вы, алгоритм, бенчмарк IMOEX');
     expect(text).toContain('+7,77 %');
     expect(text).toContain('Выгрузка отчёта пока недоступна');
 
@@ -135,7 +136,9 @@ describe('ReportPage', () => {
     expect(text).toContain('Нет данных');
     expect(root.querySelector('.stub-underwater')).toBeNull();
     expect(root.querySelector('.stub-equity')).not.toBeNull();
-    expect(text).toContain('— дн.');
+    expect(text).not.toContain('— дн.');
+    expect(text).toContain('Кривая капитала');
+    expect(text).not.toContain('бенчмарк IMOEX');
 
     const tabButton = (label: string): HTMLButtonElement => {
       const btn = Array.from(root.querySelectorAll('button')).find((b) =>

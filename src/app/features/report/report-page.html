@@ -242,7 +242,7 @@
         <section class="panel">
           <div class="panel-header">
             <h2 class="tui-text_h6">Кривая капитала</h2>
-            <span class="tui-text_body-xs muted">Вы, алгоритм и бенчмарк IMOEX</span>
+            <span class="tui-text_body-xs muted">{{ equityCurveSubtitle(rep.equityCurve) }}</span>
           </div>
           <div class="chart-pad">
             <app-report-equity-chart [points]="rep.equityCurve" />
@@ -332,15 +332,21 @@
                   <tr>
                     <td>Длительность просадки</td>
                     <td class="num">
-                      {{ hm.maxDrawdownDurationDays ?? '—' }} дн. ({{ hm.maxDrawdownDurationSteps }}
-                      шаг.)
+                      {{
+                        formatDrawdownDuration(
+                          hm.maxDrawdownDurationDays,
+                          hm.maxDrawdownDurationSteps
+                        )
+                      }}
                     </td>
                     @if (am) {
                       <td class="num">
-                        {{ am.maxDrawdownDurationDays ?? '—' }} дн. ({{
-                          am.maxDrawdownDurationSteps
+                        {{
+                          formatDrawdownDuration(
+                            am.maxDrawdownDurationDays,
+                            am.maxDrawdownDurationSteps
+                          )
                         }}
-                        шаг.)
                       </td>
                     }
                   </tr>
