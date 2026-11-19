@@ -50,7 +50,7 @@ function computeDrawdownFromSeries(values: readonly number[]): DrawdownStats {
 function buildMaxDrawdownComparison(
   humanPct: number,
   algoPct: number,
-): SessionReport['comparison']['maxDrawdown'] {
+): NonNullable<SessionReport['comparison']>['maxDrawdown'] {
   const diffPctPoints = Math.round(Math.abs(humanPct - algoPct) * 100) / 100;
   const formatted = diffPctPoints.toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
@@ -92,12 +92,12 @@ function buildEquityAndUnderwater(
   humanAmp = 28_000,
   algoAmp = 21_000,
 ): {
-  equityCurve: EquityCurvePoint[];
+  equityCurve: (EquityCurvePoint & { algoCapitalRub: number })[];
   underwaterCurve: UnderwaterPoint[];
   humanDrawdown: DrawdownStats;
   algoDrawdown: DrawdownStats;
 } {
-  const equityCurve: EquityCurvePoint[] = [];
+  const equityCurve: (EquityCurvePoint & { algoCapitalRub: number })[] = [];
   const underwaterCurve: UnderwaterPoint[] = [];
   const start = new Date(Date.UTC(2020, 1, 26));
 
@@ -670,6 +670,31 @@ const REPORT_S0105: SessionReport = {
   ],
 };
 
+// Отчёт в том виде, в каком его отдаёт backend, пока core не считает производные величины
+// и нет фонового прогона (core#54, ФТ-18…20): все nullable-поля контракта — null.
+const REPORT_NO_ALGO: SessionReport = {
+  ...REPORT_S0103,
+  sessionId: 'S-NO-ALGO',
+  backgroundAlgorithmName: null,
+  humanMetrics: {
+    ...REPORT_S0103.humanMetrics,
+    maxDrawdownDurationDays: null,
+    costsRub: { ...REPORT_S0103.humanMetrics.costsRub, totalRub: null },
+  },
+  algoMetrics: null,
+  comparison: null,
+  equityCurve: REPORT_S0103.equityCurve.map((p) => ({
+    ...p,
+    algoCapitalRub: null,
+    benchmarkCapitalRub: null,
+  })),
+  underwaterCurve: null,
+  divergenceSummary: null,
+  divergences: null,
+  reverseCheckTrades: null,
+  fills: REPORT_S0103.fills.map((f) => ({ ...f, costRub: null })),
+};
+
 function buildDynamicReport(session: StubSessionRecord): SessionReport {
   const base = session.blind ? REPORT_S0103 : REPORT_S0105;
   return {
@@ -748,6 +773,10 @@ export class StubReportApi implements ReportApi {
 
     if (sessionId === 'S-0103') {
       return { status: 'READY', report: REPORT_S0103 };
+    }
+
+    if (sessionId === 'S-NO-ALGO') {
+      return { status: 'READY', report: REPORT_NO_ALGO };
     }
 
     if (sessionId === 'S-0105') {

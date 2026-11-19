@@ -25,7 +25,7 @@ export interface ReportPeriod {
 }
 
 export interface ReportCostsBreakdown {
-  readonly totalRub: number;
+  readonly totalRub: number | null;
   readonly commissionRub: number;
   readonly exchangeFeeRub: number;
   readonly spreadRub: number;
@@ -40,7 +40,7 @@ export interface ReportMetrics {
   readonly grossReturnPct: number;
   readonly netReturnPct: number;
   readonly maxDrawdownPct: number;
-  readonly maxDrawdownDurationDays: number;
+  readonly maxDrawdownDurationDays: number | null;
   readonly maxDrawdownDurationSteps: number;
   readonly volatilityPct: number | null;
   readonly sharpe: number | null;
@@ -83,8 +83,8 @@ export interface EquityCurvePoint {
   readonly step: number;
   readonly dateLabel: string;
   readonly humanCapitalRub: number;
-  readonly algoCapitalRub: number;
-  readonly benchmarkCapitalRub: number;
+  readonly algoCapitalRub: number | null;
+  readonly benchmarkCapitalRub: number | null;
 }
 
 export interface UnderwaterPoint {
@@ -109,7 +109,7 @@ export interface ReportDivergence {
   readonly algoAction: string;
   readonly errorCostRub: number;
   readonly errorCostPct: number;
-  readonly because: string;
+  readonly because: string | null;
 }
 
 export interface DivergenceSummary {
@@ -147,7 +147,7 @@ export interface ReportFill {
     'market' | 'limit' | 'stop' | 'stop_limit' | 'take_profit' | 'trailing' | 'oco';
   readonly lots: number;
   readonly priceRub: number;
-  readonly costRub: number;
+  readonly costRub: number | null;
   readonly partial: boolean;
   readonly note: string | null;
 }
@@ -162,18 +162,18 @@ export interface SessionReport {
   readonly timeframe: ReportTimeframe;
   readonly regime: ReportRegime;
   readonly createdAt: string;
-  readonly backgroundAlgorithmName: string;
+  readonly backgroundAlgorithmName: string | null;
   readonly noDividendsNote: string;
   readonly period: ReportPeriod;
   readonly papers: readonly ReportPaperReveal[];
   readonly humanMetrics: ReportMetrics;
-  readonly algoMetrics: ReportMetrics;
-  readonly comparison: ReportComparison;
+  readonly algoMetrics: ReportMetrics | null;
+  readonly comparison: ReportComparison | null;
   readonly equityCurve: readonly EquityCurvePoint[];
-  readonly underwaterCurve: readonly UnderwaterPoint[];
-  readonly divergenceSummary: DivergenceSummary;
-  readonly divergences: readonly ReportDivergence[];
-  readonly reverseCheckTrades: readonly ReverseCheckTrade[];
+  readonly underwaterCurve: readonly UnderwaterPoint[] | null;
+  readonly divergenceSummary: DivergenceSummary | null;
+  readonly divergences: readonly ReportDivergence[] | null;
+  readonly reverseCheckTrades: readonly ReverseCheckTrade[] | null;
   readonly fills: readonly ReportFill[];
 }
 

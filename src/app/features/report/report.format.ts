@@ -44,7 +44,10 @@ export const WINNER_LABELS: Readonly<Record<ComparisonWinner, string>> = {
   tie: 'Равно',
 };
 
-export function formatRub(value: number, signed = false, fractionDigits = 0): string {
+export function formatRub(value: number | null, signed = false, fractionDigits = 0): string {
+  if (value === null) {
+    return '—';
+  }
   const formatted = Math.abs(value).toLocaleString('ru-RU', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: Math.max(fractionDigits, 2),
@@ -61,7 +64,7 @@ export function formatRub(value: number, signed = false, fractionDigits = 0): st
   return `${value < 0 ? '−' : ''}${formatted} ₽`;
 }
 
-export function formatRubExact(value: number, signed = false): string {
+export function formatRubExact(value: number | null, signed = false): string {
   return formatRub(value, signed, 2);
 }
 

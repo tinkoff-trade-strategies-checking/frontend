@@ -153,84 +153,89 @@
       <section class="panel">
         <div class="panel-header">
           <h2 class="tui-text_h6">
-            Сравнение с фоновым алгоритмом «{{ rep.backgroundAlgorithmName }}»
+            Сравнение с фоновым алгоритмом
+            @if (rep.backgroundAlgorithmName) {
+              «{{ rep.backgroundAlgorithmName }}»
+            }
           </h2>
         </div>
-        <div class="comparison-grid">
-          <div class="cmp-card">
-            <span class="tui-text_body-xs muted">Итоговый капитал</span>
-            <div class="cmp-values">
-              <div>
-                <span class="tui-text_body-xs muted">Вы</span>
-                <div class="tui-text_h5 num">
-                  {{ formatRub(rep.comparison.finalCapital.humanRub) }}
+        @if (rep.comparison; as cmp) {
+          <div class="comparison-grid">
+            <div class="cmp-card">
+              <span class="tui-text_body-xs muted">Итоговый капитал</span>
+              <div class="cmp-values">
+                <div>
+                  <span class="tui-text_body-xs muted">Вы</span>
+                  <div class="tui-text_h5 num">
+                    {{ formatRub(cmp.finalCapital.humanRub) }}
+                  </div>
+                </div>
+                <div>
+                  <span class="tui-text_body-xs muted">Алгоритм</span>
+                  <div class="tui-text_h5 num">
+                    {{ formatRub(cmp.finalCapital.algoRub) }}
+                  </div>
                 </div>
               </div>
-              <div>
-                <span class="tui-text_body-xs muted">Алгоритм</span>
-                <div class="tui-text_h5 num">
-                  {{ formatRub(rep.comparison.finalCapital.algoRub) }}
-                </div>
-              </div>
+              <span tuiBadge size="s" appearance="neutral">
+                {{ winnerLabels[cmp.finalCapital.winner] }} ·
+                {{ cmp.finalCapital.diffLabel }}
+              </span>
             </div>
-            <span tuiBadge size="s" appearance="neutral">
-              {{ winnerLabels[rep.comparison.finalCapital.winner] }} ·
-              {{ rep.comparison.finalCapital.diffLabel }}
-            </span>
-          </div>
 
-          <div class="cmp-card">
-            <span class="tui-text_body-xs muted">Доходность после издержек</span>
-            <div class="cmp-values">
-              <div>
-                <span class="tui-text_body-xs muted">Вы</span>
-                <div
-                  class="tui-text_h5 num"
-                  [class.pos]="rep.comparison.netReturn.humanPct > 0"
-                  [class.neg]="rep.comparison.netReturn.humanPct < 0"
-                >
-                  {{ formatPct(rep.comparison.netReturn.humanPct, true) }}
+            <div class="cmp-card">
+              <span class="tui-text_body-xs muted">Доходность после издержек</span>
+              <div class="cmp-values">
+                <div>
+                  <span class="tui-text_body-xs muted">Вы</span>
+                  <div
+                    class="tui-text_h5 num"
+                    [class.pos]="cmp.netReturn.humanPct > 0"
+                    [class.neg]="cmp.netReturn.humanPct < 0"
+                  >
+                    {{ formatPct(cmp.netReturn.humanPct, true) }}
+                  </div>
+                </div>
+                <div>
+                  <span class="tui-text_body-xs muted">Алгоритм</span>
+                  <div
+                    class="tui-text_h5 num"
+                    [class.pos]="cmp.netReturn.algoPct > 0"
+                    [class.neg]="cmp.netReturn.algoPct < 0"
+                  >
+                    {{ formatPct(cmp.netReturn.algoPct, true) }}
+                  </div>
                 </div>
               </div>
-              <div>
-                <span class="tui-text_body-xs muted">Алгоритм</span>
-                <div
-                  class="tui-text_h5 num"
-                  [class.pos]="rep.comparison.netReturn.algoPct > 0"
-                  [class.neg]="rep.comparison.netReturn.algoPct < 0"
-                >
-                  {{ formatPct(rep.comparison.netReturn.algoPct, true) }}
-                </div>
-              </div>
+              <span tuiBadge size="s" appearance="neutral">
+                {{ winnerLabels[cmp.netReturn.winner] }} ·
+                {{ cmp.netReturn.diffLabel }}
+              </span>
             </div>
-            <span tuiBadge size="s" appearance="neutral">
-              {{ winnerLabels[rep.comparison.netReturn.winner] }} ·
-              {{ rep.comparison.netReturn.diffLabel }}
-            </span>
-          </div>
 
-          <div class="cmp-card">
-            <span class="tui-text_body-xs muted">Максимальная просадка</span>
-            <div class="cmp-values">
-              <div>
-                <span class="tui-text_body-xs muted">Вы</span>
-                <div class="tui-text_h5 num neg">
-                  −{{ formatPct(rep.comparison.maxDrawdown.humanPct) }}
+            <div class="cmp-card">
+              <span class="tui-text_body-xs muted">Максимальная просадка</span>
+              <div class="cmp-values">
+                <div>
+                  <span class="tui-text_body-xs muted">Вы</span>
+                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.humanPct) }}</div>
+                </div>
+                <div>
+                  <span class="tui-text_body-xs muted">Алгоритм</span>
+                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.algoPct) }}</div>
                 </div>
               </div>
-              <div>
-                <span class="tui-text_body-xs muted">Алгоритм</span>
-                <div class="tui-text_h5 num neg">
-                  −{{ formatPct(rep.comparison.maxDrawdown.algoPct) }}
-                </div>
-              </div>
+              <span tuiBadge size="s" appearance="neutral">
+                {{ winnerLabels[cmp.maxDrawdown.winner] }} ·
+                {{ cmp.maxDrawdown.diffLabel }}
+              </span>
             </div>
-            <span tuiBadge size="s" appearance="neutral">
-              {{ winnerLabels[rep.comparison.maxDrawdown.winner] }} ·
-              {{ rep.comparison.maxDrawdown.diffLabel }}
-            </span>
           </div>
-        </div>
+        } @else {
+          <div class="empty-state tui-text_body-s muted">
+            Сравнение с алгоритмом недоступно: фоновый прогон пока не выполняется.
+          </div>
+        }
       </section>
 
       <div class="charts-grid">
@@ -250,7 +255,11 @@
             <span class="tui-text_body-xs muted">Отставание от пика, %</span>
           </div>
           <div class="chart-pad">
-            <app-report-underwater-chart [points]="rep.underwaterCurve" />
+            @if (rep.underwaterCurve; as underwater) {
+              <app-report-underwater-chart [points]="underwater" />
+            } @else {
+              <div class="empty-state tui-text_body-s muted">Нет данных</div>
+            }
           </div>
         </section>
       </div>
@@ -279,62 +288,88 @@
                   <tr>
                     <th>Показатель</th>
                     <th class="num">Вы</th>
-                    <th class="num">Алгоритм</th>
+                    @if (am) {
+                      <th class="num">Алгоритм</th>
+                    }
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td>Total (итоговая доходность)</td>
                     <td class="num">{{ formatPct(hm.totalReturnPct, true) }}</td>
-                    <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>CAGR (годовая)</td>
                     <td class="num">{{ formatPct(hm.cagrPct, true) }}</td>
-                    <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Gross (до комиссий и сбора)</td>
                     <td class="num">{{ formatPct(hm.grossReturnPct, true) }}</td>
-                    <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Net (после издержек)</td>
                     <td class="num">{{ formatPct(hm.netReturnPct, true) }}</td>
-                    <td class="num">{{ formatPct(am.netReturnPct, true) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.netReturnPct, true) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Макс. просадка</td>
                     <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
-                    <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
+                    @if (am) {
+                      <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Длительность просадки</td>
                     <td class="num">
-                      {{ hm.maxDrawdownDurationDays }} дн. ({{ hm.maxDrawdownDurationSteps }} шаг.)
+                      {{ hm.maxDrawdownDurationDays ?? '—' }} дн. ({{ hm.maxDrawdownDurationSteps }}
+                      шаг.)
                     </td>
-                    <td class="num">
-                      {{ am.maxDrawdownDurationDays }} дн. ({{ am.maxDrawdownDurationSteps }} шаг.)
-                    </td>
+                    @if (am) {
+                      <td class="num">
+                        {{ am.maxDrawdownDurationDays ?? '—' }} дн. ({{
+                          am.maxDrawdownDurationSteps
+                        }}
+                        шаг.)
+                      </td>
+                    }
                   </tr>
                   <tr>
                     <td>Волатильность (год.)</td>
                     <td class="num">{{ formatPct(hm.volatilityPct) }}</td>
-                    <td class="num">{{ formatPct(am.volatilityPct) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.volatilityPct) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Sharpe (rf = RUONIA)</td>
                     <td class="num">{{ formatRatio(hm.sharpe) }}</td>
-                    <td class="num">{{ formatRatio(am.sharpe) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRatio(am.sharpe) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Sortino (rf = RUONIA)</td>
                     <td class="num">{{ formatRatio(hm.sortino) }}</td>
-                    <td class="num">{{ formatRatio(am.sortino) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRatio(am.sortino) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Бенчмарк IMOEX</td>
-                    <td class="num" colspan="2">{{ formatPct(hm.benchmarkImoexPct, true) }}</td>
+                    <td class="num" [attr.colspan]="am ? 2 : 1">
+                      {{ formatPct(hm.benchmarkImoexPct, true) }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -347,68 +382,92 @@
                   <tr>
                     <th>Показатель</th>
                     <th class="num">Вы</th>
-                    <th class="num">Алгоритм</th>
+                    @if (am) {
+                      <th class="num">Алгоритм</th>
+                    }
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td>Оборот</td>
                     <td class="num">{{ formatRatio(hm.turnover) }}×</td>
-                    <td class="num">{{ formatRatio(am.turnover) }}×</td>
+                    @if (am) {
+                      <td class="num">{{ formatRatio(am.turnover) }}×</td>
+                    }
                   </tr>
                   <tr>
                     <td>Сделок</td>
                     <td class="num">{{ hm.tradesCount }}</td>
-                    <td class="num">{{ am.tradesCount }}</td>
+                    @if (am) {
+                      <td class="num">{{ am.tradesCount }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Win rate</td>
                     <td class="num">{{ formatPct(hm.winRatePct) }}</td>
-                    <td class="num">{{ formatPct(am.winRatePct) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.winRatePct) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Отказов / частичных исполнений</td>
                     <td class="num">{{ hm.rejectedOrdersCount }} / {{ hm.partialFillsCount }}</td>
-                    <td class="num">{{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}</td>
+                    @if (am) {
+                      <td class="num">{{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>HHI (концентрация)</td>
                     <td class="num">{{ formatRatio(hm.hhi) }}</td>
-                    <td class="num">{{ formatRatio(am.hhi) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRatio(am.hhi) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Крупнейшая позиция</td>
                     <td class="num">{{ formatPct(hm.largestPositionPct) }}</td>
-                    <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Издержки: комиссия брокера</td>
                     <td class="num">{{ formatRub(hm.costsRub.commissionRub) }}</td>
-                    <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Издержки: биржевой сбор</td>
                     <td class="num">{{ formatRub(hm.costsRub.exchangeFeeRub) }}</td>
-                    <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Издержки: спред</td>
                     <td class="num">{{ formatRub(hm.costsRub.spreadRub) }}</td>
-                    <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td>Издержки: проскальзывание</td>
                     <td class="num">{{ formatRub(hm.costsRub.slippageRub) }}</td>
-                    <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
+                    }
                   </tr>
                   <tr>
                     <td><strong>Издержки всего</strong></td>
                     <td class="num">
                       <strong>{{ formatRub(hm.costsRub.totalRub) }}</strong>
                     </td>
-                    <td class="num">
-                      <strong>{{ formatRub(am.costsRub.totalRub) }}</strong>
-                    </td>
+                    @if (am) {
+                      <td class="num">
+                        <strong>{{ formatRub(am.costsRub.totalRub) }}</strong>
+                      </td>
+                    }
                   </tr>
                 </tbody>
               </table>
@@ -418,181 +477,198 @@
           @let summary = rep.divergenceSummary;
           @let counts = store.divergenceCounts();
           <div class="tab-body">
-            @if (rep.finishedEarly) {
-              <div tuiNotification appearance="warning" size="s">
-                Сессия завершена досрочно ({{ rep.playedDays }} из {{ rep.totalDays }} дн.): разбор
-                расхождений построен по пройденному отрезку.
+            @if (rep.divergences === null) {
+              <div class="empty-state tui-text_body-s muted">
+                Разбор расхождений недоступен: фоновый прогон пока не выполняется.
               </div>
-            }
-
-            <div tuiNotification appearance="info" size="s">
-              <div>
-                @if (summary.totalErrorCostRub > 0) {
-                  Расхождения обошлись вам в
-                  <strong class="num neg">{{ formatRubExact(summary.totalErrorCostRub) }}</strong>
-                  (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
-                  >)
-                } @else {
-                  Расхождения сложились в вашу пользу на
-                  <strong class="num pos">{{
-                    formatRubExact(summary.totalErrorCostRub, true)
-                  }}</strong>
-                  (<strong class="num">{{ formatPct(summary.totalErrorCostPct, true) }}</strong
-                  >)
-                }
-                @if (
-                  summary.worstType &&
-                  summary.worstDay !== null &&
-                  summary.worstErrorCostRub !== null &&
-                  summary.worstErrorCostRub > 0
-                ) {
-                  , самое дорогое — {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на
-                  дне {{ summary.worstDay }} (<strong class="num">{{
-                    formatRubExact(summary.worstErrorCostRub, true)
-                  }}</strong
-                  >)
-                }
-                .
-              </div>
-              <div class="tui-text_body-xs muted">
-                Цена ошибки = V_алгоритма − V_человека до следующего решения (горизонт e): &gt; 0 —
-                выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты, как
-                правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные заявки и
-                отмены в сравнении не участвуют.
-              </div>
-            </div>
-
-            <div class="controls-bar">
-              <div class="filters-row">
-                @for (f of divergenceFilters; track f.id) {
-                  <button
-                    tuiButton
-                    type="button"
-                    size="xs"
-                    [appearance]="store.divergenceFilter() === f.id ? 'primary' : 'outline'"
-                    (click)="store.setDivergenceFilter(f.id)"
-                  >
-                    {{ f.label }} ({{ counts[f.id] }})
-                  </button>
-                }
-              </div>
-
-              <div class="sorts-row">
-                <span class="tui-text_body-xs muted">Сортировка:</span>
-                @for (s of divergenceSorts; track s.id) {
-                  <button
-                    tuiButton
-                    type="button"
-                    size="xs"
-                    [appearance]="store.divergenceSort() === s.id ? 'primary' : 'outline'"
-                    (click)="store.setDivergenceSort(s.id)"
-                  >
-                    {{ s.label }}
-                  </button>
-                }
-              </div>
-            </div>
-
-            @if (store.filteredDivergences().length === 0) {
-              <div class="empty-state tui-text_body-s muted">Расхождений выбранного типа нет.</div>
             } @else {
-              <div class="table-scroll">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th>Шаг / день</th>
-                      <th>Бумага</th>
-                      <th>Тип</th>
-                      <th>Вы</th>
-                      <th>Алгоритм</th>
-                      <th class="num">Цена ошибки</th>
-                      <th class="num col-horizon">Горизонт e</th>
-                      <th>Причина (because)</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (item of store.filteredDivergences(); track item.id) {
-                      <tr>
-                        <td class="num">
-                          <div>День {{ item.day }} ({{ item.dateLabel }})</div>
-                          <div class="tui-text_body-xs muted">шаг {{ item.step }}</div>
-                        </td>
-                        <td>{{ item.paperTicker }} · {{ item.sector }}</td>
-                        <td>
-                          <span tuiBadge size="s" appearance="neutral">
-                            {{ divergenceTypeLabel(item.type) }}
-                          </span>
-                          @if (item.deltaBars !== null) {
-                            <div class="tui-text_body-xs muted">
-                              {{ formatDeltaBars(item.deltaBars) }}
-                            </div>
-                          }
-                        </td>
-                        <td>{{ item.humanAction }}</td>
-                        <td>{{ item.algoAction }}</td>
-                        <td
-                          class="num"
-                          [class.neg]="item.errorCostRub > 0"
-                          [class.pos]="item.errorCostRub < 0"
-                        >
-                          <div>
-                            <strong>{{ formatRubExact(item.errorCostRub, true) }}</strong>
-                            ({{ formatPct(item.errorCostPct, true) }})
-                          </div>
-                          <div class="tui-text_body-xs muted">
-                            {{
-                              item.errorCostRub > 0
-                                ? 'выгоднее как алгоритм'
-                                : 'вы поступили не хуже'
-                            }}
-                          </div>
-                        </td>
-                        <td class="num">
-                          <div>День {{ item.horizonDay }}</div>
-                          <div class="tui-text_body-xs muted">шаг {{ item.horizonStep }}</div>
-                        </td>
-                        <td>{{ item.because }}</td>
-                        <td class="num">
-                          @if (rep.replayAvailable) {
-                            <a
-                              tuiButton
-                              size="xs"
-                              appearance="outline"
-                              [routerLink]="['/replay', rep.sessionId]"
-                              [queryParams]="{ step: item.step }"
-                            >
-                              Посмотреть в воспроизведении
-                            </a>
-                          } @else {
-                            <button
-                              tuiButton
-                              type="button"
-                              size="xs"
-                              appearance="outline"
-                              [disabled]="true"
-                              title="Воспроизведение недоступно для этой сессии"
-                            >
-                              Посмотреть в воспроизведении
-                            </button>
-                          }
-                        </td>
-                      </tr>
+              @if (rep.finishedEarly) {
+                <div tuiNotification appearance="warning" size="s">
+                  Сессия завершена досрочно ({{ rep.playedDays }} из {{ rep.totalDays }} дн.):
+                  разбор расхождений построен по пройденному отрезку.
+                </div>
+              }
+
+              @if (summary) {
+                <div tuiNotification appearance="info" size="s">
+                  <div>
+                    @if (summary.totalErrorCostRub > 0) {
+                      Расхождения обошлись вам в
+                      <strong class="num neg">{{
+                        formatRubExact(summary.totalErrorCostRub)
+                      }}</strong>
+                      (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
+                      >)
+                    } @else {
+                      Расхождения сложились в вашу пользу на
+                      <strong class="num pos">{{
+                        formatRubExact(summary.totalErrorCostRub, true)
+                      }}</strong>
+                      (<strong class="num">{{ formatPct(summary.totalErrorCostPct, true) }}</strong
+                      >)
                     }
-                  </tbody>
-                </table>
+                    @if (
+                      summary.worstType &&
+                      summary.worstDay !== null &&
+                      summary.worstErrorCostRub !== null &&
+                      summary.worstErrorCostRub > 0
+                    ) {
+                      , самое дорогое —
+                      {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на дне
+                      {{ summary.worstDay }} (<strong class="num">{{
+                        formatRubExact(summary.worstErrorCostRub, true)
+                      }}</strong
+                      >)
+                    }
+                    .
+                  </div>
+                  <div class="tui-text_body-xs muted">
+                    Цена ошибки = V_алгоритма − V_человека до следующего решения (горизонт e): &gt;
+                    0 — выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты,
+                    как правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные
+                    заявки и отмены в сравнении не участвуют.
+                  </div>
+                </div>
+              }
+
+              <div class="controls-bar">
+                <div class="filters-row">
+                  @for (f of divergenceFilters; track f.id) {
+                    <button
+                      tuiButton
+                      type="button"
+                      size="xs"
+                      [appearance]="store.divergenceFilter() === f.id ? 'primary' : 'outline'"
+                      (click)="store.setDivergenceFilter(f.id)"
+                    >
+                      {{ f.label }} ({{ counts[f.id] }})
+                    </button>
+                  }
+                </div>
+
+                <div class="sorts-row">
+                  <span class="tui-text_body-xs muted">Сортировка:</span>
+                  @for (s of divergenceSorts; track s.id) {
+                    <button
+                      tuiButton
+                      type="button"
+                      size="xs"
+                      [appearance]="store.divergenceSort() === s.id ? 'primary' : 'outline'"
+                      (click)="store.setDivergenceSort(s.id)"
+                    >
+                      {{ s.label }}
+                    </button>
+                  }
+                </div>
               </div>
+
+              @if (store.filteredDivergences().length === 0) {
+                <div class="empty-state tui-text_body-s muted">
+                  Расхождений выбранного типа нет.
+                </div>
+              } @else {
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Шаг / день</th>
+                        <th>Бумага</th>
+                        <th>Тип</th>
+                        <th>Вы</th>
+                        <th>Алгоритм</th>
+                        <th class="num">Цена ошибки</th>
+                        <th class="num col-horizon">Горизонт e</th>
+                        <th>Причина (because)</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (item of store.filteredDivergences(); track item.id) {
+                        <tr>
+                          <td class="num">
+                            <div>День {{ item.day }} ({{ item.dateLabel }})</div>
+                            <div class="tui-text_body-xs muted">шаг {{ item.step }}</div>
+                          </td>
+                          <td>{{ item.paperTicker }} · {{ item.sector }}</td>
+                          <td>
+                            <span tuiBadge size="s" appearance="neutral">
+                              {{ divergenceTypeLabel(item.type) }}
+                            </span>
+                            @if (item.deltaBars !== null) {
+                              <div class="tui-text_body-xs muted">
+                                {{ formatDeltaBars(item.deltaBars) }}
+                              </div>
+                            }
+                          </td>
+                          <td>{{ item.humanAction }}</td>
+                          <td>{{ item.algoAction }}</td>
+                          <td
+                            class="num"
+                            [class.neg]="item.errorCostRub > 0"
+                            [class.pos]="item.errorCostRub < 0"
+                          >
+                            <div>
+                              <strong>{{ formatRubExact(item.errorCostRub, true) }}</strong>
+                              ({{ formatPct(item.errorCostPct, true) }})
+                            </div>
+                            <div class="tui-text_body-xs muted">
+                              {{
+                                item.errorCostRub > 0
+                                  ? 'выгоднее как алгоритм'
+                                  : 'вы поступили не хуже'
+                              }}
+                            </div>
+                          </td>
+                          <td class="num">
+                            <div>День {{ item.horizonDay }}</div>
+                            <div class="tui-text_body-xs muted">шаг {{ item.horizonStep }}</div>
+                          </td>
+                          <td>{{ item.because ?? 'алгоритм здесь не действовал бы' }}</td>
+                          <td class="num">
+                            @if (rep.replayAvailable) {
+                              <a
+                                tuiButton
+                                size="xs"
+                                appearance="outline"
+                                [routerLink]="['/replay', rep.sessionId]"
+                                [queryParams]="{ step: item.step }"
+                              >
+                                Посмотреть в воспроизведении
+                              </a>
+                            } @else {
+                              <button
+                                tuiButton
+                                type="button"
+                                size="xs"
+                                appearance="outline"
+                                [disabled]="true"
+                                title="Воспроизведение недоступно для этой сессии"
+                              >
+                                Посмотреть в воспроизведении
+                              </button>
+                            }
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
             }
           </div>
         } @else if (store.activeTab() === 'reverse') {
           <div class="tab-body">
             <div tuiNotification appearance="info" size="s">
               Закрытые прибыльные сделки человека (FIFO, прибыль после издержек &gt; 0), вход в
-              которые — «лишнее действие» для алгоритма «{{ rep.backgroundAlgorithmName }}». Если за
-              ними стоит правило, его можно будет оформить в мастерской.
+              которые — «лишнее действие» для фонового алгоритма. Если за ними стоит правило, его
+              можно будет оформить в мастерской.
             </div>
 
-            @if (rep.reverseCheckTrades.length === 0) {
+            @if (rep.reverseCheckTrades === null) {
+              <div class="empty-state tui-text_body-s muted">
+                Обратная проверка недоступна: фоновый прогон пока не выполняется.
+              </div>
+            } @else if (rep.reverseCheckTrades.length === 0) {
               <div class="empty-state tui-text_body-s muted">
                 Закрытых прибыльных сделок со входом «лишнее действие» в этой сессии нет.
               </div>

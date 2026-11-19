@@ -49,9 +49,11 @@ describe('StubReportApi', () => {
       const c = ready.report.humanMetrics.costsRub;
       expect(c.commissionRub + c.exchangeFeeRub + c.spreadRub + c.slippageRub).toBe(c.totalRub);
 
-      const divTypes = new Set(ready.report.divergences.map((d) => d.type));
+      const divergences = ready.report.divergences ?? [];
+      const reverse = ready.report.reverseCheckTrades ?? [];
+      const divTypes = new Set(divergences.map((d) => d.type));
       expect(divTypes).toEqual(new Set(['extra', 'missed', 'size', 'timing']));
-      for (const div of ready.report.divergences) {
+      for (const div of divergences) {
         if (div.type === 'extra') {
           expect(div.because).toBe('алгоритм здесь не действовал бы');
         }
@@ -59,10 +61,10 @@ describe('StubReportApi', () => {
           expect(div.deltaBars).not.toBeNull();
         }
       }
-      expect(ready.report.reverseCheckTrades.length).toBeGreaterThan(0);
-      for (const rev of ready.report.reverseCheckTrades) {
+      expect(reverse.length).toBeGreaterThan(0);
+      for (const rev of reverse) {
         expect(rev.netProfitRub).toBeGreaterThan(0);
-        const entryDiv = ready.report.divergences.find((d) => d.id === rev.entryDivergenceId);
+        const entryDiv = divergences.find((d) => d.id === rev.entryDivergenceId);
         expect(entryDiv?.type).toBe('extra');
       }
     }
@@ -73,7 +75,7 @@ describe('StubReportApi', () => {
       expect(early.report.finishedEarly).toBe(true);
       expect(early.report.playedDays).toBe(28);
       expect(early.report.fills.every((f) => f.day <= 28)).toBe(true);
-      expect(early.report.divergences.some((d) => d.paperTicker === 'YDEX')).toBe(false);
+      expect((early.report.divergences ?? []).some((d) => d.paperTicker === 'YDEX')).toBe(false);
     }
 
     const openActive = await api.getReport('S-OPEN-ACTIVE');
@@ -116,7 +118,10 @@ describe('StubReportApi', () => {
       if (res.status === 'READY') {
         const rep = res.report;
         const humanCalc = calcFromCurve(rep.equityCurve.map((p) => p.humanCapitalRub));
-        const algoCalc = calcFromCurve(rep.equityCurve.map((p) => p.algoCapitalRub));
+        const algoCalc = calcFromCurve(rep.equityCurve.map((p) => p.algoCapitalRub ?? 0));
+        if (!rep.algoMetrics || !rep.comparison) {
+          throw new Error('Ожидались метрики алгоритма и сравнение');
+        }
 
         expect(rep.humanMetrics.maxDrawdownPct).toBe(humanCalc.dd);
         expect(rep.humanMetrics.maxDrawdownDurationSteps).toBe(humanCalc.steps);
@@ -183,6 +188,10 @@ describe('StubReportApi', () => {
     let sumRub = 0;
     let sumPct = 0;
 
+    const summary = rep.divergenceSummary;
+    if (!rep.divergences || !summary) {
+      throw new Error('Ожидались расхождения и сводка');
+    }
     for (const div of rep.divergences) {
       const spec = actionSpecs[div.id];
       expect(spec).toBeDefined();
@@ -209,8 +218,8 @@ describe('StubReportApi', () => {
       sumPct = round2(sumPct + div.errorCostPct);
     }
 
-    expect(rep.divergenceSummary.totalErrorCostRub).toBe(sumRub);
-    expect(rep.divergenceSummary.totalErrorCostPct).toBe(sumPct);
+    expect(summary.totalErrorCostRub).toBe(sumRub);
+    expect(summary.totalErrorCostPct).toBe(sumPct);
   });
 
   it('F6: formatPct и formatRatio возвращают «—» при null метриках', () => {

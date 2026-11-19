@@ -2,6 +2,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
@@ -36,8 +37,12 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
   template: `
     <div class="chart-legend tui-text_body-xs">
       <span class="legend-item"><span class="swatch swatch-human"></span>Вы</span>
-      <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм</span>
-      <span class="legend-item"><span class="swatch swatch-bench"></span>IMOEX</span>
+      @if (hasAlgo()) {
+        <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм</span>
+      }
+      @if (hasBenchmark()) {
+        <span class="legend-item"><span class="swatch swatch-bench"></span>IMOEX</span>
+      }
     </div>
     <div #container class="chart-host" aria-label="Кривая капитала"></div>
   `,
@@ -88,6 +93,10 @@ export class ReportEquityChart {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly points = input.required<readonly EquityCurvePoint[]>();
+  protected readonly hasAlgo = computed(() => this.points().some((p) => p.algoCapitalRub !== null));
+  protected readonly hasBenchmark = computed(() =>
+    this.points().some((p) => p.benchmarkCapitalRub !== null),
+  );
 
   private chart: IChartApi | null = null;
   private humanSeries: ISeriesApi<'Line'> | null = null;
@@ -166,6 +175,20 @@ export class ReportEquityChart {
     });
   }
 
+  private nonNullData(
+    pts: readonly EquityCurvePoint[],
+    pick: (p: EquityCurvePoint) => number | null,
+  ): LineData<Time>[] {
+    const data: LineData<Time>[] = [];
+    for (const p of pts) {
+      const value = pick(p);
+      if (value !== null) {
+        data.push({ time: toChartTime(p.step), value });
+      }
+    }
+    return data;
+  }
+
   private syncData(): void {
     if (!this.chart || !this.humanSeries || !this.algoSeries || !this.benchSeries) {
       return;
@@ -178,14 +201,8 @@ export class ReportEquityChart {
       time: toChartTime(p.step),
       value: p.humanCapitalRub,
     }));
-    const algoData: LineData<Time>[] = pts.map((p) => ({
-      time: toChartTime(p.step),
-      value: p.algoCapitalRub,
-    }));
-    const benchData: LineData<Time>[] = pts.map((p) => ({
-      time: toChartTime(p.step),
-      value: p.benchmarkCapitalRub,
-    }));
+    const algoData = this.nonNullData(pts, (p) => p.algoCapitalRub);
+    const benchData = this.nonNullData(pts, (p) => p.benchmarkCapitalRub);
 
     this.humanSeries.setData(humanData);
     this.algoSeries.setData(algoData);

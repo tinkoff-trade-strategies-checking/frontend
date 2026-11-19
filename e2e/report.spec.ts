@@ -39,3 +39,19 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(page.getByRole('heading', { name: 'Воспроизведение S-0103' })).toBeVisible();
   await expect(page.getByText('День 19 из 60')).toBeVisible();
 });
+
+test('report/S-NO-ALGO: поля null не роняют страницу', async ({ page }) => {
+  await page.goto('/report/S-NO-ALGO');
+
+  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-NO-ALGO' })).toBeVisible();
+  await expect(page.getByText('Сравнение с алгоритмом недоступно')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Расхождения' }).click();
+  await expect(page.getByText('Разбор расхождений недоступен')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Обратная проверка' }).click();
+  await expect(page.getByText('Обратная проверка недоступна')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Сделки' }).click();
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+});
