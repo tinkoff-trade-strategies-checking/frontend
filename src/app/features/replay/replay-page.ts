@@ -6,7 +6,7 @@ import { TuiBadge } from '@taiga-ui/kit';
 import { combineLatest } from 'rxjs';
 import { ArenaPage } from '../arena/arena-page';
 import { REPLAY_API, ReplayRegime } from './data/replay.models';
-import { StubReplayApi } from './data/stub-replay.api';
+import { REPLAY_API_IMPL } from '../../api-impls';
 import { ReplayStore } from './replay.store';
 
 const REGIME_LABELS: Readonly<Record<ReplayRegime, string>> = {
@@ -18,7 +18,7 @@ const REGIME_LABELS: Readonly<Record<ReplayRegime, string>> = {
 @Component({
   selector: 'app-replay-page',
   imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, ArenaPage],
-  providers: [{ provide: REPLAY_API, useClass: StubReplayApi }, ReplayStore],
+  providers: [{ provide: REPLAY_API, useClass: REPLAY_API_IMPL }, ReplayStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './replay-page.html',
   styleUrl: './replay-page.less',

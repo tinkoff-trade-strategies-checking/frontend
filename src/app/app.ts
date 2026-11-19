@@ -3,6 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TuiButton, TuiRoot } from '@taiga-ui/core';
 import { filter, map, startWith } from 'rxjs';
+import { STUB_MODE } from './core/api-mode';
+import { AuthService } from './core/auth/auth.service';
 import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 import { StubSessionRegistry } from './shared/stub-session-registry';
 
@@ -16,6 +18,10 @@ import { StubSessionRegistry } from './shared/stub-session-registry';
 export class App {
   private readonly sessionRegistry = inject(StubSessionRegistry);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+
+  protected readonly user = this.auth.user;
+  protected readonly stubMode = inject(STUB_MODE);
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -27,6 +33,14 @@ export class App {
   );
 
   protected readonly sections = computed(() => {
+    if (!this.stubMode) {
+      // Арена и отчёт открываются по id сессии: из запуска, истории и ссылки на завершение.
+      return [
+        { path: '/new', title: 'Новая сессия', activePrefix: '/new' },
+        { path: '/workshop', title: 'Мастерская', activePrefix: '/workshop' },
+        { path: '/history', title: 'История', activePrefix: '/history' },
+      ] as const;
+    }
     const lastReportId = this.sessionRegistry.lastFinishedSessionId();
     return [
       { path: '/new', title: 'Новая сессия', activePrefix: '/new' },
@@ -40,6 +54,14 @@ export class App {
       { path: '/history', title: 'История', activePrefix: '/history' },
     ] as const;
   });
+
+  protected async logout(): Promise<void> {
+    try {
+      await this.auth.logout();
+    } finally {
+      await this.router.navigate(['/login']);
+    }
+  }
 
   protected isSectionActive(prefix: string): boolean {
     const cleanUrl = this.currentUrl().split(/[?#]/)[0];

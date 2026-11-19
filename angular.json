@@ -61,6 +61,46 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "stub": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.stub.ts"
+                },
+                {
+                  "replace": "src/app/api-impls.ts",
+                  "with": "src/app/api-impls.stub.ts"
+                }
+              ]
+            },
+            "development-stub": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.stub.ts"
+                },
+                {
+                  "replace": "src/app/api-impls.ts",
+                  "with": "src/app/api-impls.stub.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -73,14 +113,24 @@
             },
             "development": {
               "buildTarget": "frontend:build:development"
+            },
+            "stub": {
+              "buildTarget": "frontend:build:stub"
+            },
+            "development-stub": {
+              "buildTarget": "frontend:build:development-stub"
             }
           },
-          "defaultConfiguration": "development"
+          "defaultConfiguration": "development",
+          "options": {
+            "proxyConfig": "proxy.conf.json"
+          }
         },
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "setupFiles": ["src/test-setup.ts"]
+            "setupFiles": ["src/test-setup.ts"],
+            "buildTarget": "frontend:build:development-stub"
           }
         },
         "lint": {

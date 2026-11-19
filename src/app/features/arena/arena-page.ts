@@ -20,7 +20,7 @@ import { ArenaOrdersPanel } from './components/arena-orders-panel';
 import { ArenaPlayer } from './components/arena-player';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaApi } from './data/arena.models';
-import { StubArenaApi } from './data/stub-arena.api';
+import { ARENA_API_IMPL } from '../../api-impls';
 
 @Component({
   selector: 'app-arena-page',
@@ -35,7 +35,7 @@ import { StubArenaApi } from './data/stub-arena.api';
     ArenaOrderTicket,
     ArenaPortfolioPanel,
   ],
-  providers: [{ provide: ARENA_API, useClass: StubArenaApi }, ArenaStore],
+  providers: [{ provide: ARENA_API, useClass: ARENA_API_IMPL }, ArenaStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './arena-page.html',
   styleUrl: './arena-page.less',

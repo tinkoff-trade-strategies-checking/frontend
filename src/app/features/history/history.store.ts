@@ -1,4 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
+import { errorMessage } from '../../core/api-problem';
 import {
   HISTORY_API,
   HISTORY_DEFAULT_PAGE_SIZE,
@@ -50,12 +51,12 @@ export class HistoryStore {
       }
       this.pageData.set({ ...data, items: data.items.map(maskHistoryEntry) });
       this.page.set(data.page);
-    } catch {
+    } catch (error) {
       if (seq !== this.loadSeq) {
         return;
       }
       this.pageData.set(null);
-      this.error.set('Не удалось загрузить историю сессий.');
+      this.error.set(errorMessage(error, 'Не удалось загрузить историю сессий.'));
     } finally {
       if (seq === this.loadSeq) {
         this.loading.set(false);
