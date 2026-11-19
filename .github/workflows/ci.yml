@@ -35,6 +35,8 @@ jobs:
         run: npm test
       - name: Сборка
         run: npm run build
+      - name: Сборка на заглушках (демо)
+        run: npm run build:stub
 
   e2e:
     runs-on: ubuntu-latest
