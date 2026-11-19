@@ -71,6 +71,11 @@ export class LaunchStore {
     return this.customPapers().filter((p) => selected.has(p.id));
   });
 
+  /** Выбранная пара «шаг × длительность» всегда превышает лимит свечей (только для случайной даты). */
+  readonly pairExceedsLimit = computed(() =>
+    this.isPairDisabled(this.durationDays(), this.timeframe()),
+  );
+
   readonly submitBlockHint = computed<string | null>(() => {
     const opts = this.options();
     if (!opts) {
@@ -79,6 +84,9 @@ export class LaunchStore {
     const capitalError = this.capitalError();
     if (capitalError) {
       return capitalError;
+    }
+    if (this.pairExceedsLimit()) {
+      return `Выбранная пара шаг × длительность даёт больше ${opts.executionRules.maxBars.toLocaleString('ru-RU')} свечей — выберите другой шаг или длительность.`;
     }
     if (this.isBlind()) {
       return null;
@@ -100,11 +108,27 @@ export class LaunchStore {
     if (this.capitalError() !== null) {
       return false;
     }
+    if (this.pairExceedsLimit()) {
+      return false;
+    }
     if (this.isBlind()) {
       return this.paperCount() >= opts.minPapers && this.paperCount() <= opts.maxPapers;
     }
     return this.submitBlockHint() === null;
   });
+
+  /**
+   * Пара «длительность × шаг» выключена, если длительность больше `maxDurationDaysByTimeframe` шага.
+   * Для своей даты не выключаем: лимит там консервативен, решает 422 TOO_MANY_BARS (backend#23).
+   */
+  isPairDisabled(days: SessionDurationDays, timeframe: CandleTimeframe): boolean {
+    const opts = this.options();
+    if (!opts || !this.isBlind()) {
+      return false;
+    }
+    const maxDays = opts.maxDurationDaysByTimeframe[timeframe];
+    return maxDays !== undefined && days > maxDays;
+  }
 
   async init(): Promise<void> {
     this.loading.set(true);
