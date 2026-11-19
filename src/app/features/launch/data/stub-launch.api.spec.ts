@@ -65,6 +65,33 @@ describe('StubLaunchApi', () => {
     expect(customRes.accepted).toBe(true);
   });
 
+  it('отклоняет начальный капитал вне 10 000 – 100 000 000 ₽ и с более чем двумя знаками', async () => {
+    const api = new StubLaunchApi();
+    const base = {
+      traderKind: 'human',
+      durationDays: 60,
+      timeframe: '1d',
+      regime: 'medium',
+      startMode: 'random',
+      customStartDate: null,
+      paperCount: 3,
+      paperIds: null,
+    } as const;
+
+    for (const initialCapitalRub of [9_999.99, 100_000_000.01, 1_000.123, Number.NaN]) {
+      const res = await api.startSession({ ...base, initialCapitalRub });
+      expect(res).toMatchObject({
+        accepted: false,
+        reason: 'INVALID_PARAMS',
+        field: 'initialCapitalRub',
+      });
+    }
+    for (const initialCapitalRub of [10_000, 12_345.67, 100_000_000]) {
+      const res = await api.startSession({ ...base, initialCapitalRub });
+      expect(res.accepted).toBe(true);
+    }
+  });
+
   it('отклоняет запуск с TOO_MANY_BARS при превышении 5000 свечей', async () => {
     const api = new StubLaunchApi();
     const res = await api.startSession({

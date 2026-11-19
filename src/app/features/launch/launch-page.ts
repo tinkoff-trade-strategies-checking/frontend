@@ -1,9 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk';
-import { TuiButton, TuiNotification } from '@taiga-ui/core';
-import { TuiBadge, TuiInputDate, TuiSegmented } from '@taiga-ui/kit';
-import { LAUNCH_API, REGIME_HINTS, REGIME_LABELS, TIMEFRAME_LABELS } from './data/launch.models';
+import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented } from '@taiga-ui/kit';
+import {
+  LAUNCH_API,
+  MAX_INITIAL_CAPITAL_RUB,
+  MIN_INITIAL_CAPITAL_RUB,
+  REGIME_HINTS,
+  REGIME_LABELS,
+  TIMEFRAME_LABELS,
+} from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
@@ -23,7 +30,16 @@ function parseIsoDay(isoDate: string): TuiDay | null {
 
 @Component({
   selector: 'app-launch-page',
-  imports: [FormsModule, TuiButton, TuiBadge, TuiInputDate, TuiNotification, TuiSegmented],
+  imports: [
+    FormsModule,
+    TuiButton,
+    TuiBadge,
+    TuiInputDate,
+    TuiInputNumber,
+    TuiNotification,
+    TuiSegmented,
+    TuiTextfield,
+  ],
   providers: [{ provide: LAUNCH_API, useClass: StubLaunchApi }, LaunchStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './launch-page.html',
@@ -36,6 +52,8 @@ export class LaunchPage implements OnInit {
     parseIsoDay(this.store.customStartDate()),
   );
 
+  protected readonly minCapital = MIN_INITIAL_CAPITAL_RUB;
+  protected readonly maxCapital = MAX_INITIAL_CAPITAL_RUB;
   protected readonly timeframeLabels = TIMEFRAME_LABELS;
   protected readonly regimeLabels = REGIME_LABELS;
   protected readonly regimeHints = REGIME_HINTS;
@@ -109,8 +127,9 @@ export class LaunchPage implements OnInit {
     }
   }
 
-  protected capitalIndex(presets: readonly number[], current: number): number {
-    return Math.max(0, presets.indexOf(current));
+  // -1 — своё значение, ни один пресет не выбран.
+  protected capitalIndex(presets: readonly number[], current: number | null): number {
+    return current === null ? -1 : presets.indexOf(current);
   }
 
   protected onCapitalIndexChange(presets: readonly number[], index: number): void {

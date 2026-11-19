@@ -6,6 +6,8 @@ import {
   LaunchCommandResult,
   LaunchCustomPaper,
   LaunchOptions,
+  MAX_INITIAL_CAPITAL_RUB,
+  MIN_INITIAL_CAPITAL_RUB,
   StartSessionCommand,
 } from './launch.models';
 
@@ -76,7 +78,13 @@ export class StubLaunchApi implements LaunchApi {
   }
 
   async startSession(command: StartSessionCommand): Promise<LaunchCommandResult> {
-    if (command.initialCapitalRub <= 0) {
+    const capital = command.initialCapitalRub;
+    if (
+      !Number.isFinite(capital) ||
+      capital < MIN_INITIAL_CAPITAL_RUB ||
+      capital > MAX_INITIAL_CAPITAL_RUB ||
+      Math.abs(capital * 100 - Math.round(capital * 100)) > 1e-6
+    ) {
       return {
         accepted: false,
         reason: 'INVALID_PARAMS',

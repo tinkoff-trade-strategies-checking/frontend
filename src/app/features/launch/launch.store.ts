@@ -6,6 +6,8 @@ import {
   LaunchCustomPaper,
   LaunchOptions,
   MarketRegime,
+  MAX_INITIAL_CAPITAL_RUB,
+  MIN_INITIAL_CAPITAL_RUB,
   SessionDurationDays,
   StartMode,
   TraderKind,
@@ -34,7 +36,21 @@ export class LaunchStore {
   readonly customStartDate = signal('2020-02-26');
   readonly paperCount = signal(3);
   readonly selectedPaperIds = signal<readonly string[]>([]);
-  readonly initialCapitalRub = signal(1_000_000);
+  readonly initialCapitalRub = signal<number | null>(1_000_000);
+
+  readonly capitalError = computed<string | null>(() => {
+    const value = this.initialCapitalRub();
+    if (value === null || !Number.isFinite(value)) {
+      return 'Введите начальный капитал.';
+    }
+    if (value < MIN_INITIAL_CAPITAL_RUB || value > MAX_INITIAL_CAPITAL_RUB) {
+      return 'Начальный капитал — от 10 000 до 100 000 000 ₽.';
+    }
+    if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) {
+      return 'Начальный капитал — не более двух знаков после запятой.';
+    }
+    return null;
+  });
 
   readonly isBlind = computed(() => this.startMode() === 'random');
 
@@ -57,7 +73,14 @@ export class LaunchStore {
 
   readonly submitBlockHint = computed<string | null>(() => {
     const opts = this.options();
-    if (!opts || this.isBlind()) {
+    if (!opts) {
+      return null;
+    }
+    const capitalError = this.capitalError();
+    if (capitalError) {
+      return capitalError;
+    }
+    if (this.isBlind()) {
       return null;
     }
     if (!this.customStartDate().trim()) {
@@ -72,6 +95,9 @@ export class LaunchStore {
   readonly canSubmit = computed(() => {
     const opts = this.options();
     if (!opts) {
+      return false;
+    }
+    if (this.capitalError() !== null) {
       return false;
     }
     if (this.isBlind()) {
@@ -167,7 +193,7 @@ export class LaunchStore {
     this.rejection.set(null);
   }
 
-  setInitialCapital(amountRub: number): void {
+  setInitialCapital(amountRub: number | null): void {
     this.initialCapitalRub.set(amountRub);
     this.rejection.set(null);
   }
@@ -193,7 +219,8 @@ export class LaunchStore {
   }
 
   async launch(): Promise<boolean> {
-    if (this.submitting() || !this.canSubmit()) {
+    const initialCapitalRub = this.initialCapitalRub();
+    if (this.submitting() || !this.canSubmit() || initialCapitalRub === null) {
       return false;
     }
 
@@ -212,7 +239,7 @@ export class LaunchStore {
         customStartDate: blind ? null : this.customStartDate(),
         paperCount: blind ? this.paperCount() : null,
         paperIds: blind ? null : this.selectedPaperIds(),
-        initialCapitalRub: this.initialCapitalRub(),
+        initialCapitalRub,
       });
 
       if (!result.accepted) {

@@ -219,6 +219,22 @@
                   <button type="button">{{ formatRub(preset) }}</button>
                 }
               </tui-segmented>
+              <tui-textfield tuiTextfieldSize="s">
+                <label tuiLabel for="launch-capital">Своё значение, ₽</label>
+                <input
+                  id="launch-capital"
+                  tuiInputNumber
+                  [min]="minCapital"
+                  [max]="maxCapital"
+                  [ngModel]="store.initialCapitalRub()"
+                  (ngModelChange)="store.setInitialCapital($event)"
+                />
+              </tui-textfield>
+              @if (store.capitalError(); as capitalError) {
+                <p class="tui-text_body-s capital-error" role="alert">{{ capitalError }}</p>
+              } @else {
+                <p class="tui-text_body-s muted hint">От 10 000 до 100 000 000 ₽, до 2 знаков.</p>
+              }
             </div>
 
             <div class="kv">
@@ -281,7 +297,9 @@
             </div>
             <div class="kv">
               <span class="muted">Начальный капитал</span>
-              <span class="num">{{ formatRub(store.initialCapitalRub()) }}</span>
+              <span class="num">
+                {{ store.capitalError() ? '—' : formatRub(store.initialCapitalRub() ?? 0) }}
+              </span>
             </div>
             <div class="kv">
               <span class="muted">Фоновый алгоритм</span>

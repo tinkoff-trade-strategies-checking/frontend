@@ -117,6 +117,67 @@ describe('LaunchPage', () => {
     expect(store.customStartDate()).toBe('');
   });
 
+  it('своё значение капитала: ввод в поле меняет store, вне 10 000 – 100 000 000 ₽ блокирует запуск', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const input = root.querySelector<HTMLInputElement>('#launch-capital');
+    expect(input).not.toBeNull();
+
+    const launchButton = (): HTMLButtonElement | undefined =>
+      Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.includes('Запустить'));
+
+    input!.value = '2 500 000';
+    input!.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(store.initialCapitalRub()).toBe(2_500_000);
+    expect(store.capitalError()).toBeNull();
+    expect(launchButton()?.disabled).toBe(false);
+    expect((root.textContent ?? '').replace(/\u00a0/g, ' ')).toContain('2 500 000 ₽');
+
+    store.setInitialCapital(9_999);
+    fixture.detectChanges();
+    expect(store.capitalError()).toContain('от 10 000 до 100 000 000');
+    expect(launchButton()?.disabled).toBe(true);
+
+    store.setInitialCapital(100_000_001);
+    expect(store.canSubmit()).toBe(false);
+
+    store.setInitialCapital(10_000.5);
+    expect(store.capitalError()).toBeNull();
+    store.setInitialCapital(10_000.555);
+    expect(store.capitalError()).toContain('двух знаков');
+
+    store.setInitialCapital(null);
+    fixture.detectChanges();
+    expect(store.canSubmit()).toBe(false);
+
+    store.setInitialCapital(100_000_000);
+    expect(store.canSubmit()).toBe(true);
+    store.setInitialCapital(10_000);
+    expect(store.canSubmit()).toBe(true);
+  });
+
+  it('своё значение капитала уходит в запрос запуска', async () => {
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi.spyOn(stubApi, 'startSession');
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const store = fixture.debugElement.injector.get(LaunchStore);
+
+    store.setInitialCapital(12_345.67);
+    expect(await store.launch()).toBe(true);
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ initialCapitalRub: 12_345.67 }),
+    );
+  });
+
   it('показывает кнопку «Повторить» при ошибке загрузки параметров', async () => {
     vi.spyOn(stubApi, 'getLaunchOptions').mockRejectedValueOnce(new Error('Network error'));
 
