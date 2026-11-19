@@ -44,9 +44,10 @@ export function formatPrice(value: number): string {
   });
 }
 
+/** Рубли — всегда два знака (`decisions.md`, «Деньги и округление»). */
 export function formatRub(value: number, signed = false): string {
   const formatted = Math.abs(value).toLocaleString('ru-RU', {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
   if (signed) {

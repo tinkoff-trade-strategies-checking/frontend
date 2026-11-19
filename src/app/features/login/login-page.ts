@@ -47,14 +47,10 @@ export function safeReturnUrl(value: string | null): string {
             required
             [ngModel]="password()"
             (ngModelChange)="password.set($event)"
+            (keydown.enter)="onEnter($event)"
           />
         </tui-textfield>
-        <button
-          tuiButton
-          type="submit"
-          appearance="primary"
-          [disabled]="submitting() || !email() || !password()"
-        >
+        <button tuiButton type="submit" appearance="primary" [disabled]="submitting()">
           Войти
         </button>
       </form>
@@ -101,8 +97,14 @@ export class LoginPage implements OnInit {
     }
   }
 
+  /** Enter в поле пароля отправляет форму сам, не полагаясь на неявную отправку браузера (автозаполнение). */
+  protected onEnter(event: Event): void {
+    event.preventDefault();
+    void this.submit();
+  }
+
   protected async submit(): Promise<void> {
-    if (this.submitting()) {
+    if (this.submitting() || !this.email() || !this.password()) {
       return;
     }
     this.submitting.set(true);

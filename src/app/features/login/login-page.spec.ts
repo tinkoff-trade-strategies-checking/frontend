@@ -76,6 +76,33 @@ describe('LoginPage', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it('Enter в поле пароля отправляет форму; пустые поля не отправляются', async () => {
+    await setup(false);
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+    controller.expectOne('/api/v1/me').flush({}, { status: 401, statusText: 'Unauthorized' });
+    await fixture.whenStable();
+    const root = fixture.nativeElement as HTMLElement;
+    const email = root.querySelector<HTMLInputElement>('#login-email')!;
+    const password = root.querySelector<HTMLInputElement>('#login-password')!;
+
+    password.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    controller.expectNone('/api/v1/auth/login');
+
+    email.value = 'a@b.c';
+    email.dispatchEvent(new Event('input'));
+    password.value = 'secret';
+    password.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    password.dispatchEvent(enter);
+    expect(enter.defaultPrevented).toBe(true);
+    const req = controller.expectOne('/api/v1/auth/login');
+    expect(req.request.body).toEqual({ email: 'a@b.c', password: 'secret' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    await vi.waitFor(() => controller.expectOne('/api/v1/me').flush({}));
+  });
+
   it('уже авторизован: сразу уходит на /new', async () => {
     const navigate = await setup(false);
     const fixture = TestBed.createComponent(LoginPage);
