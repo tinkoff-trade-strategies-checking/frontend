@@ -9,7 +9,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   paperCount: 'количество бумаг',
   paperIds: 'набор бумаг',
   customStartDate: 'дата начала периода',
-  initialCapitalRub: 'начальный капитал',
+  initialCapital: 'начальный капитал',
 };
 
 export function formatLaunchRejection(

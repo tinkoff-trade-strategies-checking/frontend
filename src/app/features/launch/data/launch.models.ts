@@ -2,6 +2,10 @@ import { InjectionToken } from '@angular/core';
 
 export type TraderKind = 'human';
 
+// Границы своего значения начального капитала (decisions.md, 19.11.2026), до 2 знаков.
+export const MIN_INITIAL_CAPITAL_RUB = 10_000;
+export const MAX_INITIAL_CAPITAL_RUB = 100_000_000;
+
 export type SessionDurationDays = 20 | 60 | 120 | 250;
 
 export type CandleTimeframe = '1m' | '5m' | '10m' | '15m' | '1h' | '1d';
@@ -55,7 +59,8 @@ export interface StartSessionCommand {
   readonly customStartDate: string | null;
   readonly paperCount: number | null;
   readonly paperIds: readonly string[] | null;
-  readonly initialCapitalRub: number;
+  /** Money из контракта (INV-6): десятичная строка рублей, до 2 знаков. */
+  readonly initialCapital: string;
 }
 
 export type LaunchCommandResult =
