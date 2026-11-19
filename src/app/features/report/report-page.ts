@@ -5,11 +5,12 @@ import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
-import { DivergenceType, REPORT_API } from './data/report.models';
+import { DivergenceType, EquityCurvePoint, REPORT_API } from './data/report.models';
 import { StubReportApi } from './data/stub-report.api';
 import {
   DIVERGENCE_TYPE_LABELS,
   formatDeltaBars,
+  formatDrawdownDuration,
   formatPct,
   formatRatio,
   formatRub,
@@ -73,6 +74,7 @@ export class ReportPage implements OnInit {
   protected readonly formatRub = formatRub;
   protected readonly formatRubExact = formatRubExact;
   protected readonly formatDeltaBars = formatDeltaBars;
+  protected readonly formatDrawdownDuration = formatDrawdownDuration;
   protected readonly formatPct = formatPct;
   protected readonly formatRatio = formatRatio;
 
@@ -81,6 +83,17 @@ export class ReportPage implements OnInit {
       const id = params.get('id') ?? 'S-0103';
       void this.store.load(id);
     });
+  }
+
+  protected equityCurveSubtitle(points: readonly EquityCurvePoint[]): string {
+    const parts = ['Вы'];
+    if (points.some((p) => p.algoCapitalRub !== null)) {
+      parts.push('алгоритм');
+    }
+    if (points.some((p) => p.benchmarkCapitalRub !== null)) {
+      parts.push('бенчмарк IMOEX');
+    }
+    return parts.join(', ');
   }
 
   protected tabIndex(current: ReportTab): number {

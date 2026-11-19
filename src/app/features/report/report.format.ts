@@ -78,6 +78,10 @@ export function formatDeltaBars(delta: number): string {
   return 'Δt = 0 бар.';
 }
 
+export function formatDrawdownDuration(days: number | null, steps: number): string {
+  return days === null ? '—' : `${days} дн. (${steps} шаг.)`;
+}
+
 export function formatPct(value: number | null, signed = false): string {
   if (value === null) {
     return '—';
