@@ -62,6 +62,10 @@ export class LaunchPage implements OnInit {
   protected readonly formatDecimalRu = formatDecimalRu;
   protected readonly formatDisplayDate = formatDisplayDate;
 
+  protected limitHint(maxBars: number): string {
+    return `больше ${maxBars.toLocaleString('ru-RU')} свечей`;
+  }
+
   ngOnInit(): void {
     void this.store.init();
   }

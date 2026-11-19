@@ -177,6 +177,58 @@ describe('LaunchPage', () => {
     expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ initialCapital: '12345.67' }));
   });
 
+  it('выключает пары шаг × длительность сверх лимита свечей и подсказывает «больше 5 000 свечей»', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const button = (label: string): HTMLButtonElement => {
+      const btn = Array.from(root.querySelectorAll('button')).find(
+        (b) => b.textContent?.trim() === label,
+      );
+      if (!btn) {
+        throw new Error(`Нет кнопки ${label}`);
+      }
+      return btn;
+    };
+    const launchBtn = (): HTMLButtonElement => button('Запустить');
+
+    // 60 дн. при шаге 1 д: максимум шагов 1 мин и 5 мин меньше 60 дней — выключены.
+    expect(button('1 мин').disabled).toBe(true);
+    expect(button('5 мин').disabled).toBe(true);
+    expect(button('10 мин').disabled).toBe(false);
+    expect(button('1 д').disabled).toBe(false);
+    expect(button('1 мин').title.replace(/\u00a0/g, ' ')).toBe('больше 5 000 свечей');
+    expect(button('1 д').title).toBe('');
+
+    // Шаг 5 мин (максимум 30 дн.) при 20 дн.: длительности больше 30 выключены.
+    store.setDuration(20);
+    store.setTimeframe('5m');
+    fixture.detectChanges();
+    expect(button('20 дн.').disabled).toBe(false);
+    expect(button('60 дн.').disabled).toBe(true);
+    expect(button('250 дн.').disabled).toBe(true);
+    expect(launchBtn().disabled).toBe(false);
+
+    // Своя дата: лимит консервативен, ничего не выключаем — решает 422 TOO_MANY_BARS.
+    await store.setStartMode('custom');
+    fixture.detectChanges();
+    expect(button('60 дн.').disabled).toBe(false);
+    expect(button('1 мин').disabled).toBe(false);
+
+    // Выбрана недопустимая пара при своей дате, затем возврат к случайной: запуск заблокирован.
+    store.setDuration(250);
+    store.setTimeframe('1m');
+    await store.setStartMode('random');
+    fixture.detectChanges();
+    expect(store.pairExceedsLimit()).toBe(true);
+    expect(launchBtn().disabled).toBe(true);
+    expect(root.textContent ?? '').toContain('Выбранная пара шаг × длительность');
+  });
+
   it('показывает кнопку «Повторить» при ошибке загрузки параметров', async () => {
     vi.spyOn(stubApi, 'getLaunchOptions').mockRejectedValueOnce(new Error('Network error'));
 

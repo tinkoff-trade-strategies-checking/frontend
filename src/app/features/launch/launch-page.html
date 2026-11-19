@@ -57,7 +57,14 @@
                 (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
               >
                 @for (days of opts.durations; track days) {
-                  <button type="button">{{ days }} дн.</button>
+                  @let off = store.isPairDisabled(days, store.timeframe());
+                  <button
+                    type="button"
+                    [disabled]="off"
+                    [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
+                  >
+                    {{ days }} дн.
+                  </button>
                 }
               </tui-segmented>
             </div>
@@ -70,14 +77,22 @@
                 (activeItemIndexChange)="onTimeframeIndexChange(opts.availableTimeframes, $event)"
               >
                 @for (tf of opts.availableTimeframes; track tf) {
-                  <button type="button">{{ timeframeLabels[tf] }}</button>
+                  @let off = store.isPairDisabled(store.durationDays(), tf);
+                  <button
+                    type="button"
+                    [disabled]="off"
+                    [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
+                  >
+                    {{ timeframeLabels[tf] }}
+                  </button>
                 }
               </tui-segmented>
             </div>
 
             <p class="tui-text_body-s muted hint">
               Доступные шаги зависят от архива. Для ручной сессии действует лимит
-              {{ opts.executionRules.maxBars.toLocaleString('ru-RU') }} свечей.
+              {{ opts.executionRules.maxBars.toLocaleString('ru-RU') }} свечей на бумагу: пары «шаг
+              × длительность», которые его всегда превышают, выключены.
             </p>
           </div>
         </section>
