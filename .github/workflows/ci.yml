@@ -59,3 +59,29 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # Ссылки на тесты в documentation/invariants.md: переименованный тест frontend роняет PR (home#29).
+  invariants:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: frontend
+      - uses: actions/checkout@v4
+        with:
+          repository: tinkoff-trade-strategies-checking/documentation
+          path: documentation
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          repository: tinkoff-trade-strategies-checking/core
+          path: core
+          fetch-depth: 1
+      - name: Проверка ссылок invariants.md
+        run: python3 documentation/scripts/check-invariants.py --core core --frontend frontend
+
+  # Размер PR в режиме наблюдения: не падает, только предупреждение (home#29).
+  pr-size:
+    if: github.event_name == 'pull_request'
+    uses: tinkoff-trade-strategies-checking/.github/.github/workflows/pr-size.yml@main
