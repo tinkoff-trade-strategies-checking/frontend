@@ -13,6 +13,9 @@ const LOCAL = '../backend/api/openapi.yaml';
 const REMOTE =
   'https://raw.githubusercontent.com/tinkoff-trade-strategies-checking/backend/main/api/openapi.yaml';
 
+// Концы строк не сравниваем: на Windows рабочая копия backend с CRLF, GitHub отдаёт LF.
+const lf = (text) => text.replaceAll('\r\n', '\n');
+
 function fail(message) {
   console.error(message);
   process.exit(1);
@@ -48,7 +51,7 @@ if (command === 'sync') {
   if (text === null) {
     if (existsSync(COPY)) fail(`${COPY} есть, а в backend контракта нет.`);
     console.warn('Ни в backend, ни во frontend нет api/openapi.yaml — пропускаю.');
-  } else if (!existsSync(COPY) || readFileSync(COPY, 'utf8') !== text) {
+  } else if (!existsSync(COPY) || lf(readFileSync(COPY, 'utf8')) !== lf(text)) {
     fail(`${COPY} расходится с backend — выполни: npm run api:sync`);
   }
 } else if (command === 'gen') {
