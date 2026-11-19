@@ -39,8 +39,7 @@
               <button type="button">Торгую сам</button>
             </tui-segmented>
             <p class="tui-text_body-s muted hint">
-              Ручная сессия в плеере арены. Прогон алгоритмов из мастерской появится после
-              подключения DSL.
+              Ручная сессия в плеере арены. Запуск алгоритмов из мастерской пока недоступен.
             </p>
           </div>
         </section>
@@ -124,16 +123,18 @@
               </p>
             } @else {
               <div class="custom-date-row">
-                <tui-textfield tuiTextfieldSize="s" class="date-field">
-                  <label tuiLabel for="launch-custom-date">Дата начала</label>
-                  <input
-                    id="launch-custom-date"
-                    tuiTextfield
-                    type="date"
-                    [ngModel]="store.customStartDate()"
-                    (ngModelChange)="store.setCustomStartDate($event)"
-                  />
-                </tui-textfield>
+                <label tuiLabel for="launch-custom-date" class="date-field">
+                  Дата начала
+                  <tui-textfield tuiTextfieldSize="s">
+                    <input
+                      id="launch-custom-date"
+                      tuiInputDate
+                      [ngModel]="customStartDay()"
+                      (ngModelChange)="onCustomStartDayChange($event)"
+                    />
+                    <tui-calendar *tuiDropdown />
+                  </tui-textfield>
+                </label>
               </div>
               <div tuiNotification appearance="info" size="s">
                 Неслепая сессия: период и тикеры бумаг видны сразу и на арене, и в отчёте.
@@ -226,7 +227,7 @@
             </div>
             <p class="tui-text_body-s muted hint">
               Фоновый алгоритм торгует на том же отрезке с тем же капиталом и правилами исполнения.
-              Выбор алгоритма из каталога появится позже.
+              Выбор алгоритма из каталога пока недоступен.
             </p>
           </div>
         </section>

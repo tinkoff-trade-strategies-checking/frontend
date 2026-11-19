@@ -76,6 +76,21 @@ describe('ArenaPage', () => {
     expect(optionTexts).toContain('OCO: стоп + тейк');
     expect(optionTexts).not.toContain('market');
 
+    // Подписи полей формы заявки расположены снаружи tui-textfield (не обрезаются у size="s").
+    const ticketLabels = Array.from(
+      root.querySelectorAll('app-arena-order-ticket label[tuiLabel]'),
+    );
+    expect(ticketLabels.length).toBeGreaterThanOrEqual(3);
+    for (const label of ticketLabels) {
+      expect(label.closest('tui-textfield')).toBeNull();
+      expect(label.querySelector('tui-textfield')).not.toBeNull();
+      expect(label.getAttribute('data-orientation')).toBe('vertical');
+    }
+    const labelTexts = ticketLabels.map((l) => l.textContent ?? '');
+    expect(labelTexts.some((t) => t.includes('Бумага'))).toBe(true);
+    expect(labelTexts.some((t) => t.includes('Тип заявки'))).toBe(true);
+    expect(labelTexts.some((t) => t.includes('Количество, лотов'))).toBe(true);
+
     // INV-7: в слепом режиме нет рублёвых сумм и тикеров.
     expect(text).not.toContain('₽');
     expect(text).not.toContain('SBER');

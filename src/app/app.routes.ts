@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'arena' },
@@ -22,7 +23,7 @@ export const routes: Routes = [
     title: 'Мастерская',
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
-  { path: 'report', pathMatch: 'full', redirectTo: 'report/S-0103' },
+  { path: 'report', pathMatch: 'full', redirectTo: `report/${DEFAULT_REPORT_SESSION_ID}` },
   {
     path: 'report/:id',
     title: 'Отчёт',

@@ -107,7 +107,7 @@ describe('ReportPage', () => {
     expect(text).toContain('4,21');
     expect(text).toContain('rf = RUONIA');
     expect(text).toContain('+7,77 %');
-    expect(text).toContain('после подключения API');
+    expect(text).toContain('Выгрузка отчёта пока недоступна');
 
     const buttons = Array.from(root.querySelectorAll('button'));
     const xlsxBtn = buttons.find((b) => b.textContent?.includes('Скачать XLSX'));

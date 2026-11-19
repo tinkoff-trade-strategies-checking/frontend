@@ -1,15 +1,29 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { TuiDay } from '@taiga-ui/cdk';
+import { TuiButton, TuiNotification } from '@taiga-ui/core';
+import { TuiBadge, TuiInputDate, TuiSegmented } from '@taiga-ui/kit';
 import { LAUNCH_API, REGIME_HINTS, REGIME_LABELS, TIMEFRAME_LABELS } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIsoDay(isoDate: string): TuiDay | null {
+  if (!ISO_DATE_RE.test(isoDate)) {
+    return null;
+  }
+  try {
+    return TuiDay.jsonParse(isoDate);
+  } catch {
+    return null;
+  }
+}
+
 @Component({
   selector: 'app-launch-page',
-  imports: [FormsModule, TuiButton, TuiBadge, TuiNotification, TuiSegmented, TuiTextfield],
+  imports: [FormsModule, TuiButton, TuiBadge, TuiInputDate, TuiNotification, TuiSegmented],
   providers: [{ provide: LAUNCH_API, useClass: StubLaunchApi }, LaunchStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './launch-page.html',
@@ -17,6 +31,10 @@ import { LaunchStore } from './launch.store';
 })
 export class LaunchPage implements OnInit {
   protected readonly store = inject(LaunchStore);
+
+  protected readonly customStartDay = computed<TuiDay | null>(() =>
+    parseIsoDay(this.store.customStartDate()),
+  );
 
   protected readonly timeframeLabels = TIMEFRAME_LABELS;
   protected readonly regimeLabels = REGIME_LABELS;
@@ -74,6 +92,10 @@ export class LaunchPage implements OnInit {
 
   protected onStartModeIndexChange(index: number): void {
     void this.store.setStartMode(index === 1 ? 'custom' : 'random');
+  }
+
+  protected onCustomStartDayChange(day: TuiDay | null): void {
+    this.store.setCustomStartDate(day ? day.toJSON() : '');
   }
 
   protected paperCountIndex(counts: readonly number[], current: number): number {

@@ -33,8 +33,50 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
 @Component({
   selector: 'app-report-equity-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div #container class="chart-host" aria-label="Кривая капитала"></div>`,
+  template: `
+    <div class="chart-legend tui-text_body-xs">
+      <span class="legend-item"><span class="swatch swatch-human"></span>Вы</span>
+      <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм</span>
+      <span class="legend-item"><span class="swatch swatch-bench"></span>IMOEX</span>
+    </div>
+    <div #container class="chart-host" aria-label="Кривая капитала"></div>
+  `,
   styles: `
+    .chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 0 0.5rem 0.375rem;
+      color: var(--tui-text-secondary);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 1rem;
+      height: 0;
+      border-top: 2px solid currentColor;
+    }
+
+    .swatch-human {
+      border-top-color: var(--tui-text-action);
+    }
+
+    .swatch-algo {
+      border-top-color: var(--tui-text-positive);
+    }
+
+    .swatch-bench {
+      border-top-color: var(--tui-text-tertiary, var(--tui-text-secondary));
+      border-top-style: dashed;
+    }
+
     .chart-host {
       width: 100%;
       height: 260px;
@@ -104,20 +146,23 @@ export class ReportEquityChart {
     this.humanSeries = this.chart.addSeries(LineSeries, {
       color: humanColor,
       lineWidth: 2,
-      title: 'Вы',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     this.algoSeries = this.chart.addSeries(LineSeries, {
       color: algoColor,
       lineWidth: 2,
-      title: 'Алгоритм',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     this.benchSeries = this.chart.addSeries(LineSeries, {
       color: benchColor,
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
-      title: 'IMOEX',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
   }
 
@@ -145,6 +190,13 @@ export class ReportEquityChart {
     this.humanSeries.setData(humanData);
     this.algoSeries.setData(algoData);
     this.benchSeries.setData(benchData);
-    this.chart.timeScale().fitContent();
+    if (pts.length > 0) {
+      this.chart.timeScale().setVisibleLogicalRange({
+        from: -2,
+        to: pts.length + 0.5,
+      });
+    } else {
+      this.chart.timeScale().fitContent();
+    }
   }
 }

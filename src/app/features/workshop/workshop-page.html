@@ -63,20 +63,22 @@
         </div>
 
         <div class="filter-group author-group">
-          <tui-textfield
-            tuiTextfieldSize="s"
-            [tuiTextfieldCleaner]="false"
-            [stringify]="authorStringify"
-          >
-            <label tuiLabel for="workshop-author-filter">Автор</label>
-            <select
-              id="workshop-author-filter"
-              tuiSelect
-              [items]="authorOptions()"
-              [ngModel]="store.authorId()"
-              (ngModelChange)="store.setAuthor($event ?? null)"
-            ></select>
-          </tui-textfield>
+          <label tuiLabel for="workshop-author-filter">
+            Автор
+            <tui-textfield
+              tuiTextfieldSize="s"
+              [tuiTextfieldCleaner]="false"
+              [stringify]="authorStringify"
+            >
+              <select
+                id="workshop-author-filter"
+                tuiSelect
+                [items]="authorOptions()"
+                [ngModel]="store.authorId()"
+                (ngModelChange)="store.setAuthor($event ?? null)"
+              ></select>
+            </tui-textfield>
+          </label>
         </div>
 
         <div class="filter-group search-group">
@@ -146,9 +148,9 @@
             <thead>
               <tr>
                 <th>Алгоритм</th>
-                <th>Автор</th>
-                <th>Версия</th>
-                <th>Публикация</th>
+                <th class="col-secondary">Автор</th>
+                <th class="col-secondary">Версия</th>
+                <th class="col-secondary">Публикация</th>
                 <th>Линтер</th>
                 <th class="actions-col">Карточка</th>
               </tr>
@@ -171,9 +173,11 @@
                       <p class="tui-text_body-xs muted desc-preview">{{ item.description }}</p>
                     </div>
                   </td>
-                  <td class="nowrap">{{ item.author }}</td>
-                  <td class="nowrap num">v{{ item.latestVersion }}</td>
-                  <td class="date-col muted">{{ formatDateTime(item.publishedAt) }}</td>
+                  <td class="nowrap col-secondary">{{ item.author }}</td>
+                  <td class="nowrap num col-secondary">v{{ item.latestVersion }}</td>
+                  <td class="date-col muted col-secondary">
+                    {{ formatDateTime(item.publishedAt) }}
+                  </td>
                   <td>
                     @if (item.linterWarnings.length === 0) {
                       <span tuiBadge size="s" appearance="positive">Чисто</span>
@@ -328,7 +332,7 @@
             </div>
 
             <p class="tui-text_body-xs muted">
-              Действия «Форк» и «Запустить прогон» будут доступны после решения по DSL.
+              Действия «Форк» и «Запустить прогон» пока недоступны.
             </p>
 
             <section class="detail-section">
@@ -347,7 +351,7 @@
                 <p class="tui-text_body-s muted">Предупреждений линтера нет.</p>
               } @else {
                 <p class="tui-text_body-xs muted">
-                  Коды предупреждений приведены как пример до решения по DSL.
+                  Предупреждения линтера приведены как ознакомительный пример.
                 </p>
                 <ul class="warnings-list">
                   @for (warn of algo.linterWarnings; track warn.code + '-' + warn.line) {

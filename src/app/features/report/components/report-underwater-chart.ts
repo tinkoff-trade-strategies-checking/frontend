@@ -34,8 +34,44 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
 @Component({
   selector: 'app-report-underwater-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div #container class="chart-host" aria-label="Underwater-просадка"></div>`,
+  template: `
+    <div class="chart-legend tui-text_body-xs">
+      <span class="legend-item"><span class="swatch swatch-human"></span>Вы, %</span>
+      <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм, %</span>
+    </div>
+    <div #container class="chart-host" aria-label="Underwater-просадка"></div>
+  `,
   styles: `
+    .chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 0 0.5rem 0.375rem;
+      color: var(--tui-text-secondary);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 1rem;
+      height: 0;
+      border-top: 2px solid currentColor;
+    }
+
+    .swatch-human {
+      border-top-color: var(--tui-text-negative);
+    }
+
+    .swatch-algo {
+      border-top-color: var(--tui-text-action);
+    }
+
     .chart-host {
       width: 100%;
       height: 200px;
@@ -107,13 +143,15 @@ export class ReportUnderwaterChart {
       topColor: fillBg,
       bottomColor: 'transparent',
       lineWidth: 2,
-      title: 'Вы, %',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
 
     this.algoSeries = this.chart.addSeries(LineSeries, {
       color: algoColor,
       lineWidth: 2,
-      title: 'Алгоритм, %',
+      lastValueVisible: false,
+      priceLineVisible: false,
     });
   }
 
@@ -136,6 +174,13 @@ export class ReportUnderwaterChart {
 
     this.humanSeries.setData(humanData);
     this.algoSeries.setData(algoData);
-    this.chart.timeScale().fitContent();
+    if (pts.length > 0) {
+      this.chart.timeScale().setVisibleLogicalRange({
+        from: -2,
+        to: pts.length + 0.5,
+      });
+    } else {
+      this.chart.timeScale().fitContent();
+    }
   }
 }
