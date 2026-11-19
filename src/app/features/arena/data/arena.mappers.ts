@@ -190,7 +190,7 @@ function mapStat(stat: PaperStat, fallbackPrice: number): ArenaPaperStat {
   };
 }
 
-/** Номер события потока: строка `eventId`/`id:` или число; не число — `null`. */
+/** Номер события потока: строка `eventId`/`id:` или число (`"0"` — событий ещё не было); не число — `null`. */
 export function parseEventId(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -234,7 +234,7 @@ export function mapSnapshot(snapshot: Snapshot): ArenaSnapshot {
     portfolio: mapPortfolio(snapshot.portfolio),
     orders: (snapshot.orders as (BlindOrder | OpenOrder)[]).map(mapOrder),
     fills: (snapshot.fills as (BlindFill | OpenFill)[]).map(mapFill),
-    lastEventId: parseEventId((snapshot as { lastEventId?: string | number | null }).lastEventId),
+    lastEventId: parseEventId(snapshot.lastEventId),
     playing: snapshot.playing ?? undefined,
     speed: (snapshot.speed ?? undefined) as ArenaSpeed | undefined,
   };

@@ -31,6 +31,7 @@ function blindSnapshot(overrides: Record<string, unknown> = {}) {
     finished: false,
     playing: true,
     speed: 5,
+    lastEventId: '0',
     papers: [
       {
         paperIndex: 2,
@@ -263,10 +264,62 @@ describe('HttpArenaApi', () => {
     );
   });
 
-  it('снимок передаёт lastEventId (null, пока сервер не отдаёт поле)', async () => {
-    expect((await load()).lastEventId).toBeNull();
-    const snap = await load(blindSnapshot({ lastEventId: '17' }));
-    expect(snap.lastEventId).toBe(17);
+  it('снимок передаёт lastEventId: строка, 0 — событий ещё не было, null — снимок воспроизведения', async () => {
+    expect((await load()).lastEventId).toBe(0);
+    expect((await load(blindSnapshot({ lastEventId: '17' }))).lastEventId).toBe(17);
+    expect((await load(blindSnapshot({ lastEventId: null }))).lastEventId).toBeNull();
+  });
+
+  it('завершённая слепая сессия приходит раскрытым снимком: тикеры и даты видны (INV-7 снят)', async () => {
+    const snap = await load({
+      ...blindSnapshot({ finished: true, playing: false }),
+      mode: 'OPEN',
+      papers: [
+        {
+          id: PAPER,
+          instrumentIndex: 2,
+          label: 'Бумага A',
+          sector: 'IT',
+          ticker: 'YDEX',
+          name: 'Яндекс',
+          lotSize: 1,
+          candles: [
+            {
+              step: 0,
+              day: 1,
+              candleInDay: 1,
+              openedAt: '2020-02-26T07:00:00Z',
+              open: '100',
+              high: '101',
+              low: '99',
+              close: '100',
+              volume: 10,
+              afterHalt: false,
+            },
+          ],
+          stat: { changePct: '0', lastPrice: '100' },
+        },
+      ],
+      portfolio: {
+        mode: 'OPEN',
+        equityPct: '100',
+        cashPct: '100',
+        investedPct: '0',
+        pnlPct: '0',
+        costsPct: '0',
+        equity: '1000000.00',
+        cash: '1000000.00',
+        invested: '0.00',
+        pnl: '0.00',
+        costs: '0.00',
+        positions: [],
+      },
+    });
+    expect(snap.finished).toBe(true);
+    expect(snap.blind).toBe(false);
+    expect(snap.papers[0]).toMatchObject({ id: PAPER, label: 'YDEX' });
+    expect(snap.papers[0].candles[0].fullDateLabel).toBe('26.02.2020 10:00');
+    expect(snap.portfolio.equityRub).toBe(1000000);
   });
 
   it('повтор команды после обрыва сети идёт с тем же Idempotency-Key', async () => {
