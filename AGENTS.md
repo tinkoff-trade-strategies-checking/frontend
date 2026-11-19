@@ -21,7 +21,7 @@ npm run api:sync             # скопировать контракт в api/op
 npm run api:check            # копия совпадает с backend на GitHub (main) — как в CI
 ```
 
-CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джоба `e2e` теперь ОБЯЗАТЕЛЬНА в ruleset `main`.
+CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джобы `e2e` и `invariants` (ссылки `documentation/invariants.md` на тесты frontend и core — `check-invariants.py`) обязательны в ruleset `main`; `pr-size` — размер PR в режиме наблюдения, только предупреждение (общий workflow из `.github`).
 
 ## Структура
 
