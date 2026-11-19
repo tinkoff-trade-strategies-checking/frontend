@@ -11,6 +11,7 @@ Node 22 LTS (`>=22.22.3`, этого требует Angular 22 CLI), npm 11 (`pa
 ```sh
 npx -y npm@11.21.2 install   # зависимости
 npm start                    # генерация клиента API + dev-сервер на настоящем backend (прокси /api → localhost:8080, proxy.conf.json), http://localhost:4200
+npm run start:local          # настоящий режим против локального backend (прокси /api → localhost:${BACKEND_PORT:-8080}, proxy.conf.js)
 npm run start:stub           # то же на заглушках, без backend (и без входа)
 npm run lint                 # ESLint (angular-eslint)
 npm run format               # Prettier — исправить формат; format:check — проверить
@@ -67,3 +68,7 @@ CI (`.github/workflows/ci.yml`): формат, линтер, сверка коп
 ## Когда обновлять документы
 
 Общая таблица — `../home/workflow.md`, «Когда обновлять документы». Для frontend: новая команда или скрипт → «Команды»; новая фича, общий слой, папка → «Структура»; новая библиотека → «Стандарты» и `decisions.md` «Архитектура».
+
+## Локальный стенд
+
+Настоящий режим против backend на своей машине: поднять backend и его зависимости скриптом `../backend/deploy/dev-up.sh` (backend#45; пока скрипта в `main` нет — см. `../backend/README.md`), затем `npm run start:local`. Прокси (`proxy.conf.js`) отправляет `/api` на `http://localhost:8080`; другой порт — переменная `BACKEND_PORT` (`BACKEND_PORT=18080 npm run start:local`). Вход — пользователем из сидов backend; без backend — `npm run start:stub`.
