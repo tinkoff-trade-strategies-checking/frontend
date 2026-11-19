@@ -206,7 +206,9 @@ paths:
         При `action: step` дополнительно возвращает `stepResult` (и публикует событие `step` в SSE).
         `speed` обязателен при `action: speed`; при остальных действиях его нет или он `null` (число — 400).
         `Idempotency-Key` защищает `step` от двойного шага при повторе после обрыва сети.
-        409 с кодом `PLAYER_STATE_CONFLICT`: `step` во время `play`, `play` на последнем шаге, `step` на последнем шаге.
+        409 с кодом `PLAYER_STATE_CONFLICT`: `step` во время `play`, `play` на последнем шаге, `step` на последнем шаге
+        (защитная проверка: пройдя последний шаг, сессия завершается, и дальше любая команда — 409 `SESSION_NOT_ACTIVE`).
+        `pause`, `speed` и `play` не обращаются к воркеру (кроме самой первой команды сессии), поэтому остановить время можно и при сбое воркера.
         Изменение состояния плеера публикуется событием `player`.
       security:
         - sessionCookie: []
@@ -249,6 +251,9 @@ paths:
         Строка `id:` равна `eventId` и монотонно возрастает в рамках сессии: по ней клиент сопоставляет
         снимок (`step`) с догоняющими событиями и убирает дубли. Смена состояния плеера (play, пауза,
         скорость) публикуется событием `player`, так вторая вкладка узнаёт о ней без снимка.
+        На скоростях ×10 и ×100 за такт часов (не чаще 200 мс) проходит несколько свечей: событие `step` одно на такт,
+        `result.bars` содержит все свечи пачки, а `step` — последний шаг. Событие никогда не опережает курсор сессии (INV-1).
+        События завершённой сессии хранятся сутки.
       parameters:
         - $ref: '#/components/parameters/SessionId'
         - name: Last-Event-ID
@@ -1025,7 +1030,7 @@ components:
         day: { type: integer }
         finished: { type: boolean }
     BlindStepResult:
-      description: 'Результат шага слепой сессии; словари `bars` и `paperStats` — по `paperIndex` (строка из цифр)'
+      description: 'Результат шага слепой сессии; словари `bars` и `paperStats` — по `paperIndex` (строка из цифр). `bars` — массив свечей пачки шагов `(предыдущий шаг; step]` по бумаге (на быстрых скоростях за такт проходит несколько свечей), шаги по возрастанию; у бумаги без свечи в пачке записи нет'
       allOf:
         - $ref: '#/components/schemas/StepResultBase'
         - type: object
@@ -1035,7 +1040,10 @@ components:
             bars:
               type: object
               propertyNames: { pattern: '^\d+$' }
-              additionalProperties: { $ref: '#/components/schemas/BlindCandle' }
+              additionalProperties:
+                type: array
+                minItems: 1
+                items: { $ref: '#/components/schemas/BlindCandle' }
             paperStats:
               type: object
               propertyNames: { pattern: '^\d+$' }
@@ -1045,7 +1053,7 @@ components:
             orders: { type: array, items: { $ref: '#/components/schemas/BlindOrder' } }
       unevaluatedProperties: false
     OpenStepResult:
-      description: 'Результат шага раскрытой сессии; словари `bars` и `paperStats` — по `paperId` из каталога'
+      description: 'Результат шага раскрытой сессии; словари `bars` и `paperStats` — по `paperId` из каталога. `bars` — массив свечей пачки шагов `(предыдущий шаг; step]` по бумаге, шаги по возрастанию; у бумаги без свечи в пачке записи нет'
       allOf:
         - $ref: '#/components/schemas/StepResultBase'
         - type: object
@@ -1055,7 +1063,10 @@ components:
             bars:
               type: object
               propertyNames: { format: uuid }
-              additionalProperties: { $ref: '#/components/schemas/OpenCandle' }
+              additionalProperties:
+                type: array
+                minItems: 1
+                items: { $ref: '#/components/schemas/OpenCandle' }
             paperStats:
               type: object
               propertyNames: { format: uuid }
@@ -1427,7 +1438,7 @@ components:
       properties:
         type: { type: string, const: paused }
         eventId: { type: string, description: 'Равен строке `id:` SSE; монотонен в рамках сессии' }
-        reason: { type: string, enum: [user, disconnect, worker_failure] }
+        reason: { type: string, enum: [user, disconnect, worker_failure, restart], description: 'Причина паузы: команда пользователя, нет подписчиков, сбой воркера в такте, перезапуск сервера' }
     PlayerEvent:
       type: object
       unevaluatedProperties: false
@@ -1464,13 +1475,14 @@ components:
     ReplayMeta:
       type: object
       description: Только для раскрытой (завершённой) сессии, поэтому период допустим
-      required: [sessionId, blind, period, regime, totalSteps, totalDays]
+      required: [sessionId, blind, period, regime, totalSteps, lastStep, totalDays]
       properties:
         sessionId: { $ref: '#/components/schemas/Uuid' }
         blind: { type: boolean }
         period: { $ref: '#/components/schemas/Period' }
         regime: { $ref: '#/components/schemas/Regime' }
         totalSteps: { type: integer }
+        lastStep: { type: integer, description: 'Итоговый шаг: у досрочно завершённой и обанкротившейся сессии меньше `totalSteps`, дальше него воспроизведение не идёт' }
         totalDays: { type: integer }
     ReplayReady:
       type: object
@@ -1530,7 +1542,7 @@ components:
       type: object
       required: [total, commission, exchangeFee, spread, slippage]
       properties:
-        total: { $ref: '#/components/schemas/Money' }
+        total: { $ref: '#/components/schemas/MoneyOrNull', description: 'Сумму издержек считает core (core#54); null, пока core не отдаёт' }
         commission: { $ref: '#/components/schemas/Money' }
         exchangeFee: { $ref: '#/components/schemas/Money' }
         spread: { $ref: '#/components/schemas/Money' }
@@ -1597,7 +1609,7 @@ components:
         step: { type: integer }
         date: { type: string, format: date-time }
         humanCapital: { $ref: '#/components/schemas/Money' }
-        algoCapital: { $ref: '#/components/schemas/Money' }
+        algoCapital: { $ref: '#/components/schemas/MoneyOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         benchmarkCapital: { $ref: '#/components/schemas/MoneyOrNull' }
     UnderwaterPoint:
       type: object
@@ -1700,7 +1712,7 @@ components:
         orderType: { $ref: '#/components/schemas/OrderLegType' }
         lots: { type: integer }
         price: { $ref: '#/components/schemas/Price' }
-        cost: { $ref: '#/components/schemas/Money' }
+        cost: { $ref: '#/components/schemas/MoneyOrNull', description: 'Общие издержки исполнения считает core (core#54); null, пока core не отдаёт' }
         partial: { type: boolean }
     SessionReport:
       type: object
@@ -1716,17 +1728,17 @@ components:
         timeframe: { $ref: '#/components/schemas/Timeframe' }
         regime: { $ref: '#/components/schemas/Regime' }
         createdAt: { type: string, format: date-time }
-        backgroundAlgorithmName: { type: string }
+        backgroundAlgorithmName: { type: [string, 'null'], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         period: { $ref: '#/components/schemas/Period' }
         papers: { type: array, items: { $ref: '#/components/schemas/PaperReveal' } }
         humanMetrics: { $ref: '#/components/schemas/ReportMetrics' }
-        algoMetrics: { $ref: '#/components/schemas/ReportMetrics' }
-        comparison: { $ref: '#/components/schemas/Comparison' }
+        algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         equityCurve: { type: array, items: { $ref: '#/components/schemas/EquityPoint' } }
-        underwaterCurve: { type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' } }
-        divergenceSummary: { $ref: '#/components/schemas/DivergenceSummary' }
-        divergences: { type: array, items: { $ref: '#/components/schemas/Divergence' } }
-        reverseCheckTrades: { type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }
+        underwaterCurve: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' } }, { type: 'null' }], description: 'Считает core (core#54); null, пока core не отдаёт' }
+        divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
         roundTrips: { type: array, items: { $ref: '#/components/schemas/RoundTrip' } }
         fills: { type: array, items: { $ref: '#/components/schemas/ReportFill' } }
     ReportReady:
