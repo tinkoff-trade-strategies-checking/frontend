@@ -4,6 +4,8 @@
   "scripts": {
     "prestart": "npm run api:gen",
     "start": "ng serve",
+    "prestart:local": "npm run api:gen",
+    "start:local": "ng serve",
     "prestart:stub": "npm run api:gen",
     "start:stub": "ng serve --configuration development-stub",
     "build": "npm run api:gen && ng build",
