@@ -144,6 +144,13 @@
         </div>
       </header>
 
+      @if ((rep.humanMetrics.stopTakeSameBarCount ?? 0) > 0) {
+        <div tuiNotification appearance="warning" size="s" class="same-bar-warning">
+          В {{ rep.humanMetrics.stopTakeSameBarCount }} случаях стоп и тейк сработали на одном баре
+          — исполнение пессимистичное: сначала стоп, сделка помечена.
+        </div>
+      }
+
       <section class="panel">
         <div class="panel-header">
           <h2 class="tui-text_h6">{{ rep.blind ? 'Период раскрыт' : 'Период и бумаги' }}</h2>
@@ -795,6 +802,56 @@
                 </tbody>
               </table>
             </div>
+
+            @if (rep.roundTrips; as trips) {
+              <h3 class="tui-text_h6">Результаты сделок</h3>
+              <p class="tui-text_body-s muted">
+                Покупки сопоставлены с продажами по FIFO; издержки распределены по парам с
+                округлением, поэтому сумма может отличаться от общего результата на копейки.
+              </p>
+              @if (trips.length === 0) {
+                <div tuiNotification appearance="info" size="s">Закрытых сделок нет.</div>
+              } @else {
+                <div class="table-scroll">
+                  <table class="data-table round-trips">
+                    <thead>
+                      <tr>
+                        <th>Бумага</th>
+                        <th>Вход</th>
+                        <th>Выход</th>
+                        <th class="num">Лоты</th>
+                        <th class="num">Цена входа</th>
+                        <th class="num">Цена выхода</th>
+                        <th class="num">Результат до издержек</th>
+                        <th class="num">Издержки</th>
+                        <th class="num">Результат</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (trip of trips; track $index) {
+                        <tr>
+                          <td>{{ trip.paperTicker }}</td>
+                          <td>{{ trip.entryDateLabel }}</td>
+                          <td>{{ trip.exitDateLabel }}</td>
+                          <td class="num">{{ trip.lots }}</td>
+                          <td class="num">{{ formatRub(trip.entryPriceRub) }}</td>
+                          <td class="num">{{ formatRub(trip.exitPriceRub) }}</td>
+                          <td class="num">{{ formatRub(trip.grossPnlRub, true) }}</td>
+                          <td class="num">{{ formatRub(trip.costsRub) }}</td>
+                          <td
+                            class="num"
+                            [class.pos]="trip.netPnlRub > 0"
+                            [class.neg]="trip.netPnlRub < 0"
+                          >
+                            {{ formatRub(trip.netPnlRub, true) }}
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            }
           </div>
         }
       </section>
