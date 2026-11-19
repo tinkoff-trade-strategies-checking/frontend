@@ -228,7 +228,7 @@ test('отчёт /report/S-0103 раскрывает период и тикер�
   await page.goto('/report/S-0103');
 
   await expect(page.getByText('Период раскрыт')).toBeVisible();
-  await expect(page.getByText('26.02.2020 — 21.05.2020')).toBeVisible();
+  await expect(page.locator('.reveal-card').getByText('26.02.2020 — 21.05.2020')).toBeVisible();
   await expect(page.getByText('SBER', { exact: true })).toBeVisible();
   await expect(page.getByText('GAZP', { exact: true })).toBeVisible();
   await expect(page.getByText('YDEX', { exact: true })).toBeVisible();
@@ -307,7 +307,7 @@ test('F1: Новая сессия → Запустить → /arena/:id → За
 
   await page.locator('main').getByRole('link', { name: 'Открыть отчёт' }).click();
   await expect(page).toHaveURL(new RegExp(`/report/${sessionId}$`));
-  await expect(page.getByRole('heading', { name: `Отчёт сессии ${sessionId}` })).toBeVisible();
+  await expect(page.locator('.report-header').getByText(sessionId, { exact: true })).toBeVisible();
   await expect(page.getByText('Период раскрыт')).toBeVisible();
 });
 
@@ -325,6 +325,6 @@ test('Арена в навигации (S-0104) → Завершить → От�
   await page.locator('main').getByRole('link', { name: 'Открыть отчёт' }).click();
 
   await expect(page).toHaveURL(/\/report\/S-0104$/);
-  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-0104' })).toBeVisible();
+  await expect(page.locator('.report-header').getByText('S-0104', { exact: true })).toBeVisible();
   await expect(page.getByText('Период раскрыт')).toBeVisible();
 });

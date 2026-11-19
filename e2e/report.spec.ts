@@ -5,7 +5,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
 }) => {
   await page.goto('/report/S-0103');
 
-  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-0103' })).toBeVisible();
+  await expect(page.locator('.report-header').getByText('S-0103', { exact: true })).toBeVisible();
 
   // Открываем вкладку «Расхождения».
   await page.getByRole('button', { name: 'Расхождения' }).click();
@@ -36,14 +36,16 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await page.getByRole('link', { name: 'Посмотреть в воспроизведении' }).click();
 
   await expect(page).toHaveURL(/\/replay\/S-0103\?step=18$/);
-  await expect(page.getByRole('heading', { name: 'Воспроизведение S-0103' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Воспроизведение' })).toBeVisible();
   await expect(page.getByText('День 19 из 60')).toBeVisible();
 });
 
 test('report/S-NO-ALGO: поля null не роняют страницу', async ({ page }) => {
   await page.goto('/report/S-NO-ALGO');
 
-  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-NO-ALGO' })).toBeVisible();
+  await expect(
+    page.locator('.report-header').getByText('S-NO-ALGO', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText('Сравнение с алгоритмом недоступно')).toBeVisible();
 
   await page.getByRole('button', { name: 'Расхождения' }).click();

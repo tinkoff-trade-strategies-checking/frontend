@@ -186,9 +186,9 @@ const REPORT_S0103: SessionReport = {
   backgroundAlgorithmName: 'Эталон платформы',
   noDividendsNote: 'без дивидендов',
   period: {
-    startDate: '26.02.2020',
-    endDate: '21.05.2020',
-    label: 'Весна 2020: обвал и отскок',
+    startDate: '2020-02-26',
+    endDate: '2020-05-21',
+    label: '26.02.2020 — 21.05.2020',
   },
   papers: [
     {
@@ -478,9 +478,9 @@ const REPORT_S0105: SessionReport = {
   backgroundAlgorithmName: 'Эталон платформы',
   noDividendsNote: 'без дивидендов',
   period: {
-    startDate: '26.02.2020',
-    endDate: '03.04.2020',
-    label: 'Март 2020: острая фаза (досрочно)',
+    startDate: '2020-02-26',
+    endDate: '2020-04-03',
+    label: '26.02.2020 — 03.04.2020',
   },
   papers: REPORT_S0103.papers.slice(0, 2),
   humanMetrics: {

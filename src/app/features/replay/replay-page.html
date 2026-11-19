@@ -58,7 +58,7 @@
     } @else if (store.arenaApi(); as api) {
       <app-arena-page
         [readOnly]="true"
-        [headerTitle]="'Воспроизведение ' + res.session.sessionId"
+        headerTitle="Воспроизведение"
         [periodLabel]="res.session.periodLabel"
         [reportRoute]="'/report/' + res.session.sessionId"
         [apiSource]="api"

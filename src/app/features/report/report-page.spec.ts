@@ -9,6 +9,7 @@ import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import {
   EquityCurvePoint,
   REPORT_API,
+  SessionReport,
   SessionReportResult,
   UnderwaterPoint,
 } from './data/report.models';
@@ -120,6 +121,21 @@ describe('ReportPage', () => {
     expect(csvBtn?.disabled).toBe(true);
   });
 
+  it('период показан один раз (ДД.ММ.ГГГГ) с днями, заголовок — «бумаги · период», подпись сделок — про закрытые пары', async () => {
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    const rep = (await stubApi.getReport('S-0103')) as { status: 'READY'; report: SessionReport };
+    expect(root.querySelector('h1')?.textContent).toContain('·');
+    expect(root.querySelector('h1')?.textContent).toContain(rep.report.period.label);
+    expect(text).not.toContain(rep.report.period.startDate + ' —');
+    expect(text).not.toContain('день 1 — день');
+    expect(text).toContain('Закрытых сделок (пары FIFO)');
+  });
+
   it('stopTakeSameBarCount > 0 — предупреждение; 0 или нет поля — без предупреждения', async () => {
     const base = await stubApi.getReport('S-0103');
     if (base.status !== 'READY') {
@@ -199,7 +215,8 @@ describe('ReportPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
-    expect(text).toContain('Отчёт сессии S-NO-ALGO');
+    expect(text).toContain('S-NO-ALGO');
+    expect(text).toContain('SBER');
     expect(text).toContain('Сравнение с алгоритмом недоступно');
     expect(text).not.toContain('Алгоритм впереди');
     expect(text).toContain('Нет данных');

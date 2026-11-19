@@ -12,7 +12,7 @@ import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
-import { DivergenceType, EquityCurvePoint, REPORT_API } from './data/report.models';
+import { DivergenceType, EquityCurvePoint, REPORT_API, SessionReport } from './data/report.models';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
 import { ReportExportFormat, ReportExportService } from './data/report-export.service';
@@ -110,6 +110,12 @@ export class ReportPage implements OnInit {
     } finally {
       this.exporting.set(false);
     }
+  }
+
+  /** Заголовок как в истории: «бумаги · период»; идентификатор показывается рядом мелко. */
+  protected reportTitle(rep: SessionReport): string {
+    const tickers = rep.papers.map((p) => p.ticker).join(', ');
+    return tickers ? `${tickers} · ${rep.period.label}` : rep.period.label;
   }
 
   protected equityCurveSubtitle(points: readonly EquityCurvePoint[]): string {

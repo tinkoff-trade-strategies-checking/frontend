@@ -1,6 +1,7 @@
 import {
   afterNextRender,
   ChangeDetectionStrategy,
+  computed,
   Component,
   DestroyRef,
   effect,
@@ -37,7 +38,9 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
   template: `
     <div class="chart-legend tui-text_body-xs">
       <span class="legend-item"><span class="swatch swatch-human"></span>Вы, %</span>
-      <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм, %</span>
+      @if (hasAlgo()) {
+        <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм, %</span>
+      }
     </div>
     <div #container class="chart-host" aria-label="Underwater-просадка"></div>
   `,
@@ -83,6 +86,10 @@ export class ReportUnderwaterChart {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly points = input.required<readonly UnderwaterPoint[]>();
+  /** Ряд алгоритма есть, только когда был фоновый прогон; иначе его нет ни в легенде, ни на графике. */
+  protected readonly hasAlgo = computed(() =>
+    this.points().some((p) => p.algoDrawdownPct !== null),
+  );
 
   private chart: IChartApi | null = null;
   private humanSeries: ISeriesApi<'Area'> | null = null;

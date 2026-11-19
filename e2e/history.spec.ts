@@ -54,5 +54,5 @@ test('фильтр «Только слепые», пагинация и пере
   await rowS0103.getByRole('link', { name: 'Открыть отчёт' }).click();
 
   await expect(page).toHaveURL(/\/report\/S-0103$/);
-  await expect(page.getByRole('heading', { name: 'Отчёт сессии S-0103' })).toBeVisible();
+  await expect(page.locator('.report-header').getByText('S-0103', { exact: true })).toBeVisible();
 });
