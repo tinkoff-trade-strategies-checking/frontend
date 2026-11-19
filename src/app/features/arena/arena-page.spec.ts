@@ -165,7 +165,7 @@ describe('ArenaPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     const primaryEquity = root.querySelector('.equity-row .metric-item .tui-text_h5');
-    expect(primaryEquity?.textContent?.trim()).toBe('0 ₽');
+    expect(primaryEquity?.textContent?.trim()).toBe('0,00 ₽');
     expect(root.textContent ?? '').toContain('в ₽ и %');
   });
 

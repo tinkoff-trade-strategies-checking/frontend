@@ -107,14 +107,14 @@ test('replay/S-0103: проигрывает сессию в режиме тол�
   const finalPortfolioText = (
     (await page.locator('app-arena-portfolio-panel').textContent()) ?? ''
   ).replace(/\u00a0/g, ' ');
-  expect(finalPortfolioText).toContain('1 064 250 ₽');
+  expect(finalPortfolioText).toContain('1 064 250,00 ₽');
   expect(finalPortfolioText).toContain('+6,43 %');
 
   await page.getByRole('link', { name: 'Открыть отчёт' }).click();
   await expect(page).toHaveURL(/\/report\/S-0103$/);
   await expect(page.locator('.report-header').getByText('S-0103', { exact: true })).toBeVisible();
   const reportText = ((await page.locator('main').textContent()) ?? '').replace(/\u00a0/g, ' ');
-  expect(reportText).toContain('1 064 250 ₽');
+  expect(reportText).toContain('1 064 250,00 ₽');
   expect(reportText).toContain('+6,43 %');
 });
 

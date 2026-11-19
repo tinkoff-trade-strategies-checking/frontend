@@ -184,7 +184,7 @@ describe('mapComparison', () => {
       netReturn: { humanPct: '1', algoPct: '3.75', winner: 'algo', diffPctPoints: '2.75' },
       maxDrawdown: { humanPct: '5', algoPct: '5', winner: 'tie', diffPctPoints: '0' },
     });
-    expect(cmp.finalCapital.diffLabel).toMatch(/^Алгоритм лучше на 27\s550 ₽$/);
+    expect(cmp.finalCapital.diffLabel).toMatch(/^Алгоритм лучше на 27\s550,00 ₽$/);
     expect(cmp.netReturn.diffLabel).toBe('Алгоритм лучше на 2,75 п.п.');
     expect(cmp.maxDrawdown.diffLabel).toBe('Просадки равны');
   });

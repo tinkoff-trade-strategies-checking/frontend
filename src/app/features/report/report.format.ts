@@ -44,7 +44,8 @@ export const WINNER_LABELS: Readonly<Record<ComparisonWinner, string>> = {
   tie: 'Равно',
 };
 
-export function formatRub(value: number | null, signed = false, fractionDigits = 0): string {
+/** Рубли — всегда два знака (`decisions.md`, «Деньги и округление»). */
+export function formatRub(value: number | null, signed = false, fractionDigits = 2): string {
   if (value === null) {
     return '—';
   }
@@ -106,8 +107,10 @@ export function formatRatio(value: number | null): string {
   if (value === null) {
     return '—';
   }
-  return value.toLocaleString('ru-RU', {
+  const formatted = Math.abs(value).toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+  // Минус — «−» (U+2212), как у процентов и рублей, а не дефис.
+  return `${value < 0 ? '−' : ''}${formatted}`;
 }
