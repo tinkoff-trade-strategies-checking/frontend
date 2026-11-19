@@ -78,8 +78,13 @@ jobs:
           repository: tinkoff-trade-strategies-checking/core
           path: core
           fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          repository: tinkoff-trade-strategies-checking/backend
+          path: backend
+          fetch-depth: 1
       - name: Проверка ссылок invariants.md
-        run: python3 documentation/scripts/check-invariants.py --core core --frontend frontend
+        run: python3 documentation/scripts/check-invariants.py --core core --frontend frontend --backend backend
 
   # Размер PR в режиме наблюдения: не падает, только предупреждение (home#29).
   pr-size:
