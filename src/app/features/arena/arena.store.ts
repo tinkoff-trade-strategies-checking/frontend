@@ -69,7 +69,7 @@ export class ArenaStore {
   private finishedCloseTimer: ReturnType<typeof setTimeout> | null = null;
   /** Номер последнего события потока, учтённого на экране (INV-8); `null` — ещё не знаем. */
   private lastEventId: number | null = null;
-  private snapshotRetries = 0;
+  private resyncInFlight = false;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
@@ -153,7 +153,18 @@ export class ArenaStore {
    * применённых событий отбрасываем и читаем заново: иначе экран откатился бы назад.
    */
   resync(reopenEvents = true): Promise<void> {
-    return this.enqueue(() => this.refreshSnapshot(reopenEvents, true));
+    // Пока снимок читается, новые события с пропуском номера не должны ставить в очередь ещё по одному чтению.
+    if (this.resyncInFlight) {
+      return this.queue;
+    }
+    this.resyncInFlight = true;
+    return this.enqueue(async () => {
+      try {
+        await this.refreshSnapshot(reopenEvents, true);
+      } finally {
+        this.resyncInFlight = false;
+      }
+    });
   }
 
   private async refreshSnapshot(reopenEvents: boolean, reportErrors: boolean): Promise<void> {

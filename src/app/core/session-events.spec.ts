@@ -50,6 +50,25 @@ describe('sessionEventStream', () => {
     expect(items.map((i) => (i.type === 'stream_failed' ? i.type : i.eventId))).toEqual(['8', '9']);
   });
 
+  it('CRLF, разорванный между чанками, не остаётся в номере события', async () => {
+    const calls: Record<string, string>[] = [];
+    let n = 0;
+    const fetchFn: SessionFetch = vi.fn(async (_url, init) => {
+      calls.push(init.headers);
+      n++;
+      return n === 1
+        ? response(200, sse('id: 5\r', '\ndata: {"type":"report_ready","eventId":"5"}\r\n\r', '\n'))
+        : response(200, new ReadableStream({ start: () => undefined }));
+    });
+    vi.useFakeTimers();
+    const items: SessionStreamItem[] = [];
+    const sub = sessionEventStream('/x', null, fetchFn).subscribe((i) => items.push(i));
+    await vi.advanceTimersByTimeAsync(1000);
+    sub.unsubscribe();
+    expect(items).toHaveLength(1);
+    expect(calls[1]['Last-Event-ID']).toBe('5');
+  });
+
   it('без номера в снимке заголовка нет', async () => {
     const fetchFn: SessionFetch = vi.fn(async () => response(200, sse(event(1, 'report_ready'))));
     const sub = sessionEventStream('/x', null, fetchFn).subscribe();

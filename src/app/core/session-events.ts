@@ -123,7 +123,9 @@ export function sessionEventStream(
               if (done) {
                 break;
               }
-              buffer += decoder.decode(value, { stream: true }).replaceAll('\r\n', '\n');
+              buffer += decoder.decode(value, { stream: true });
+              // CRLF мог разорваться между чанками: нормализуем весь буфер, а не чанк.
+              buffer = buffer.replaceAll('\r\n', '\n');
               let end = buffer.indexOf('\n\n');
               while (end !== -1) {
                 emit(buffer.slice(0, end));
