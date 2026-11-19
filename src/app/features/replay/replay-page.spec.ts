@@ -59,7 +59,8 @@ describe('ReplayPage', () => {
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Воспроизведение S-0103');
+    expect(text).toContain('Воспроизведение');
+    expect(text).toContain('S-0103');
     expect(text).toContain('Только просмотр: заявки из журнала');
     expect(text).toContain('Открыть отчёт');
     expect(text).toContain('26.02.2020 — 21.05.2020');

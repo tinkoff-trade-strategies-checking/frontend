@@ -418,6 +418,51 @@ describe('ArenaStore при серверном времени', () => {
     expect(store.closedOrders().map((o) => o.id)).toEqual(['old-stop', 'old-take']);
   });
 
+  it('событие finished: слепая сессия раскрывается снимком сервера (тикеры, даты) без перезагрузки', async () => {
+    const api = new FakeServerApi();
+    api.snapshots = [
+      snapshot({ lastEventId: 10 }),
+      snapshot({
+        blind: true,
+        finished: true,
+        playing: false,
+        lastEventId: 11,
+        papers: [
+          {
+            id: 'p-1',
+            label: 'SBER',
+            sector: 'Финансы',
+            candles: [
+              candle(0, { dateLabel: '26.02.2020' }),
+              candle(1, { dateLabel: '27.02.2020' }),
+            ],
+            changePct: 0,
+            lastPrice: 100,
+          },
+        ],
+      }),
+    ];
+    const store = setup(api);
+    await store.init();
+    expect(store.blind()).toBe(true);
+    api.events$.next({
+      type: 'finished',
+      eventId: 11,
+      result: {
+        sessionId: 's-1',
+        finishedAtStep: 1,
+        finishedAtDay: 1,
+        portfolio: PORTFOLIO,
+        partial: true,
+      },
+    });
+    await vi.waitFor(() => expect(store.finished()).toBe(true));
+    await vi.waitFor(() => expect(store.selectedPaper()!.label).toBe('SBER'));
+    expect(store.blind()).toBe(true);
+    expect(store.selectedPaper()!.label).toBe('SBER');
+    expect(store.selectedPaper()!.candles[0].dateLabel).toBe('26.02.2020');
+  });
+
   it('INV-7: в идущей слепой сессии даты не выводятся, даже если пришли в снимке и в шаге', async () => {
     const api = new FakeServerApi();
     api.snapshots = [

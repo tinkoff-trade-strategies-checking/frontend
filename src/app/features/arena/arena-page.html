@@ -4,7 +4,7 @@
       <h1 class="tui-text_h3">{{ headerTitle() }}</h1>
       @if (store.blind()) {
         <span tuiBadge appearance="neutral" size="m">
-          {{ readOnly() ? 'Слепая (раскрыта)' : 'Слепая сессия' }}
+          {{ readOnly() || store.finished() ? 'Слепая (раскрыта)' : 'Слепая сессия' }}
         </span>
       }
       @if (readOnly()) {
@@ -31,16 +31,11 @@
           Открыть отчёт
         </a>
       }
-      <button
-        tuiButton
-        type="button"
-        size="s"
-        appearance="outline"
-        [disabled]="store.finished()"
-        (click)="confirmFinish()"
-      >
-        Завершить сессию
-      </button>
+      @if (!store.finished()) {
+        <button tuiButton type="button" size="s" appearance="outline" (click)="confirmFinish()">
+          Завершить сессию
+        </button>
+      }
     }
   </header>
 

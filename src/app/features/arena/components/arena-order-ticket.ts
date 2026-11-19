@@ -230,6 +230,7 @@ function round2(value: number): number {
               tuiInputNumber
               [ngModel]="lots()"
               (ngModelChange)="onLotsChange($event)"
+              (focus)="selectOnFocus($event)"
             />
           </tui-textfield>
         </label>
@@ -524,6 +525,11 @@ export class ArenaOrderTicket {
       this.tif.set('gtc');
     }
     this.syncDefaultPrices(type, this.side());
+  }
+
+  /** Предзаполненное значение выделяем при фокусе: ввод «5» заменяет его, а не даёт «55». */
+  protected selectOnFocus(event: Event): void {
+    (event.target as HTMLInputElement).select();
   }
 
   protected onLotsChange(value: number | null): void {

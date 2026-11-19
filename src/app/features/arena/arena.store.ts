@@ -392,6 +392,10 @@ export class ArenaStore {
         }
         this.editingOrder.set(null);
         this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
+        if (this.serverDriven) {
+          // Раскрытый вид завершённой слепой сессии — только в снимке сервера.
+          await this.refreshSnapshot(false, false);
+        }
       } catch (err) {
         this.error.set(messageOf(err, 'Не удалось завершить сессию.'));
       }
@@ -604,6 +608,8 @@ export class ArenaStore {
         if (event.result.orders) {
           this.orders.update((list) => mergeById(list, event.result.orders ?? []));
         }
+        // Завершённая слепая сессия раскрывается: берём раскрытый вид (тикеры, даты, суммы) снимком сервера.
+        void this.resync(false);
         // После `finished` приходит только `report_ready`; не дождёмся — закроем поток сами.
         this.finishedCloseTimer = setTimeout(() => this.closeEvents(), FINISHED_STREAM_GRACE_MS);
         break;

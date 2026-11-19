@@ -1043,9 +1043,10 @@ components:
         stat: { $ref: '#/components/schemas/PaperStat' }
     SnapshotBase:
       type: object
-      required: [sessionId, regime, step, totalSteps, warmupSteps, day, totalDays, finished, playing, speed, lastEventId]
+      required: [sessionId, blind, regime, step, totalSteps, warmupSteps, day, totalDays, finished, playing, speed, lastEventId]
       properties:
         sessionId: { $ref: '#/components/schemas/Uuid' }
+        blind: { type: boolean, description: 'Режим запуска сессии: у завершённой слепой сессии `mode` = `OPEN` (всё раскрыто), а `blind` остаётся `true` — по нему клиент пишет «Слепая (раскрыта)»' }
         regime: { $ref: '#/components/schemas/Regime' }
         step: { type: integer }
         totalSteps: { type: integer }

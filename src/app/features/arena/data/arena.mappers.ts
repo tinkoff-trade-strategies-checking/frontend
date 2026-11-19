@@ -224,7 +224,8 @@ export function mapSnapshot(snapshot: Snapshot): ArenaSnapshot {
         });
   return {
     sessionId: snapshot.sessionId,
-    blind: snapshot.mode === 'BLIND',
+    // `mode` — вид данных (у завершённой слепой сессии OPEN), `blind` — режим запуска сессии.
+    blind: snapshot.blind,
     step: snapshot.step,
     totalSteps: snapshot.totalSteps,
     day: snapshot.day,

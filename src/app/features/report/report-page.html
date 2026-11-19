@@ -8,7 +8,8 @@
   } @else if (store.result(); as res) {
     @if (res.status === 'BUILDING') {
       <header class="report-header">
-        <h1 class="tui-text_h3">Отчёт сессии {{ res.sessionId }}</h1>
+        <h1 class="tui-text_h3">Отчёт сессии</h1>
+        <span class="tui-text_body-xs muted">{{ res.sessionId }}</span>
       </header>
       <div tuiNotification appearance="info" size="s">
         <strong>Отчёт строится</strong>
@@ -77,7 +78,8 @@
 
       <header class="report-header">
         <div class="title-group">
-          <h1 class="tui-text_h3">Отчёт сессии {{ rep.sessionId }}</h1>
+          <h1 class="tui-text_h3">{{ reportTitle(rep) }}</h1>
+          <span class="tui-text_body-xs muted">{{ rep.sessionId }}</span>
           <span tuiBadge size="s" [appearance]="rep.blind ? 'info' : 'neutral'">
             {{ rep.blind ? 'Слепая (раскрыта)' : 'Неслепая' }}
           </span>
@@ -159,13 +161,10 @@
         <div class="reveal-grid">
           <div class="reveal-card">
             <span class="tui-text_body-xs muted">Период</span>
-            @if (rep.blind) {
-              <span class="tui-text_body-xs muted">день 1 — день {{ rep.playedDays }}</span>
-            }
-            <strong class="tui-text_body-l">
-              {{ rep.period.startDate }} — {{ rep.period.endDate }}
-            </strong>
-            <span class="tui-text_body-xs muted">{{ rep.period.label }}</span>
+            <strong class="tui-text_body-l">{{ rep.period.label }}</strong>
+            <span class="tui-text_body-xs muted"
+              >{{ rep.playedDays }} из {{ rep.totalDays }} дн.</span
+            >
           </div>
           @for (paper of rep.papers; track paper.id) {
             <div class="reveal-card">
@@ -435,7 +434,7 @@
                     }
                   </tr>
                   <tr>
-                    <td>Сделок</td>
+                    <td>Закрытых сделок (пары FIFO)</td>
                     <td class="num">{{ hm.tradesCount }}</td>
                     @if (am) {
                       <td class="num">{{ am.tradesCount }}</td>
