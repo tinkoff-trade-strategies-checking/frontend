@@ -28,13 +28,8 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   // 2. Запуск ручной сессии + проверка селектора фонового алгоритма + Арена + F5 (INV-8).
   const bgSelect = page.locator('#launch-background-algorithm');
   await expect(bgSelect).toBeVisible();
-  const bgOptions = await bgSelect.locator('option').allTextContents();
-  expect(bgOptions.some((text) => text.includes('Эталон платформы'))).toBe(true);
-  const seededBgOption = bgOptions.find((text) => text.includes('v1'));
-  if (seededBgOption) {
-    await bgSelect.selectOption({ label: seededBgOption });
-    await expect(page.locator('aside.summary-col')).toContainText('Эталон платформы');
-  }
+  await expect(bgSelect).toContainText('Эталон платформы (по умолчанию)');
+  await expect(page.locator('aside.summary-col')).toContainText('Эталон платформы');
 
   await page.getByRole('button', { name: '20 дн.', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
@@ -83,13 +78,24 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   await page.getByRole('button', { name: 'Выставить заявку' }).click();
   await expect(activeBadge).toHaveText('1');
 
+  const activeOrdersBeforeReload = (await ordersPanel.locator('tbody tr').allInnerTexts()).map(
+    normalizeSpaces,
+  );
+  await fillsTab.click();
+  await expect(ordersPanel.locator('tbody tr')).toHaveCount(1);
+  const fillsBeforeReload = (await ordersPanel.locator('tbody tr').allInnerTexts()).map(
+    normalizeSpaces,
+  );
+  await activeTab.click();
+
   const snapshotBeforeReload = {
     day: normalizeSpaces(await dayCounter.innerText()),
     equity: normalizeSpaces(await equityValue.innerText()),
     cash: normalizeSpaces(await cashValue.innerText()),
     invested: normalizeSpaces(await investedValue.innerText()),
     positions: (await portfolio.locator('tbody tr').allInnerTexts()).map(normalizeSpaces),
-    activeOrders: (await ordersPanel.locator('tbody tr').allInnerTexts()).map(normalizeSpaces),
+    activeOrders: activeOrdersBeforeReload,
+    fills: fillsBeforeReload,
   };
 
   // INV-8: F5 восстанавливает шаг, деньги, позиции, активные заявки и сделки из журнала backend.
@@ -114,6 +120,10 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
 
   await fillsTab.click();
   await expect(ordersPanel.locator('tbody tr')).toHaveCount(1);
+  const restoredFills = (await ordersPanel.locator('tbody tr').allInnerTexts()).map(
+    normalizeSpaces,
+  );
+  expect(restoredFills).toEqual(snapshotBeforeReload.fills);
 
   // Досрочное завершение сессии.
   await page.getByRole('button', { name: 'Завершить сессию' }).click();
@@ -127,7 +137,7 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   await expect(page.getByRole('heading', { name: 'Показатели эффективности' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Расхождения' }).click();
-  await expect(page.getByRole('button', { name: /^Все \(\d+\)$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Все \([1-9]\d*\)$/ })).toBeVisible();
 
   // 4. Мастерская -> Проверка (L001) -> Автоисправление -> Публикация -> Прогон -> Отчёт прогона.
   await page.locator('nav').getByRole('link', { name: 'Мастерская' }).click();
