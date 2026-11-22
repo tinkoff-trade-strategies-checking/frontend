@@ -36,7 +36,7 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
     await expect(page.locator('aside.summary-col')).toContainText('Эталон платформы');
   }
 
-  await page.getByRole('button', { name: '20 дн.' }).click();
+  await page.getByRole('button', { name: '20 дн.', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
   await page.getByRole('button', { name: 'Запустить' }).click();
 
@@ -174,7 +174,7 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   await expect(
     detail.getByRole('heading', { name: `Запуск прогона: ${strategyName}` }),
   ).toBeVisible();
-  await detail.getByRole('button', { name: '20 дн.' }).click();
+  await detail.getByRole('button', { name: '20 дн.', exact: true }).click();
   await detail.getByRole('button', { name: 'Запустить' }).click();
 
   await expect(page).toHaveURL(/\/runs\/[0-9a-f-]+$/i);
