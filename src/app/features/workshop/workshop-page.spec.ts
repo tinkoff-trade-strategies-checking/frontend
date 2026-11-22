@@ -106,8 +106,8 @@ describe('WorkshopPage', () => {
     expect(detail).not.toBeNull();
     const detailText = detail?.textContent ?? '';
     expect(detailText).toContain('Breakout ATR');
-    expect(detailText).toContain('MAGIC_CONST');
-    expect(detailText).toContain('UNUSED_PARAM');
+    expect(detailText).toContain('L001');
+    expect(detailText).toContain('W-LA01');
     expect(detailText).toContain('неизменяема');
     expect(detailText).toContain('v3');
     expect(detailText).toContain('v2');

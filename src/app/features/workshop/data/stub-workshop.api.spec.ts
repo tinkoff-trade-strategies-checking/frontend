@@ -114,4 +114,29 @@ describe('StubWorkshopApi', () => {
     expect(res.algorithm.versions.map((v) => v.version)).toEqual([3, 2, 1]);
     expect(res.algorithm.versions.every((v) => v.immutable)).toBe(true);
   });
+
+  it('использует канонические коды диагностик dsl.md v1 и эталон платформы с прогревом 200 баров', async () => {
+    const api = new StubWorkshopApi();
+    const list = await api.list({ pageSize: WORKSHOP_MAX_PAGE_SIZE });
+    const allowedCodes = new Set(['L001', 'W-LA01']);
+
+    for (const item of list.items) {
+      for (const warning of item.linterWarnings) {
+        expect(allowedCodes.has(warning.code)).toBe(true);
+      }
+    }
+
+    const platformRef = await api.getById('A-0001');
+    expect(platformRef.status).toBe('READY');
+    if (platformRef.status === 'READY') {
+      expect(platformRef.algorithm.linterWarnings).toEqual([]);
+      expect(platformRef.algorithm.description).toContain('200 баров');
+    }
+
+    const breakout = await api.getById('A-0003');
+    expect(breakout.status).toBe('READY');
+    if (breakout.status === 'READY') {
+      expect(breakout.algorithm.linterWarnings.map((w) => w.code)).toEqual(['L001', 'W-LA01']);
+    }
+  });
 });
