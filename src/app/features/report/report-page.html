@@ -749,12 +749,7 @@
                             type="button"
                             size="xs"
                             appearance="outline"
-                            [disabled]="stubMode"
-                            [title]="
-                              stubMode
-                                ? 'Редактор правил пока недоступен'
-                                : 'Перейти в мастерскую для написания правила'
-                            "
+                            title="Перейти в мастерскую для написания правила"
                             (click)="openWorkshop()"
                           >
                             Написать правило

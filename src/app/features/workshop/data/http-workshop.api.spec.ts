@@ -136,16 +136,30 @@ describe('HttpWorkshopApi', () => {
     expect(await pOk).toMatchObject({ ok: true, version: { version: 1, id: 'ver-1' } });
 
     const pErr = api.publish('alg-2', { summary: 'bad' });
-    http
-      .expectOne('/api/v1/workshop/algorithms/alg-2/publish')
-      .flush(
-        { code: 'STRATEGY_INVALID', detail: 'E-LA01 на строке 3' },
-        { status: 422, statusText: 'Unprocessable Entity' },
-      );
+    const diag = {
+      code: 'E-LA01',
+      level: 'ERROR',
+      startLine: 3,
+      startColumn: 1,
+      endLine: 3,
+      endColumn: 10,
+      message: 'Обращение к будущему бару',
+      fixes: [],
+    };
+    http.expectOne('/api/v1/workshop/algorithms/alg-2/publish').flush(
+      {
+        code: 'STRATEGY_INVALID',
+        detail: 'Strategy contains static errors and cannot be published',
+        lookaheadLevel: 'ERROR',
+        diagnostics: [diag],
+      },
+      { status: 422, statusText: 'Unprocessable Entity' },
+    );
     expect(await pErr).toEqual({
       ok: false,
       code: 'STRATEGY_INVALID',
-      detail: 'E-LA01 на строке 3',
+      lookaheadLevel: 'ERROR',
+      diagnostics: [diag],
     });
   });
 });

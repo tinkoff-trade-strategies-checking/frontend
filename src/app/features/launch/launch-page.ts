@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented } from '@taiga-ui/kit';
@@ -34,6 +35,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
   selector: 'app-launch-page',
   imports: [
     FormsModule,
+    RouterLink,
     TuiButton,
     TuiBadge,
     TuiInputDate,

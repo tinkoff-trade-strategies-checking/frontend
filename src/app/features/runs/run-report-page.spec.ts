@@ -15,19 +15,21 @@ import { RunReportPage } from './run-report-page';
 @Component({
   selector: 'app-report-equity-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div class="stub-equity">{{ points().length }}</div>`,
+  template: `<div class="stub-equity">{{ points().length }}:{{ primaryLabel() }}</div>`,
 })
 class StubEquityChart {
   readonly points = input.required<readonly EquityCurvePoint[]>();
+  readonly primaryLabel = input('Вы');
 }
 
 @Component({
   selector: 'app-report-underwater-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<div class="stub-underwater">{{ points().length }}</div>`,
+  template: `<div class="stub-underwater">{{ points().length }}:{{ primaryLabel() }}</div>`,
 })
 class StubUnderwaterChart {
   readonly points = input.required<readonly UnderwaterPoint[]>();
+  readonly primaryLabel = input('Вы');
 }
 
 describe('RunReportPage', () => {
@@ -75,8 +77,8 @@ describe('RunReportPage', () => {
     expect(text).toContain('W-RT01');
     expect(text).toContain('Первые 14 баров пропущены на прогрев индикатора RSI.');
     expect(text).toContain('SBER');
-    expect(root.querySelector('.stub-equity')?.textContent).toBe('3');
-    expect(root.querySelector('.stub-underwater')?.textContent).toBe('3');
+    expect(root.querySelector('.stub-equity')?.textContent).toBe('3:Алгоритм');
+    expect(root.querySelector('.stub-underwater')?.textContent).toBe('3:Алгоритм');
 
     const ordersTab = Array.from(root.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Заявки алгоритма'),

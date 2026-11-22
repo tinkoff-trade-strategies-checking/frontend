@@ -151,7 +151,12 @@ export interface PublishWorkshopAlgorithmCommand {
 
 export type PublishWorkshopResult =
   | { readonly ok: true; readonly version: WorkshopAlgorithmVersion }
-  | { readonly ok: false; readonly code: 'STRATEGY_INVALID'; readonly detail: string | null };
+  | {
+      readonly ok: false;
+      readonly code: 'STRATEGY_INVALID';
+      readonly lookaheadLevel: CheckLevel;
+      readonly diagnostics: readonly StrategyDiagnostic[];
+    };
 
 export interface ForkWorkshopAlgorithmCommand {
   readonly version?: number | null;

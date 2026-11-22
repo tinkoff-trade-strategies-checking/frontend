@@ -93,7 +93,7 @@ describe('RunStore', () => {
     expect(store.reportReady()).toBe(true);
   });
 
-  it('перечитывает прогон при run_failed и фиксирует ошибку потока при stream_failed', async () => {
+  it('при run_failed закрывает SSE-поток и перечитывает прогон', async () => {
     const events$ = new Subject<RunStreamEvent>();
     const running: RunInfo = {
       runId: 'R-2',
@@ -141,14 +141,69 @@ describe('RunStore', () => {
 
     const store = TestBed.inject(RunStore);
     await store.load('R-2');
+    expect(events$.observed).toBe(true);
+
     events$.next({ type: 'run_failed', eventId: '1', errorCode: 'E-RT01' });
+    expect(events$.observed).toBe(false);
     await Promise.resolve();
     await Promise.resolve();
+    expect(getRun).toHaveBeenCalledTimes(2);
     expect(store.run()?.status).toBe('failed');
     expect(store.run()?.errorCode).toBe('E-RT01');
+  });
 
-    events$.next({ type: 'stream_failed', status: 404 });
+  it('при stream_failed закрывает поток и вызывает refreshRun для обработки 401/404 через HttpClient', async () => {
+    const events$ = new Subject<RunStreamEvent>();
+    const running: RunInfo = {
+      runId: 'R-3',
+      strategyVersionId: 'v1',
+      algoName: 'Stream Fail Algo',
+      blind: false,
+      status: 'running',
+      doneSteps: 2,
+      totalSteps: 10,
+      repeatOfRunId: null,
+      repeatMatch: null,
+      lastEventId: '5',
+      createdAt: '2026-11-18T11:30:00+03:00',
+      finishedAt: null,
+      errorCode: null,
+      diagnostics: [],
+      period: null,
+      papers: null,
+    };
+    const getRun = vi
+      .fn<RunsApi['getRun']>()
+      .mockResolvedValueOnce(running)
+      .mockRejectedValueOnce(new Error('401'));
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: RUNS_API,
+          useValue: {
+            getRun,
+            events: () => events$.asObservable(),
+            createRun: vi.fn(),
+            repeatRun: vi.fn(),
+            getRunReport: vi.fn(),
+          },
+        },
+        RunStore,
+      ],
+    });
+
+    const store = TestBed.inject(RunStore);
+    await store.load('R-3');
+    expect(events$.observed).toBe(true);
+
+    events$.next({ type: 'stream_failed', status: 401 });
+    expect(events$.observed).toBe(false);
     expect(store.streamError()).toBeTruthy();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getRun).toHaveBeenCalledTimes(2);
+    expect(getRun).toHaveBeenLastCalledWith('R-3');
   });
 
   it('repeat вызывает repeatRun и возвращает новый runId', async () => {

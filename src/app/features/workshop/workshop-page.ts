@@ -1,5 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  OnInit,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { LAUNCH_API_IMPL, RUNS_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
@@ -47,6 +56,8 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
 })
 export class WorkshopPage implements OnInit {
   protected readonly store = inject(WorkshopStore);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
@@ -72,6 +83,11 @@ export class WorkshopPage implements OnInit {
 
   ngOnInit(): void {
     void this.store.load();
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      if (params.get('create') === '1') {
+        this.store.openCreateDraft();
+      }
+    });
   }
 
   protected sortIndex(current: WorkshopSortField): number {

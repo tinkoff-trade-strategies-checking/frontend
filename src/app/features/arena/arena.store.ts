@@ -73,6 +73,7 @@ export class ArenaStore {
   /** Номер последнего события потока, учтённого на экране (INV-8); `null` — ещё не знаем. */
   private lastEventId: number | null = null;
   private resyncInFlight = false;
+  private destroyed = false;
 
   readonly loading = signal(false);
   readonly sessionId = signal('');
@@ -119,6 +120,7 @@ export class ArenaStore {
 
   constructor() {
     this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
       this.stopTimer();
       this.closeEvents();
     });
@@ -127,6 +129,9 @@ export class ArenaStore {
   init(customApi?: ArenaApi, sessionId?: string): Promise<void> {
     this.customApi = customApi ?? null;
     return this.enqueue(async () => {
+      if (this.destroyed) {
+        return;
+      }
       this.loading.set(true);
       this.error.set(null);
       this.notice.set(null);
@@ -138,15 +143,22 @@ export class ArenaStore {
       try {
         // INV-8: состояние всегда восстанавливается из источника, без локального кеша.
         const snap = await this.api.getSnapshot(sessionId);
+        if (this.destroyed) {
+          return;
+        }
         this.applySnapshot(snap);
         this.lastEventId = snap.lastEventId ?? null;
         if (!snap.finished) {
           this.openEvents(this.lastEventId);
         }
       } catch (err) {
-        this.error.set(messageOf(err, 'Не удалось загрузить сессию.'));
+        if (!this.destroyed) {
+          this.error.set(messageOf(err, 'Не удалось загрузить сессию.'));
+        }
       } finally {
-        this.loading.set(false);
+        if (!this.destroyed) {
+          this.loading.set(false);
+        }
       }
     });
   }
@@ -157,7 +169,7 @@ export class ArenaStore {
    */
   resync(reopenEvents = true): Promise<void> {
     // Пока снимок читается, новые события с пропуском номера не должны ставить в очередь ещё по одному чтению.
-    if (this.resyncInFlight) {
+    if (this.resyncInFlight || this.destroyed) {
       return this.queue;
     }
     this.resyncInFlight = true;
@@ -172,8 +184,14 @@ export class ArenaStore {
 
   private async refreshSnapshot(reopenEvents: boolean, reportErrors: boolean): Promise<void> {
     for (let attempt = 0; attempt < MAX_STALE_SNAPSHOT_RETRIES; attempt++) {
+      if (this.destroyed) {
+        return;
+      }
       try {
         const snap = await this.api.getSnapshot(this.sessionId() || undefined);
+        if (this.destroyed) {
+          return;
+        }
         const snapId = snap.lastEventId ?? null;
         if (snapId !== null && this.lastEventId !== null && snapId < this.lastEventId) {
           continue;
@@ -188,7 +206,7 @@ export class ArenaStore {
         }
         return;
       } catch (err) {
-        if (reportErrors) {
+        if (!this.destroyed && reportErrors) {
           this.error.set(messageOf(err, 'Не удалось обновить сессию.'));
         }
         return;
@@ -533,9 +551,10 @@ export class ArenaStore {
   }
 
   private openEvents(lastEventId: number | null): void {
-    if (!this.api.events) {
+    if (this.destroyed || !this.api.events) {
       return;
     }
+    this.closeEvents();
     this.eventsSub = this.api.events(lastEventId).subscribe((event) => this.handleEvent(event));
   }
 
@@ -553,6 +572,9 @@ export class ArenaStore {
    * с пропуском номера — часть событий потеряна, перечитываем снимок и переоткрываем поток с его номера.
    */
   private handleEvent(event: ArenaEvent): void {
+    if (this.destroyed) {
+      return;
+    }
     if (event.type === 'stream_failed') {
       // Поток закрыт сервером (401, 404…): снимок покажет причину, переподключения нет.
       this.closeEvents();

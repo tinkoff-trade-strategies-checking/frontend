@@ -96,4 +96,35 @@ describe('ReportStore: отчёт ещё собирается (BUILDING)', () =>
     expect(failing).toHaveBeenCalledTimes(4);
     expect(store2.error()).toBeTruthy();
   });
+
+  it('не запускает polling если стор уничтожен пока getReport в полёте', async () => {
+    vi.useFakeTimers();
+    let resolveReport!: (res: SessionReportResult) => void;
+    const getReport = vi.fn<ReportApi['getReport']>().mockImplementation(
+      () =>
+        new Promise<SessionReportResult>((resolve) => {
+          resolveReport = resolve;
+        }),
+    );
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: REPORT_API, useValue: { getReport } }, ReportStore],
+    });
+    const store = TestBed.inject(ReportStore);
+    store.pollIntervalMs = 1000;
+
+    const loadPromise = store.load('S-INFLIGHT');
+    TestBed.resetTestingModule();
+
+    resolveReport({
+      status: 'BUILDING',
+      sessionId: 'S-INFLIGHT',
+      message: 'Отчёт собирается',
+    });
+    await loadPromise;
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(getReport).toHaveBeenCalledTimes(1);
+    expect(store.result()).toBeNull();
+  });
 });

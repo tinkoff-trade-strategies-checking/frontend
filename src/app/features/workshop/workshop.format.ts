@@ -80,17 +80,19 @@ export function validateStrategyParam(
   if (param.rangeMax !== null && value > param.rangeMax) {
     return `Максимальное значение: ${param.rangeMax}.`;
   }
-  if (param.step !== null) {
-    const stepNum = Number(param.step);
-    if (Number.isFinite(stepNum) && stepNum > 0) {
-      const base = param.rangeMin ?? param.defaultValue;
-      const steps = (value - base) / stepNum;
-      if (Math.abs(steps - Math.round(steps)) > 1e-6) {
-        return `Значение должно соответствовать шагу ${param.step}.`;
-      }
-    }
-  }
   return null;
+}
+
+export function formatStrategyInvalidMessage(
+  diagnostics: readonly StrategyDiagnostic[],
+  fallback = 'Стратегия содержит ошибки DSL и не может быть опубликована.',
+): string {
+  const errors = diagnostics.filter((diag) => diag.level === 'ERROR');
+  if (errors.length === 0) {
+    return fallback;
+  }
+  const messages = errors.map((diag) => `${diag.code}: ${diag.message}`);
+  return `Публикация невозможна — ошибки DSL: ${messages.join('; ')}`;
 }
 
 export function formatRunRejection(
@@ -99,17 +101,12 @@ export function formatRunRejection(
   if (result.reason === 'STRATEGY_INVALID') {
     return {
       title: 'Стратегия не прошла проверку (STRATEGY_INVALID)',
-      suggestion:
-        result.detail?.trim() || 'Исправьте ошибки DSL в черновике и опубликуйте новую версию.',
+      suggestion: 'Исправьте ошибки DSL в черновике и опубликуйте новую версию.',
     };
   }
-  const base = formatLaunchRejection(result.reason, {
+  return formatLaunchRejection(result.reason, {
     field: result.field,
     barsCount: result.barsCount,
     maxBars: result.maxBars,
   });
-  if (result.reason === 'INVALID_PARAMS' && result.detail?.trim()) {
-    return { title: base.title, suggestion: result.detail.trim() };
-  }
-  return base;
 }
