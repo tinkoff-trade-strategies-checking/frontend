@@ -443,7 +443,23 @@ describe('WorkshopStore', () => {
       async publish() {
         publishCalls++;
         if (publishCalls === 1) {
-          return { ok: false, code: 'STRATEGY_INVALID', detail: 'Синтаксическая ошибка' };
+          return {
+            ok: false,
+            code: 'STRATEGY_INVALID',
+            lookaheadLevel: 'ERROR',
+            diagnostics: [
+              {
+                code: 'E-SYN',
+                level: 'ERROR',
+                startLine: 1,
+                startColumn: 1,
+                endLine: 1,
+                endColumn: 5,
+                message: 'Синтаксическая ошибка',
+                fixes: [],
+              },
+            ],
+          };
         }
         return {
           ok: true,
@@ -474,8 +490,12 @@ describe('WorkshopStore', () => {
     await store.checkDraft();
     expect(await store.publishDraft()).toBe(false);
     expect(publishCalls).toBe(1);
-    expect(store.publishError()).toBe('Синтаксическая ошибка');
+    expect(store.publishError()).toContain('E-SYN');
+    expect(store.publishError()).toContain('Синтаксическая ошибка');
+    expect(store.checkResult()?.lookaheadLevel).toBe('ERROR');
+    expect(store.checkResult()?.diagnostics[0]?.code).toBe('E-SYN');
 
+    await store.checkDraft();
     store.setPublishSummary('Исправлено');
     expect(await store.publishDraft()).toBe(true);
     expect(store.publishError()).toBeNull();
@@ -603,5 +623,223 @@ describe('WorkshopStore', () => {
 
     expect(store.editorMode()).toBe('closed');
     expect(store.draft()?.strategyId).toBe('A-2');
+  });
+
+  it('защищает checkDraft от устаревшего ответа при правке текста или смене черновика', async () => {
+    let resolveCheck!: (res: Awaited<ReturnType<WorkshopApi['check']>>) => void;
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-1')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: makeAlgo(id) };
+        },
+      }),
+      async getDraft(id: string) {
+        return {
+          strategyId: id,
+          name: 'Algo',
+          description: '',
+          source: 'old code',
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: null,
+        };
+      },
+      check(): ReturnType<WorkshopApi['check']> {
+        return new Promise((resolve) => {
+          resolveCheck = resolve;
+        });
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.openDraft('A-1');
+    const pCheck = store.checkDraft();
+    store.setDraftSource('new edited code');
+
+    resolveCheck({
+      lookaheadLevel: 'ERROR',
+      params: [],
+      diagnostics: [
+        {
+          code: 'E-SYN',
+          level: 'ERROR',
+          startLine: 1,
+          startColumn: 1,
+          endLine: 1,
+          endColumn: 4,
+          message: 'Устаревшая ошибка',
+          fixes: [],
+        },
+      ],
+    });
+    await pCheck;
+
+    expect(store.checkResult()).toBeNull();
+    expect(store.draftChecking()).toBe(false);
+  });
+
+  it('saveDraft не затирает изменённый текст draftSource и игнорирует ответ при смене draftSeq', async () => {
+    const saveResolvers: ((d: Awaited<ReturnType<WorkshopApi['saveDraft']>>) => void)[] = [];
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-1')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: makeAlgo(id) };
+        },
+      }),
+      async getDraft(id: string) {
+        return {
+          strategyId: id,
+          name: 'Algo',
+          description: '',
+          source: 'v1',
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: null,
+        };
+      },
+      saveDraft(): ReturnType<WorkshopApi['saveDraft']> {
+        return new Promise((resolve) => {
+          saveResolvers.push(resolve);
+        });
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.openDraft('A-1');
+    const pSave = store.saveDraft();
+    store.setDraftSource('v2 typed while saving');
+
+    saveResolvers[0]({
+      strategyId: 'A-1',
+      name: 'Algo',
+      description: '',
+      source: 'v1',
+      updatedAt: '2026-11-22T12:01:00Z',
+      check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+    });
+    expect(await pSave).toBe(true);
+    expect(store.draftSource()).toBe('v2 typed while saving');
+    expect(store.checkResult()).toBeNull();
+
+    // Закрытие редактора во время saveDraft отбрасывает запоздавший ответ.
+    const pSave2 = store.saveDraft();
+    store.closeEditor();
+    saveResolvers[1]({
+      strategyId: 'A-1',
+      name: 'Algo',
+      description: '',
+      source: 'v2 typed while saving',
+      updatedAt: '2026-11-22T12:02:00Z',
+      check: null,
+    });
+    expect(await pSave2).toBe(false);
+    expect(store.editorMode()).toBe('closed');
+    expect(store.draftSuccess()).toBeNull();
+  });
+
+  it('createDraft, publishDraft и forkAlgorithm игнорируют ответ при изменении draftSeq', async () => {
+    let resolveCreate!: (d: Awaited<ReturnType<WorkshopApi['createAlgorithm']>>) => void;
+    let resolvePublish!: (r: Awaited<ReturnType<WorkshopApi['publish']>>) => void;
+    let resolveFork!: (d: Awaited<ReturnType<WorkshopApi['fork']>>) => void;
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-1')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: makeAlgo(id) };
+        },
+      }),
+      async getDraft(id: string) {
+        return {
+          strategyId: id,
+          name: 'Algo',
+          description: '',
+          source: 'let x = 1;',
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+        };
+      },
+      createAlgorithm(): ReturnType<WorkshopApi['createAlgorithm']> {
+        return new Promise((resolve) => {
+          resolveCreate = resolve;
+        });
+      },
+      publish(): ReturnType<WorkshopApi['publish']> {
+        return new Promise((resolve) => {
+          resolvePublish = resolve;
+        });
+      },
+      fork(): ReturnType<WorkshopApi['fork']> {
+        return new Promise((resolve) => {
+          resolveFork = resolve;
+        });
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    store.openCreateDraft();
+    store.setDraftName('New');
+    const pCreate = store.createDraft();
+    store.closeEditor();
+    resolveCreate({
+      strategyId: 'A-NEW',
+      name: 'New',
+      description: '',
+      source: '',
+      updatedAt: '2026-11-22T12:00:00Z',
+      check: null,
+    });
+    expect(await pCreate).toBe(false);
+    expect(store.editorMode()).toBe('closed');
+    expect(store.draft()).toBeNull();
+
+    await store.openDraft('A-1');
+    const pPublish = store.publishDraft();
+    store.closeEditor();
+    resolvePublish({
+      ok: true,
+      version: {
+        id: 'A-1-v2',
+        version: 2,
+        publishedAt: '2026-11-22T12:00:00Z',
+        summary: 'v2',
+        immutable: true,
+      },
+    });
+    expect(await pPublish).toBe(false);
+    expect(store.editorMode()).toBe('closed');
+    expect(store.draftSuccess()).toBeNull();
+
+    const pFork = store.forkAlgorithm('A-1');
+    store.closeEditor();
+    resolveFork({
+      strategyId: 'A-FORK',
+      name: 'Fork',
+      description: '',
+      source: '',
+      updatedAt: '2026-11-22T12:00:00Z',
+      check: null,
+    });
+    await pFork;
+    expect(store.editorMode()).toBe('closed');
+    expect(store.draft()?.strategyId).toBe('A-1');
   });
 });

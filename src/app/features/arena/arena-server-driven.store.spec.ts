@@ -628,4 +628,49 @@ describe('ArenaStore при серверном времени', () => {
     await store.init();
     expect(api.opened).toEqual([]);
   });
+
+  it('не открывает SSE если стор уничтожен пока getSnapshot в init() ещё в полёте', async () => {
+    let resolveSnap!: (snap: ArenaSnapshot) => void;
+    const api = new FakeServerApi();
+    api.getSnapshot.mockImplementationOnce(
+      () =>
+        new Promise<ArenaSnapshot>((resolve) => {
+          resolveSnap = resolve;
+        }),
+    );
+
+    const store = setup(api);
+    const initPromise = store.init(undefined, 's-1');
+    await Promise.resolve();
+    TestBed.resetTestingModule();
+
+    resolveSnap(snapshot({ finished: false, lastEventId: 10 }));
+    await initPromise;
+
+    expect(api.opened).toEqual([]);
+  });
+
+  it('не переоткрывает SSE если стор уничтожен пока getSnapshot в resync() ещё в полёте', async () => {
+    let resolveResync!: (snap: ArenaSnapshot) => void;
+    const api = new FakeServerApi();
+    const store = setup(api);
+    await store.init(undefined, 's-1');
+    expect(api.opened).toEqual([10]);
+
+    api.getSnapshot.mockImplementationOnce(
+      () =>
+        new Promise<ArenaSnapshot>((resolve) => {
+          resolveResync = resolve;
+        }),
+    );
+
+    const resyncPromise = store.resync(true);
+    await Promise.resolve();
+    TestBed.resetTestingModule();
+
+    resolveResync(snapshot({ finished: false, lastEventId: 15 }));
+    await resyncPromise;
+
+    expect(api.opened).toEqual([10]);
+  });
 });

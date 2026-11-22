@@ -12,6 +12,7 @@ interface LineSpan {
 }
 
 interface ResolvedEdit {
+  readonly index: number;
   readonly start: number;
   readonly end: number;
   readonly replacement: string;
@@ -60,6 +61,9 @@ function positionToOffset(
     offset += cp > 0xffff ? 2 : 1;
     col++;
   }
+  if (col < column) {
+    throw new RangeError(`Некорректный номер столбца: ${column} в строке ${line}.`);
+  }
   return offset;
 }
 
@@ -74,7 +78,7 @@ export function applyTextEdits(source: string, edits: readonly TextEdit[]): stri
   }
 
   const spans = buildLineSpans(source);
-  const resolved: ResolvedEdit[] = edits.map((edit) => {
+  const resolved: ResolvedEdit[] = edits.map((edit, index) => {
     const start = positionToOffset(source, spans, edit.startLine, edit.startColumn);
     const end = positionToOffset(source, spans, edit.endLine, edit.endColumn);
     if (start > end) {
@@ -82,10 +86,10 @@ export function applyTextEdits(source: string, edits: readonly TextEdit[]): stri
         `Некорректный диапазон правки: (${edit.startLine}:${edit.startColumn}) > (${edit.endLine}:${edit.endColumn}).`,
       );
     }
-    return { start, end, replacement: edit.replacement };
+    return { index, start, end, replacement: edit.replacement };
   });
 
-  resolved.sort((a, b) => b.start - a.start || b.end - a.end);
+  resolved.sort((a, b) => b.start - a.start || b.end - a.end || b.index - a.index);
 
   for (let i = 1; i < resolved.length; i++) {
     const later = resolved[i - 1];

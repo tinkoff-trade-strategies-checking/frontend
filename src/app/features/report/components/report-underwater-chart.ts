@@ -37,7 +37,9 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="chart-legend tui-text_body-xs">
-      <span class="legend-item"><span class="swatch swatch-human"></span>Вы, %</span>
+      <span class="legend-item"
+        ><span class="swatch swatch-human"></span>{{ primaryLabel() }}, %</span
+      >
       @if (hasAlgo()) {
         <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм, %</span>
       }
@@ -86,6 +88,7 @@ export class ReportUnderwaterChart {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly points = input.required<readonly UnderwaterPoint[]>();
+  readonly primaryLabel = input('Вы');
   /** Ряд алгоритма есть, только когда был фоновый прогон; иначе его нет ни в легенде, ни на графике. */
   protected readonly hasAlgo = computed(() =>
     this.points().some((p) => p.algoDrawdownPct !== null),

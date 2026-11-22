@@ -11,6 +11,7 @@ export class ReportStore {
   private readonly api = inject(REPORT_API);
   private readonly destroyRef = inject(DestroyRef);
   private loadSeq = 0;
+  private destroyed = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
@@ -74,6 +75,9 @@ export class ReportStore {
   });
 
   async load(sessionId: string): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
@@ -85,7 +89,7 @@ export class ReportStore {
 
     try {
       const res = await this.api.getReport(sessionId);
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.result.set(res);
@@ -93,33 +97,40 @@ export class ReportStore {
         this.schedulePoll(sessionId, seq, 1);
       }
     } catch (err) {
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.error.set(errorMessage(err, 'Не удалось загрузить отчёт.'));
     } finally {
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
   }
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.stopPolling());
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.loadSeq++;
+      this.stopPolling();
+    });
   }
 
   private schedulePoll(sessionId: string, seq: number, attempt: number, failures = 0): void {
+    if (this.destroyed || seq !== this.loadSeq) {
+      return;
+    }
     if (attempt > ReportStore.MAX_POLLS) {
       this.error.set('Отчёт собирается дольше обычного. Обновите страницу позже.');
       return;
     }
     this.pollTimer = setTimeout(async () => {
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       try {
         const res = await this.api.getReport(sessionId);
-        if (seq !== this.loadSeq) {
+        if (this.destroyed || seq !== this.loadSeq) {
           return;
         }
         this.result.set(res);
@@ -127,7 +138,7 @@ export class ReportStore {
           this.schedulePoll(sessionId, seq, attempt + 1);
         }
       } catch (err) {
-        if (seq !== this.loadSeq) {
+        if (this.destroyed || seq !== this.loadSeq) {
           return;
         }
         // Одиночный сбой сети не должен оставлять экран на «собирается» навсегда: повторяем.

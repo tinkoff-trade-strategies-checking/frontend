@@ -41,6 +41,11 @@ describe('LaunchPage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Новая сессия');
     expect(text).toContain('Торгую сам');
+    expect(text).toContain('мастерской');
+    expect(text).not.toContain('Запуск алгоритмов из мастерской пока недоступен');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('a[href="/workshop"]'),
+    ).not.toBeNull();
     expect(text).toContain('60 дн.');
     expect(text).toContain('1 д');
     expect(text).toContain('Эталон платформы');

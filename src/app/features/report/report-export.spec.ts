@@ -159,4 +159,25 @@ describe('ReportPage: выгрузка отчёта', () => {
     expect(list.length).toBe(2);
     expect(list.every((b) => b.disabled)).toBe(true);
   });
+
+  it('игнорирует повторный вызов download пока идёт экспорт', async () => {
+    const fixture = await render(false);
+    const http = TestBed.inject(HttpTestingController);
+    const page = fixture.componentInstance as unknown as {
+      download: (sessionId: string, format: 'xlsx' | 'csv') => Promise<void>;
+    };
+
+    const first = page.download('S-0103', 'xlsx');
+    const second = page.download('S-0103', 'csv');
+
+    const req = http.expectOne(
+      (r) => r.url === '/api/v1/sessions/S-0103/report/export' && r.params.get('format') === 'xlsx',
+    );
+    http.expectNone(
+      (r) => r.url === '/api/v1/sessions/S-0103/report/export' && r.params.get('format') === 'csv',
+    );
+    req.flush(new Blob(['x']));
+    await Promise.all([first, second]);
+    expect(saved).toHaveLength(1);
+  });
 });

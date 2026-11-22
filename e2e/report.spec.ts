@@ -23,12 +23,12 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(rows.first()).toContainText('GAZP');
   await expect(rows.first()).toContainText('День 19 (23.03)');
 
-  // Проверяем вкладку «Обратная проверка» и неактивную кнопку «Написать правило».
+  // Проверяем вкладку «Обратная проверка» и активную кнопку «Написать правило».
   await page.getByRole('button', { name: 'Обратная проверка' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody tr').first()).toContainText('GAZP');
   await expect(page.locator('tbody tr').first()).toContainText('+7 470,00 ₽');
-  await expect(page.getByRole('button', { name: 'Написать правило' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Написать правило' })).toBeEnabled();
 
   // Возвращаемся на «Расхождения» и переходим в воспроизведение на шаг расхождения (шаг 18 -> День 19).
   await page.getByRole('button', { name: 'Расхождения' }).click();
@@ -38,6 +38,17 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(page).toHaveURL(/\/replay\/S-0103\?step=18$/);
   await expect(page.getByRole('heading', { name: 'Воспроизведение' })).toBeVisible();
   await expect(page.getByText('День 19 из 60')).toBeVisible();
+});
+
+test('report/S-0103: «Написать правило» открывает создание черновика в мастерской', async ({
+  page,
+}) => {
+  await page.goto('/report/S-0103');
+  await page.getByRole('button', { name: 'Обратная проверка' }).click();
+  await page.getByRole('button', { name: 'Написать правило' }).click();
+
+  await expect(page).toHaveURL(/\/workshop\?create=1$/);
+  await expect(page.getByRole('heading', { name: 'Новый алгоритм' })).toBeVisible();
 });
 
 test('report/S-NO-ALGO: поля null не роняют страницу', async ({ page }) => {

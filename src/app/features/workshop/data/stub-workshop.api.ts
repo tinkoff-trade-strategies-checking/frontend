@@ -1111,7 +1111,8 @@ export class StubWorkshopApi implements WorkshopApi {
       return {
         ok: false,
         code: 'STRATEGY_INVALID',
-        detail: check.diagnostics.find((d) => d.level === 'ERROR')?.message ?? 'Ошибка DSL.',
+        lookaheadLevel: check.lookaheadLevel,
+        diagnostics: check.diagnostics,
       };
     }
 

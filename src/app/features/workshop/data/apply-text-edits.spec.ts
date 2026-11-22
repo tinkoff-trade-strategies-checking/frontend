@@ -43,12 +43,26 @@ describe('applyTextEdits', () => {
     expect(out).toBe('// 🚀 проверка\nlet x = limit;');
   });
 
-  it('ограничивает столбец концом строки без захвата разделителя строк', () => {
+  it('сохраняет порядок двух вставок в одну точку (start === end)', () => {
+    const out = applyTextEdits('helloworld', [
+      { startLine: 1, startColumn: 6, endLine: 1, endColumn: 6, replacement: ' ' },
+      { startLine: 1, startColumn: 6, endLine: 1, endColumn: 6, replacement: 'beautiful ' },
+    ]);
+    expect(out).toBe('hello beautiful world');
+  });
+
+  it('разрешает вставку в конец строки без захвата CRLF и бросает RangeError при столбце больше длины + 1', () => {
     const src = 'abc\r\ndef';
     const out = applyTextEdits(src, [
-      { startLine: 1, startColumn: 2, endLine: 1, endColumn: 99, replacement: 'XYZ' },
+      { startLine: 1, startColumn: 2, endLine: 1, endColumn: 4, replacement: 'XYZ' },
     ]);
     expect(out).toBe('aXYZ\r\ndef');
+
+    expect(() =>
+      applyTextEdits(src, [
+        { startLine: 1, startColumn: 2, endLine: 1, endColumn: 99, replacement: 'XYZ' },
+      ]),
+    ).toThrow(RangeError);
   });
 
   it('бросает ошибку при пересекающихся правках или некорректном диапазоне', () => {

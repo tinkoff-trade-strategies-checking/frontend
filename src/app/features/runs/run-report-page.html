@@ -324,7 +324,7 @@
           </div>
           <div class="chart-pad">
             @if (store.equityPoints().length > 0) {
-              <app-report-equity-chart [points]="store.equityPoints()" />
+              <app-report-equity-chart [points]="store.equityPoints()" primaryLabel="Алгоритм" />
             } @else {
               <div class="empty-state tui-text_body-s muted">Нет данных</div>
             }
@@ -336,7 +336,10 @@
           </div>
           <div class="chart-pad">
             @if (store.underwaterPoints().length > 0) {
-              <app-report-underwater-chart [points]="store.underwaterPoints()" />
+              <app-report-underwater-chart
+                [points]="store.underwaterPoints()"
+                primaryLabel="Алгоритм"
+              />
             } @else {
               <div class="empty-state tui-text_body-s muted">Нет данных</div>
             }

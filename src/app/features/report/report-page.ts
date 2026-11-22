@@ -102,6 +102,9 @@ export class ReportPage implements OnInit {
   }
 
   protected async download(sessionId: string, format: ReportExportFormat): Promise<void> {
+    if (this.exporting()) {
+      return;
+    }
     this.exporting.set(true);
     this.exportError.set(null);
     try {
@@ -149,6 +152,6 @@ export class ReportPage implements OnInit {
   }
 
   protected openWorkshop(): void {
-    void this.router.navigate(['/workshop']);
+    void this.router.navigate(['/workshop'], { queryParams: { create: '1' } });
   }
 }

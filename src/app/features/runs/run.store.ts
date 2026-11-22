@@ -153,6 +153,7 @@ export class RunStore {
               }
             : current,
         );
+        this.closeEvents();
         void this.refreshRun(runId, seq);
         break;
       case 'report_ready':
@@ -160,8 +161,9 @@ export class RunStore {
         this.closeEvents();
         break;
       case 'stream_failed':
-        this.streamError.set('Поток событий прогона закрыт сервером.');
         this.closeEvents();
+        this.streamError.set('Поток событий прогона закрыт сервером.');
+        void this.refreshRun(runId, seq);
         break;
     }
   }

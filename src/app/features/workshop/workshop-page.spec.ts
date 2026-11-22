@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
+import { of, Subject } from 'rxjs';
 import { vi } from 'vitest';
 import { RUNS_API, RunsApi } from '../runs/data/runs.models';
 import {
@@ -575,6 +576,24 @@ describe('WorkshopPage', () => {
       paramOverrides: expect.objectContaining({ fast: 20 }),
     });
     expect(navSpy).toHaveBeenCalledWith(['/runs', 'R-9999']);
+  });
+
+  it('открывает создание нового черновика при переходе на /workshop?create=1', async () => {
+    const queryParamMap$ = new Subject<ReturnType<typeof convertToParamMap>>();
+    TestBed.overrideProvider(ActivatedRoute, {
+      useValue: { queryParamMap: queryParamMap$.asObservable() },
+    });
+
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    queryParamMap$.next(convertToParamMap({ create: '1' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const store = fixture.debugElement.injector.get(WorkshopStore);
+    expect(store.editorMode()).toBe('create');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Новый алгоритм');
+    void of(true);
   });
 });
 

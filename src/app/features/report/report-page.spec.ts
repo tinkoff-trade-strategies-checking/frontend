@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { BehaviorSubject } from 'rxjs';
 import { vi } from 'vitest';
@@ -426,7 +426,10 @@ describe('ReportPage', () => {
     expect(replayLink?.getAttribute('href')).toContain('/replay/S-0103?step=5');
   });
 
-  it('вкладка «Обратная проверка» показывает прибыльные сделки со входом «лишнее действие» и неактивную кнопку', async () => {
+  it('вкладка «Обратная проверка» показывает прибыльные сделки со входом «лишнее действие» и активную кнопку перехода в мастерскую', async () => {
+    const router = TestBed.inject(Router);
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
     const fixture = TestBed.createComponent(ReportPage);
     const store = fixture.debugElement.injector.get(ReportStore);
     fixture.detectChanges();
@@ -442,7 +445,10 @@ describe('ReportPage', () => {
     const ruleBtn = Array.from(root.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Написать правило'),
     );
-    expect(ruleBtn?.disabled).toBe(true);
+    expect(ruleBtn).toBeDefined();
+    expect(ruleBtn?.disabled).toBe(false);
+    ruleBtn?.click();
+    expect(navSpy).toHaveBeenCalledWith(['/workshop'], { queryParams: { create: '1' } });
   });
 
   it('для S-0105 кнопка «Посмотреть в воспроизведении» неактивна, а обратная проверка содержит SBER', async () => {

@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Api } from '../../../api/api';
 import { checkWorkshopStrategy } from '../../../api/fn/workshop/check-workshop-strategy';
@@ -16,6 +17,7 @@ import { WorkshopDetailResult as ApiWorkshopDetailResult } from '../../../api/mo
 import { WorkshopDraft as ApiWorkshopDraft } from '../../../api/models/workshop-draft';
 import { toProblem } from '../../../core/api-problem';
 import {
+  CheckLevel,
   CheckStrategyResult,
   CheckWorkshopStrategyCommand,
   CreateWorkshopAlgorithmCommand,
@@ -23,6 +25,7 @@ import {
   PublishWorkshopAlgorithmCommand,
   PublishWorkshopResult,
   SaveWorkshopDraftCommand,
+  StrategyDiagnostic,
   WORKSHOP_DEFAULT_PAGE_SIZE,
   WorkshopAlgorithmDetail,
   WorkshopAlgorithmSummary,
@@ -34,6 +37,38 @@ import {
   WorkshopQuery,
   WorkshopVisibility,
 } from './workshop.models';
+
+function parseProblemObject(error: unknown): Record<string, unknown> {
+  if (!(error instanceof HttpErrorResponse)) {
+    return {};
+  }
+  let raw: unknown = error.error;
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  return typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+}
+
+function parseCheckLevel(raw: unknown): CheckLevel {
+  return raw === 'OK' || raw === 'WARNING' || raw === 'ERROR' ? raw : 'ERROR';
+}
+
+function parseDiagnostics(raw: unknown): readonly StrategyDiagnostic[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter(
+    (item): item is StrategyDiagnostic =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof (item as { code?: unknown }).code === 'string' &&
+      typeof (item as { message?: unknown }).message === 'string',
+  );
+}
 
 function mapVersion(v: ApiWorkshopVersion): WorkshopAlgorithmVersion {
   return {
@@ -151,7 +186,13 @@ export class HttpWorkshopApi implements WorkshopApi {
     } catch (error) {
       const problem = toProblem(error);
       if (problem.status === 422 && problem.code === 'STRATEGY_INVALID') {
-        return { ok: false, code: 'STRATEGY_INVALID', detail: problem.detail };
+        const body = parseProblemObject(error);
+        return {
+          ok: false,
+          code: 'STRATEGY_INVALID',
+          lookaheadLevel: parseCheckLevel(body['lookaheadLevel']),
+          diagnostics: parseDiagnostics(body['diagnostics']),
+        };
       }
       throw error;
     }

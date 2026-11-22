@@ -4,6 +4,7 @@ import {
   formatDiagnosticLocation,
   formatLinterSummary,
   formatRunRejection,
+  formatStrategyInvalidMessage,
   formatWorkshopDateTime,
   validateStrategyParam,
 } from './workshop.format';
@@ -41,7 +42,7 @@ describe('workshop.format', () => {
     expect(formatDiagnosticLocation({ startLine: 12, startColumn: 5 })).toBe('12:5');
   });
 
-  it('валидирует параметры StrategyParamDecl: диапазон, целочисленность и шаг', () => {
+  it('валидирует параметры StrategyParamDecl: диапазон и целочисленность (без блокировки по step)', () => {
     const intParam = {
       name: 'slow',
       defaultValue: 50,
@@ -51,11 +52,21 @@ describe('workshop.format', () => {
       integer: true,
     };
     expect(validateStrategyParam(intParam, 55)).toBeNull();
+    expect(validateStrategyParam(intParam, 23)).toBeNull();
     expect(validateStrategyParam(intParam, null)).toContain('числовое');
     expect(validateStrategyParam(intParam, 25.5)).toContain('целым');
     expect(validateStrategyParam(intParam, 10)).toContain('20');
     expect(validateStrategyParam(intParam, 250)).toContain('200');
-    expect(validateStrategyParam(intParam, 23)).toContain('шагу 5');
+
+    const unalignedDefaultParam = {
+      name: 'fast',
+      defaultValue: 12,
+      rangeMin: 5,
+      rangeMax: 50,
+      step: '5',
+      integer: true,
+    };
+    expect(validateStrategyParam(unalignedDefaultParam, 12)).toBeNull();
 
     const floatParam = {
       name: 'stop_pct',
@@ -66,10 +77,29 @@ describe('workshop.format', () => {
       integer: false,
     };
     expect(validateStrategyParam(floatParam, 5.5)).toBeNull();
-    expect(validateStrategyParam(floatParam, 5.3)).toContain('шагу 0.5');
+    expect(validateStrategyParam(floatParam, 5.3)).toBeNull();
   });
 
-  it('форматирует отказ запуска прогона для STRATEGY_INVALID и LaunchRejectReason', () => {
+  it('форматирует ошибки STRATEGY_INVALID и отказ запуска прогона без вывода сырого английского detail', () => {
+    expect(
+      formatStrategyInvalidMessage([
+        {
+          code: 'E-LA01',
+          level: 'ERROR',
+          startLine: 3,
+          startColumn: 1,
+          endLine: 3,
+          endColumn: 10,
+          message: 'Обращение к будущему бару',
+          fixes: [],
+        },
+      ]),
+    ).toBe('Публикация невозможна — ошибки DSL: E-LA01: Обращение к будущему бару');
+
+    expect(formatStrategyInvalidMessage([])).toBe(
+      'Стратегия содержит ошибки DSL и не может быть опубликована.',
+    );
+
     expect(
       formatRunRejection({
         accepted: false,
@@ -77,12 +107,23 @@ describe('workshop.format', () => {
         field: 'strategyVersionId',
         barsCount: null,
         maxBars: null,
-        detail: 'Обращение к будущему бару.',
+        detail: 'Strategy contains static errors and cannot be executed',
       }),
     ).toEqual({
       title: 'Стратегия не прошла проверку (STRATEGY_INVALID)',
-      suggestion: 'Обращение к будущему бару.',
+      suggestion: 'Исправьте ошибки DSL в черновике и опубликуйте новую версию.',
     });
+
+    const invalidParams = formatRunRejection({
+      accepted: false,
+      reason: 'INVALID_PARAMS',
+      field: 'initialCapital',
+      barsCount: null,
+      maxBars: null,
+      detail: 'initialCapital must be positive',
+    });
+    expect(invalidParams.title).toContain('начальный капитал');
+    expect(invalidParams.suggestion).not.toContain('must be positive');
 
     expect(
       formatRunRejection({
