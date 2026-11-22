@@ -111,3 +111,60 @@ test('форк, проверка DSL с автоисправлением, пуб
   await expect(page).toHaveURL(/\/runs\/R-\d{4}$/);
   await expect(page.getByText('Отчёт сформирован и готов к просмотру.')).toBeVisible();
 });
+
+test('сравнение выбранных алгоритмов (UC-22): переход из compareList, метрики, наложение кривых и снятие алгоритма', async ({
+  page,
+}) => {
+  await page.goto('/workshop');
+
+  const addToCompare = async (id: string) => {
+    await page.locator(`tr[data-algo-id="${id}"]`).getByRole('button', { name: 'Открыть' }).click();
+    const detail = page.getByRole('complementary', { name: 'Карточка алгоритма' });
+    await detail.getByRole('button', { name: 'Добавить в сравнение' }).click();
+  };
+
+  // При 1 алгоритме кнопка «Сравнить (1)» отключена и видна подсказка.
+  await addToCompare('A-0002');
+  await expect(page.getByText('Выберите ещё минимум один алгоритм')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Сравнить (1)' })).toBeDisabled();
+
+  // Добавляем ещё 2 алгоритма (один с прогоном, один без прогона) и переходим к сравнению.
+  await addToCompare('A-0003');
+  await addToCompare('A-0001');
+
+  const compareLink = page.getByRole('link', { name: 'Сравнить (3)' });
+  await expect(compareLink).toBeVisible();
+  await compareLink.click();
+
+  await expect(page).toHaveURL(/\/workshop\/compare\?ids=A-0002,A-0003,A-0001/);
+  await expect(page.getByRole('heading', { name: 'Сравнение алгоритмов' })).toBeVisible();
+
+  // Сравнительная таблица метрик, выделение лучшего значения, предупреждение о разных периодах и «Нет прогона».
+  await expect(page.locator('.compare-table')).toContainText('Momentum RSI');
+  await expect(page.locator('.compare-table')).toContainText('Breakout ATR');
+  await expect(page.locator('.compare-table')).toContainText('Эталон платформы');
+  await expect(page.locator('.compare-table')).toContainText('+8,15 %');
+  await expect(page.locator('.compare-table')).toContainText('+3,74 %');
+  await expect(page.locator('.compare-table')).toContainText('Нет прогона');
+  await expect(page.locator('.compare-table .best-cell').first()).toBeVisible();
+  await expect(page.getByText('разных периодах, таймфреймах или наборах бумаг')).toBeVisible();
+
+  // Наложение кривых доходности (canvas), переключение режима и скрытие серии.
+  const chart = page.locator('app-workshop-compare-chart');
+  await expect(chart.locator('canvas').first()).toBeVisible();
+  const legendBtn = chart.getByRole('button', { name: 'Momentum RSI' });
+  await expect(legendBtn).toHaveAttribute('aria-pressed', 'true');
+  await legendBtn.click();
+  await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
+  await chart.getByRole('button', { name: 'Капитал, ₽' }).click();
+
+  // Убираем алгоритм без прогона прямо на экране сравнения: состояние графика сохраняется.
+  await page.getByRole('button', { name: 'Убрать Эталон платформы из сравнения' }).click();
+  await expect(page.locator('th[data-compare-algo="A-0001"]')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/workshop\/compare\?ids=A-0002,A-0003/);
+  await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
+
+  await page.getByRole('link', { name: 'Назад в Мастерскую' }).click();
+  await expect(page).toHaveURL(/\/workshop\?compare=A-0002,A-0003/);
+  await expect(page.getByText('В сравнении: 2 из 5')).toBeVisible();
+});

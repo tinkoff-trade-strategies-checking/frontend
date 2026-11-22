@@ -1,0 +1,217 @@
+<section class="compare-page">
+  <header class="compare-header">
+    <div>
+      <h1 class="tui-text_h3">Сравнение алгоритмов</h1>
+      <p class="tui-text_body-m muted">
+        Сводка по последнему завершённому прогону каждого выбранного алгоритма из Мастерской.
+      </p>
+    </div>
+    <a
+      tuiButton
+      size="m"
+      appearance="outline"
+      routerLink="/workshop"
+      [queryParams]="backQueryParams()"
+    >
+      Назад в Мастерскую
+    </a>
+  </header>
+
+  @if (store.error(); as msg) {
+    <div tuiNotification appearance="negative" size="s" role="alert">{{ msg }}</div>
+  }
+
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка отчётов прогонов…</div>
+  } @else if (store.entries().length === 0) {
+    <div class="panel empty-state">
+      <span class="tui-text_body-m muted">Нет выбранных алгоритмов для сравнения.</span>
+      <a tuiButton size="m" appearance="primary" routerLink="/workshop">Выбрать в Мастерской</a>
+    </div>
+  } @else {
+    <section class="panel chips-bar" aria-label="Алгоритмы в сравнении">
+      @for (item of store.entries(); track item.id) {
+        <span class="compare-chip">
+          <span class="tui-text_body-s">
+            {{
+              item.status === 'not_found'
+                ? item.id
+                : item.latestVersion > 0
+                  ? item.name + ' v' + item.latestVersion
+                  : item.name + ' (Черновик)'
+            }}
+          </span>
+          <button
+            type="button"
+            class="chip-remove"
+            [attr.aria-label]="
+              'Убрать ' + (item.status === 'not_found' ? item.id : item.name) + ' из сравнения'
+            "
+            (click)="remove(item.id)"
+          >
+            ×
+          </button>
+        </span>
+      }
+    </section>
+
+    @if (store.entries().length < 2) {
+      <div tuiNotification appearance="info" size="s">
+        Для полноценного сравнения выберите минимум 2 алгоритма в Мастерской.
+      </div>
+    }
+
+    @if (store.hasDifferentContexts()) {
+      <div tuiNotification appearance="warning" size="s">
+        Последние прогоны алгоритмов выполнялись на разных периодах, таймфреймах или наборах бумаг —
+        учитывайте это при сопоставлении метрик и кривых.
+      </div>
+    }
+
+    @if (store.chartSeries().length > 0) {
+      <section class="panel chart-panel">
+        <div class="panel-head">
+          <h2 class="tui-text_h6">Наложение кривых доходности</h2>
+          <span class="tui-text_body-xs muted">
+            По умолчанию кривые нормированы в % к начальному капиталу прогона
+          </span>
+        </div>
+        <div class="chart-wrap">
+          <app-workshop-compare-chart [series]="store.chartSeries()" />
+        </div>
+      </section>
+    }
+
+    <section class="panel table-panel">
+      <div class="table-scroll">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Показатель</th>
+              @for (item of store.entries(); track item.id) {
+                <th [attr.data-compare-algo]="item.id">
+                  <div class="col-head">
+                    @if (item.status === 'not_found') {
+                      <strong>{{ item.id }}</strong>
+                      <span class="tui-text_body-xs muted">Не найден</span>
+                    } @else {
+                      <strong>{{ item.name }}</strong>
+                      <span class="tui-text_body-xs muted">
+                        {{ item.author }} ·
+                        {{ item.latestVersion > 0 ? 'v' + item.latestVersion : 'Черновик' }}
+                      </span>
+                    }
+                    <button
+                      tuiButton
+                      type="button"
+                      size="xs"
+                      appearance="flat"
+                      (click)="remove(item.id)"
+                    >
+                      Убрать
+                    </button>
+                  </div>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Последний прогон</td>
+              @for (item of store.entries(); track item.id) {
+                <td>
+                  @if (item.status === 'ready') {
+                    <div class="run-cell">
+                      <span tuiBadge size="s" [appearance]="statusAppearance(item.report.status)">
+                        {{ statusLabels[item.report.status] }}
+                      </span>
+                      <a class="tui-text_body-xs" [routerLink]="['/runs', item.runId, 'report']">
+                        Отчёт {{ item.runId }}
+                      </a>
+                    </div>
+                  } @else if (item.status === 'no_run') {
+                    <div class="no-run-cell">
+                      <span tuiBadge size="s" appearance="neutral">Нет прогона</span>
+                      @if (item.latestVersion > 0) {
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="outline"
+                          routerLink="/workshop"
+                          [queryParams]="{ algo: item.id, run: '1' }"
+                        >
+                          Запустить прогон
+                        </a>
+                      } @else {
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="outline"
+                          routerLink="/workshop"
+                          [queryParams]="{ algo: item.id }"
+                        >
+                          Открыть карточку
+                        </a>
+                        <span class="tui-text_body-xs muted"> Опубликуйте версию для прогона </span>
+                      }
+                    </div>
+                  } @else {
+                    <span class="tui-text_body-s muted">Алгоритм скрыт или удалён</span>
+                  }
+                </td>
+              }
+            </tr>
+            <tr>
+              <td>Период и режим</td>
+              @for (item of store.entries(); track item.id) {
+                <td class="tui-text_body-s">
+                  @if (item.status === 'ready') {
+                    <div>{{ item.report.period.label }}</div>
+                    <div class="tui-text_body-xs muted">
+                      {{ regimeLabels[item.report.regime] }} ·
+                      {{ timeframeLabels[item.report.timeframe] }} ({{ item.report.playedDays }}/{{
+                        item.report.totalDays
+                      }}
+                      дн.)
+                    </div>
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+              }
+            </tr>
+            <tr>
+              <td>Инструменты</td>
+              @for (item of store.entries(); track item.id) {
+                <td class="tui-text_body-s">
+                  @if (item.status === 'ready') {
+                    {{ paperList(item) }}
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+              }
+            </tr>
+            @for (row of metricRows; track row.key) {
+              <tr>
+                <td>{{ row.label }}</td>
+                @for (item of store.entries(); track item.id) {
+                  <td
+                    class="num"
+                    [class.best-cell]="item.status === 'ready' && isBest(row.key, item.id)"
+                  >
+                    @if (item.status === 'ready') {
+                      {{ row.format(item) }}
+                    } @else {
+                      <span class="muted">—</span>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</section>

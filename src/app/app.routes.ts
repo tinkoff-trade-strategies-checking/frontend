@@ -37,6 +37,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
   {
+    path: 'workshop/compare',
+    title: 'Сравнение алгоритмов',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/workshop/workshop-compare-page').then((m) => m.WorkshopComparePage),
+  },
+  {
     path: 'runs/:id',
     title: 'Прогон алгоритма',
     canActivate: [authGuard],
