@@ -16,8 +16,8 @@ info:
     Необязательные поля отчёта и истории — `null`, а не пропуск.
     Производные величины (проценты портфеля, позиций и сделок, издержки, `changePct`, кривая просадки, длительность
     просадки в днях) считает core (core#54), backend только передаёт результат без арифметики; проценты уже ×100.
-    Они есть всегда. `null` остаётся только у отложенного (разбор расхождений, обратная проверка, сравнение,
-    фоновый алгоритм — ФТ-18…20) и у `changePct` бумаги без бара на курсоре.
+    Они есть всегда. `null` остаётся у `changePct` бумаги без бара на курсоре, а также у полей фонового алгоритма
+    для старых сессий без привязанного алгоритма (до ФТ-18…20).
 
     CSRF (Spring Security, cookie-токен). Токен — cookie `XSRF-TOKEN` (без HttpOnly, его читает Angular),
     клиент без токена получает его из ответа `GET /me`, в том числе из `401`. Заголовок `X-XSRF-TOKEN`
@@ -35,6 +35,10 @@ tags:
     description: Учётные записи, вход и текущая сессия
   - name: marketdata
     description: Каталог бумаг и параметры запуска
+  - name: workshop
+    description: Мастерская алгоритмов — каталог, черновики, проверка, публикация, форк, видимость
+  - name: simulation
+    description: Прогоны алгоритмов на истории, очередь, SSE, повтор
   - name: sessions
     description: 'Ручная торговля — сессии, плеер, заявки, SSE, воспроизведение'
   - name: analysis
@@ -515,6 +519,339 @@ paths:
               schema: { $ref: '#/components/schemas/HistoryPage' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
+  /workshop/algorithms:
+    get:
+      tags: [workshop]
+      operationId: listWorkshopAlgorithms
+      summary: Каталог алгоритмов Мастерской
+      description: Возвращает опубликованные публичные алгоритмы и собственные алгоритмы текущего пользователя.
+      parameters:
+        - { name: sort, in: query, schema: { $ref: '#/components/schemas/WorkshopSortField' } }
+        - { name: authorId, in: query, schema: { $ref: '#/components/schemas/Uuid' } }
+        - { name: mineOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: cleanOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: search, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Страница каталога алгоритмов
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [workshop]
+      operationId: createWorkshopAlgorithm
+      summary: Создать новый алгоритм и его черновик
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateWorkshopAlgorithmRequest' }
+      responses:
+        '201':
+          description: Черновик алгоритма создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopDraft' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /workshop/algorithms/{id}:
+    get:
+      tags: [workshop]
+      operationId: getWorkshopAlgorithm
+      summary: Карточка алгоритма Мастерской
+      description: Чужие скрытые и несуществующие алгоритмы возвращают 200 со статусом `NOT_FOUND`.
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      responses:
+        '200':
+          description: Карточка алгоритма или NOT_FOUND
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopDetailResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /workshop/algorithms/{id}/draft:
+    get:
+      tags: [workshop]
+      operationId: getWorkshopDraft
+      summary: Получить черновик алгоритма владельца
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      responses:
+        '200':
+          description: Черновик алгоритма
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopDraft' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      tags: [workshop]
+      operationId: saveWorkshopDraft
+      summary: Сохранить черновик алгоритма владельца
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWorkshopDraftRequest' }
+      responses:
+        '200':
+          description: Черновик обновлён
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopDraft' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /workshop/check:
+    post:
+      tags: [workshop]
+      operationId: checkWorkshopStrategy
+      summary: Статическая проверка и линтер DSL-стратегии
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckStrategyRequest' }
+      responses:
+        '200':
+          description: Результат статической проверки и объявленные параметры
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckStrategyResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /workshop/algorithms/{id}/publish:
+    post:
+      tags: [workshop]
+      operationId: publishWorkshopAlgorithm
+      summary: Опубликовать новую неизменяемую версию алгоритма (INV-5)
+      description: Предварительно вызывает статическую проверку; при `lookaheadLevel == ERROR` возвращает 422 `STRATEGY_INVALID`.
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PublishWorkshopAlgorithmRequest' }
+      responses:
+        '201':
+          description: Версия опубликована
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopAlgorithmVersion' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /workshop/algorithms/{id}/fork:
+    post:
+      tags: [workshop]
+      operationId: forkWorkshopAlgorithm
+      summary: Создать черновик на основе опубликованной версии алгоритма (UC-20)
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForkWorkshopAlgorithmRequest' }
+      responses:
+        '201':
+          description: Создан новый алгоритм-форк с черновиком
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopDraft' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /workshop/algorithms/{id}/visibility:
+    patch:
+      tags: [workshop]
+      operationId: updateWorkshopVisibility
+      summary: Скрыть или вернуть собственный алгоритм в каталог (UC-21)
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/AlgorithmId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateWorkshopVisibilityRequest' }
+      responses:
+        '200':
+          description: Видимость обновлена
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkshopAlgorithmSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /runs:
+    post:
+      tags: [simulation]
+      operationId: createRun
+      summary: Запустить прогон алгоритма на истории (UC-14)
+      description: |
+        Подбирает период через `LaunchPlanner` и ставит прогон в фоновую очередь воркера.
+        При отклонении параметров периода — 422 `LaunchProblem`, при статических ошибках DSL — 422 `STRATEGY_INVALID`.
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRunRequest' }
+      responses:
+        '201':
+          description: Прогон поставлен в очередь
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedRun' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422':
+          description: Параметры запуска отклонены или стратегия содержит ошибки DSL
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LaunchProblem'
+                  - $ref: '#/components/schemas/Problem'
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /runs/{runId}:
+    get:
+      tags: [simulation]
+      operationId: getRun
+      summary: Статус и метаданные прогона алгоритма
+      description: В слепом режиме до завершения прогона период и бумаги не раскрываются (INV-7).
+      parameters: [{ $ref: '#/components/parameters/RunId' }]
+      responses:
+        '200':
+          description: Состояние прогона
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunInfo' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /runs/{runId}/repeat:
+    post:
+      tags: [simulation]
+      operationId: repeatRun
+      summary: Повторить прогон с теми же параметрами, снапшотом и периодом (UC-18, INV-4)
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/RunId' }]
+      responses:
+        '201':
+          description: Повторный прогон поставлен в очередь
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CreatedRun' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /runs/{runId}/events:
+    get:
+      tags: [simulation]
+      operationId: streamRunEvents
+      summary: Поток событий прогона алгоритма (SSE)
+      description: Поддерживает `Last-Event-ID`. Публикует `run_progress`, `run_finished`, `run_failed`, `report_ready`.
+      parameters:
+        - { $ref: '#/components/parameters/RunId' }
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        '200':
+          description: 'SSE-поток событий (`RunEvent` в `data:`, `id:` — монотонный идентификатор события)'
+          content:
+            text/event-stream:
+              schema: { $ref: '#/components/schemas/RunEvent' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /runs/{runId}/report:
+    get:
+      tags: [analysis]
+      operationId: getRunReport
+      summary: Отчёт прогона алгоритма
+      description: Всегда 200 со статусом `READY`, `BUILDING`, `NOT_FINISHED` или `NOT_FOUND`.
+      parameters: [{ $ref: '#/components/parameters/RunId' }]
+      responses:
+        '200':
+          description: Отчёт прогона или его состояние
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunReportResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /runs/{runId}/report/export:
+    get:
+      tags: [analysis]
+      operationId: exportRunReport
+      summary: Выгрузка отчёта прогона алгоритма (ФТ-17)
+      description: |
+        Файл из сохранённого отчёта завершённого прогона (`run-<runId>.xlsx` или `run-<runId>.zip`).
+        Чужой или несуществующий прогон — 404. Незавершённый или ещё строящийся отчёт — 409.
+      parameters:
+        - { $ref: '#/components/parameters/RunId' }
+        - { name: format, in: query, required: true, schema: { type: string, enum: [xlsx, csv] } }
+      responses:
+        '200':
+          description: Файл выгрузки
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="run-<runId>.xlsx"` или `.zip` для csv'
+              schema: { type: string }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/zip:
+              schema: { type: string, format: binary }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
 components:
   securitySchemes:
     sessionCookie:
@@ -546,6 +883,16 @@ components:
       schema: { $ref: '#/components/schemas/Uuid' }
     OrderId:
       name: orderId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    AlgorithmId:
+      name: id
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/Uuid' }
+    RunId:
+      name: runId
       in: path
       required: true
       schema: { $ref: '#/components/schemas/Uuid' }
@@ -648,6 +995,8 @@ components:
         - TOO_MANY_BARS
         - INVALID_PARAMS
         - CORPORATE_ACTION_ON_PERIOD
+        - STRATEGY_INVALID
+        - CONFLICT
         - BAD_REQUEST
         - UNAUTHENTICATED
         - INVALID_CREDENTIALS
@@ -745,7 +1094,7 @@ components:
       enum: [NO_MATCHING_PERIOD, TOO_MANY_BARS, INVALID_PARAMS, CORPORATE_ACTION_ON_PERIOD]
     HistoryStatus:
       type: string
-      enum: [running, completed, finished_early, bankrupt]
+      enum: [running, completed, finished_early, bankrupt, invalid, failed]
     PlayerAction:
       type: string
       enum: [play, pause, step, speed]
@@ -827,6 +1176,9 @@ components:
           type: [array, 'null']
           items: { $ref: '#/components/schemas/Uuid' }
         initialCapital: { $ref: '#/components/schemas/Money' }
+        backgroundAlgorithmId:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+          description: Необязательный идентификатор алгоритма из каталога мастерской для фонового сравнения (по умолчанию — «Эталон платформы»)
     CreatedSession:
       type: object
       required: [sessionId]
@@ -1704,7 +2056,7 @@ components:
         step: { type: integer }
         date: { type: string, format: date-time }
         humanCapital: { $ref: '#/components/schemas/Money' }
-        algoCapital: { $ref: '#/components/schemas/MoneyOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoCapital: { $ref: '#/components/schemas/MoneyOrNull', description: 'Капитал фонового алгоритма (ФТ-18); null, если на шаге нет точки или у старой сессии нет алгоритма' }
         benchmarkCapital: { $ref: '#/components/schemas/MoneyOrNull' }
     UnderwaterPoint:
       type: object
@@ -1713,7 +2065,7 @@ components:
         step: { type: integer }
         date: { type: string, format: date-time }
         humanDrawdownPct: { $ref: '#/components/schemas/Pct', description: 'Глубина просадки от пика в %, считает core (core#54)' }
-        algoDrawdownPct: { $ref: '#/components/schemas/PctOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoDrawdownPct: { $ref: '#/components/schemas/PctOrNull', description: 'Просадка фонового алгоритма в % (ФТ-18); null, если на шаге нет точки или у старой сессии нет алгоритма' }
     DivergenceType:
       type: string
       enum: [extra, missed, size, timing]
@@ -1823,17 +2175,17 @@ components:
         timeframe: { $ref: '#/components/schemas/Timeframe' }
         regime: { $ref: '#/components/schemas/Regime' }
         createdAt: { type: string, format: date-time }
-        backgroundAlgorithmName: { type: [string, 'null'], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        backgroundAlgorithmName: { type: [string, 'null'], description: 'Название фонового алгоритма сессии (ФТ-18); null для старых сессий без алгоритма' }
         period: { $ref: '#/components/schemas/Period' }
         papers: { type: array, items: { $ref: '#/components/schemas/PaperReveal' } }
         humanMetrics: { $ref: '#/components/schemas/ReportMetrics' }
-        algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'Метрики фонового алгоритма (ФТ-18); null для старых сессий без алгоритма' }
+        comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'Сравнение результатов человека и фонового алгоритма (ФТ-18); null для старых сессий без алгоритма' }
         equityCurve: { type: array, items: { $ref: '#/components/schemas/EquityPoint' } }
         underwaterCurve: { type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' }, description: 'Кривая просадки: точка на каждую точку `equityCurve`, считает core (core#54)' }
-        divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'Сводка по расхождениям (ФТ-19); null для старых сессий без алгоритма' }
+        divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'Список расхождений (ФТ-18…19); null для старых сессий без алгоритма' }
+        reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'Пропущенные алгоритмом прибыльные сделки человека (ФТ-20); null для старых сессий без алгоритма' }
         roundTrips: { type: array, items: { $ref: '#/components/schemas/RoundTrip' } }
         fills: { type: array, items: { $ref: '#/components/schemas/ReportFill' } }
     ReportReady:
@@ -1923,3 +2275,399 @@ components:
         page: { type: integer }
         pageSize: { type: integer }
         totalPages: { type: integer }
+    # ---------- мастерская ----------
+    WorkshopSortField:
+      type: string
+      enum: [published_desc, name_asc, author_asc]
+    WorkshopLicense:
+      type: string
+      enum: [MIT]
+    WorkshopVisibility:
+      type: string
+      enum: [public, hidden]
+    CheckLevel:
+      type: string
+      enum: [OK, WARNING, ERROR]
+    TextEdit:
+      type: object
+      required: [startLine, startColumn, endLine, endColumn, replacement]
+      properties:
+        startLine: { type: integer, minimum: 1 }
+        startColumn: { type: integer, minimum: 1 }
+        endLine: { type: integer, minimum: 1 }
+        endColumn: { type: integer, minimum: 1 }
+        replacement: { type: string }
+    DiagnosticFix:
+      type: object
+      required: [description, edits]
+      properties:
+        description: { type: string }
+        edits: { type: array, items: { $ref: '#/components/schemas/TextEdit' } }
+    StrategyDiagnostic:
+      type: object
+      required: [code, level, startLine, startColumn, endLine, endColumn, message, fixes]
+      properties:
+        code: { type: string }
+        level: { $ref: '#/components/schemas/CheckLevel' }
+        startLine: { type: integer, minimum: 0 }
+        startColumn: { type: integer, minimum: 0 }
+        endLine: { type: integer, minimum: 0 }
+        endColumn: { type: integer, minimum: 0 }
+        message: { type: string }
+        fixes: { type: array, items: { $ref: '#/components/schemas/DiagnosticFix' } }
+    StrategyParamDecl:
+      type: object
+      required: [name, defaultValue, rangeMin, rangeMax, step, integer]
+      properties:
+        name: { type: string }
+        defaultValue: { type: number }
+        rangeMin: { type: [number, 'null'] }
+        rangeMax: { type: [number, 'null'] }
+        step: { type: [string, 'null'] }
+        integer: { type: boolean }
+    CheckStrategyRequest:
+      type: object
+      required: [source]
+      properties:
+        source: { type: string }
+        paramOverrides:
+          type: object
+          additionalProperties: { type: number }
+    CheckStrategyResult:
+      type: object
+      required: [lookaheadLevel, diagnostics, params]
+      properties:
+        lookaheadLevel: { $ref: '#/components/schemas/CheckLevel' }
+        diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
+        params: { type: array, items: { $ref: '#/components/schemas/StrategyParamDecl' } }
+    WorkshopLinterWarning:
+      type: object
+      required: [code, line, message]
+      properties:
+        code: { type: string }
+        line: { type: integer }
+        message: { type: string }
+    WorkshopAlgorithmVersion:
+      type: object
+      description: INV-5 — опубликованные версии алгоритма неизменяемы
+      required: [version, publishedAt, summary, immutable]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        version: { type: integer, minimum: 1 }
+        publishedAt: { type: string, format: date-time }
+        summary: { type: string }
+        immutable: { type: boolean, const: true }
+        source: { type: string }
+        lookaheadLevel: { $ref: '#/components/schemas/CheckLevel' }
+        diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
+        params: { type: array, items: { $ref: '#/components/schemas/StrategyParamDecl' } }
+    WorkshopAuthorOption:
+      type: object
+      required: [id, name]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+    WorkshopAlgorithmSummary:
+      type: object
+      required: [id, name, description, authorId, author, isMine, isSystem, visibility, latestVersion, publishedAt, license, linterWarnings]
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description: { type: string }
+        authorId: { $ref: '#/components/schemas/Uuid' }
+        author: { type: string }
+        isMine: { type: boolean }
+        isSystem: { type: boolean }
+        visibility: { $ref: '#/components/schemas/WorkshopVisibility' }
+        latestVersion: { type: integer, minimum: 0 }
+        latestVersionId: { $ref: '#/components/schemas/UuidOrNull' }
+        publishedAt: { type: [string, 'null'], format: date-time }
+        license: { $ref: '#/components/schemas/WorkshopLicense' }
+        linterWarnings: { type: array, items: { $ref: '#/components/schemas/WorkshopLinterWarning' } }
+    WorkshopAlgorithmDetail:
+      allOf:
+        - $ref: '#/components/schemas/WorkshopAlgorithmSummary'
+        - type: object
+          required: [versions]
+          properties:
+            versions: { type: array, items: { $ref: '#/components/schemas/WorkshopAlgorithmVersion' } }
+    WorkshopDetailReady:
+      type: object
+      required: [status, algorithm]
+      properties:
+        status: { type: string, const: READY }
+        algorithm: { $ref: '#/components/schemas/WorkshopAlgorithmDetail' }
+    WorkshopDetailNotFound:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, const: NOT_FOUND }
+    WorkshopDetailResult:
+      oneOf:
+        - $ref: '#/components/schemas/WorkshopDetailReady'
+        - $ref: '#/components/schemas/WorkshopDetailNotFound'
+      discriminator:
+        propertyName: status
+        mapping:
+          READY: '#/components/schemas/WorkshopDetailReady'
+          NOT_FOUND: '#/components/schemas/WorkshopDetailNotFound'
+    WorkshopPage:
+      type: object
+      required: [items, authors, total, page, pageSize, totalPages]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/WorkshopAlgorithmSummary' } }
+        authors: { type: array, items: { $ref: '#/components/schemas/WorkshopAuthorOption' } }
+        total: { type: integer }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalPages: { type: integer }
+    CreateWorkshopAlgorithmRequest:
+      type: object
+      required: [name, source]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        description: { type: string, maxLength: 2000 }
+        source: { type: string }
+    UpdateWorkshopDraftRequest:
+      type: object
+      properties:
+        name: { type: [string, 'null'], minLength: 1, maxLength: 80 }
+        description: { type: [string, 'null'], maxLength: 2000 }
+        source: { type: [string, 'null'] }
+    WorkshopDraft:
+      type: object
+      required: [strategyId, name, description, source, updatedAt, check]
+      properties:
+        strategyId: { $ref: '#/components/schemas/Uuid' }
+        name: { type: string }
+        description: { type: string }
+        source: { type: string }
+        updatedAt: { type: string, format: date-time }
+        check:
+          oneOf:
+            - $ref: '#/components/schemas/CheckStrategyResult'
+            - { type: 'null' }
+    PublishWorkshopAlgorithmRequest:
+      type: object
+      properties:
+        summary: { type: string, maxLength: 500 }
+        source: { type: [string, 'null'] }
+    ForkWorkshopAlgorithmRequest:
+      type: object
+      properties:
+        version: { type: [integer, 'null'], minimum: 1 }
+        name: { type: [string, 'null'], minLength: 1, maxLength: 80 }
+        description: { type: [string, 'null'], maxLength: 2000 }
+    UpdateWorkshopVisibilityRequest:
+      type: object
+      required: [visibility]
+      properties:
+        visibility: { $ref: '#/components/schemas/WorkshopVisibility' }
+    # ---------- прогоны алгоритмов ----------
+    RunStatus:
+      type: string
+      enum: [queued, running, completed, bankrupt, invalid, failed]
+    CreateRunRequest:
+      type: object
+      required: [strategyVersionId, durationDays, timeframe, regime, startMode, customStartDate, paperCount, paperIds, initialCapital]
+      properties:
+        strategyVersionId: { $ref: '#/components/schemas/Uuid' }
+        paramOverrides:
+          type: object
+          additionalProperties: { type: number }
+        blind: { type: boolean, default: false }
+        durationDays: { type: integer, enum: [20, 60, 120, 250] }
+        timeframe: { $ref: '#/components/schemas/Timeframe' }
+        regime: { $ref: '#/components/schemas/Regime' }
+        startMode: { type: string, enum: [random, custom] }
+        customStartDate: { type: [string, 'null'], format: date, description: Только для custom }
+        paperCount: { type: [integer, 'null'] }
+        paperIds:
+          type: [array, 'null']
+          items: { $ref: '#/components/schemas/Uuid' }
+        initialCapital: { $ref: '#/components/schemas/Money' }
+    CreatedRun:
+      type: object
+      required: [runId]
+      properties:
+        runId: { $ref: '#/components/schemas/Uuid' }
+    RunInfo:
+      type: object
+      description: Состояние прогона; в слепом режиме период и бумаги не раскрываются до завершения (INV-7)
+      required: [runId, strategyVersionId, algoName, blind, status, doneSteps, totalSteps, repeatOfRunId, repeatMatch, lastEventId, createdAt, finishedAt, errorCode, period, papers]
+      properties:
+        runId: { $ref: '#/components/schemas/Uuid' }
+        strategyVersionId: { $ref: '#/components/schemas/Uuid' }
+        algoName: { type: string }
+        blind: { type: boolean }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        doneSteps: { type: integer, minimum: 0 }
+        totalSteps: { type: [integer, 'null'], minimum: 0 }
+        repeatOfRunId: { $ref: '#/components/schemas/UuidOrNull' }
+        repeatMatch: { type: [boolean, 'null'] }
+        lastEventId: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        errorCode: { type: [string, 'null'] }
+        diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
+        period:
+          oneOf:
+            - $ref: '#/components/schemas/Period'
+            - { type: 'null' }
+        papers:
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/PaperReveal' }
+            - { type: 'null' }
+    RunEvent:
+      oneOf:
+        - $ref: '#/components/schemas/RunProgressEvent'
+        - $ref: '#/components/schemas/RunFinishedEvent'
+        - $ref: '#/components/schemas/RunFailedEvent'
+        - $ref: '#/components/schemas/RunReportReadyEvent'
+      discriminator:
+        propertyName: type
+        mapping:
+          run_progress: '#/components/schemas/RunProgressEvent'
+          run_finished: '#/components/schemas/RunFinishedEvent'
+          run_failed: '#/components/schemas/RunFailedEvent'
+          report_ready: '#/components/schemas/RunReportReadyEvent'
+    RunProgressEvent:
+      type: object
+      unevaluatedProperties: false
+      required: [type, eventId, doneSteps, totalSteps]
+      properties:
+        type: { type: string, const: run_progress }
+        eventId: { type: string }
+        doneSteps: { type: integer, minimum: 0 }
+        totalSteps: { type: integer, minimum: 0 }
+    RunFinishedEvent:
+      type: object
+      unevaluatedProperties: false
+      required: [type, eventId, status, repeatMatch]
+      properties:
+        type: { type: string, const: run_finished }
+        eventId: { type: string }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        repeatMatch: { type: [boolean, 'null'] }
+    RunFailedEvent:
+      type: object
+      unevaluatedProperties: false
+      required: [type, eventId, errorCode]
+      properties:
+        type: { type: string, const: run_failed }
+        eventId: { type: string }
+        errorCode: { type: string }
+    RunReportReadyEvent:
+      type: object
+      unevaluatedProperties: false
+      required: [type, eventId, runId]
+      properties:
+        type: { type: string, const: report_ready }
+        eventId: { type: string }
+        runId: { $ref: '#/components/schemas/Uuid' }
+    StrategyFinding:
+      type: object
+      required: [code, level, message, step]
+      properties:
+        code: { type: string }
+        level: { $ref: '#/components/schemas/CheckLevel' }
+        message: { type: string }
+        step: { type: integer }
+    RunOrder:
+      type: object
+      required: [id, paperTicker, side, orderType, lots, status, placedStep, closedStep, ruleName, because]
+      properties:
+        id: { type: integer }
+        paperTicker: { type: string }
+        side: { $ref: '#/components/schemas/OrderSide' }
+        orderType: { $ref: '#/components/schemas/OrderLegType' }
+        lots: { type: integer, minimum: 1 }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        placedStep: { type: integer }
+        closedStep: { type: [integer, 'null'] }
+        limitPrice: { $ref: '#/components/schemas/PriceOrNull' }
+        stopPrice: { $ref: '#/components/schemas/PriceOrNull' }
+        trailingPct: { $ref: '#/components/schemas/PctOrNull' }
+        ruleName: { type: string }
+        because: { type: string }
+    RunEquityPoint:
+      type: object
+      required: [step, date, capital, benchmarkCapital]
+      properties:
+        step: { type: integer }
+        date: { type: string, format: date-time }
+        capital: { $ref: '#/components/schemas/Money' }
+        benchmarkCapital: { $ref: '#/components/schemas/MoneyOrNull' }
+    RunUnderwaterPoint:
+      type: object
+      required: [step, date, drawdownPct]
+      properties:
+        step: { type: integer }
+        date: { type: string, format: date-time }
+        drawdownPct: { $ref: '#/components/schemas/Pct' }
+    AlgoRunReport:
+      type: object
+      description: Раскрытый отчёт завершённого прогона алгоритма (INV-1, INV-4, INV-7)
+      required: [runId, strategyVersionId, algoName, blind, status, playedDays, totalDays, timeframe, regime, createdAt, repeatOfRunId, repeatMatch, level, findings, diagnostics, period, papers, metrics, equityCurve, underwaterCurve, roundTrips, fills, orders]
+      properties:
+        runId: { $ref: '#/components/schemas/Uuid' }
+        strategyVersionId: { $ref: '#/components/schemas/Uuid' }
+        algoName: { type: string }
+        blind: { type: boolean }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        playedDays: { type: integer }
+        totalDays: { type: integer }
+        timeframe: { $ref: '#/components/schemas/Timeframe' }
+        regime: { $ref: '#/components/schemas/Regime' }
+        createdAt: { type: string, format: date-time }
+        repeatOfRunId: { $ref: '#/components/schemas/UuidOrNull' }
+        repeatMatch: { type: [boolean, 'null'] }
+        level: { $ref: '#/components/schemas/CheckLevel' }
+        findings: { type: array, items: { $ref: '#/components/schemas/StrategyFinding' } }
+        diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
+        period: { $ref: '#/components/schemas/Period' }
+        papers: { type: array, items: { $ref: '#/components/schemas/PaperReveal' } }
+        metrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }] }
+        equityCurve: { type: array, items: { $ref: '#/components/schemas/RunEquityPoint' } }
+        underwaterCurve: { type: array, items: { $ref: '#/components/schemas/RunUnderwaterPoint' } }
+        roundTrips: { type: array, items: { $ref: '#/components/schemas/RoundTrip' } }
+        fills: { type: array, items: { $ref: '#/components/schemas/ReportFill' } }
+        orders: { type: array, items: { $ref: '#/components/schemas/RunOrder' } }
+    RunReportReady:
+      type: object
+      required: [status, report]
+      properties:
+        status: { type: string, const: READY }
+        report: { $ref: '#/components/schemas/AlgoRunReport' }
+    RunReportBuilding:
+      type: object
+      required: [status, runId]
+      properties:
+        status: { type: string, const: BUILDING }
+        runId: { $ref: '#/components/schemas/Uuid' }
+    RunNotFinished:
+      type: object
+      required: [status, runId]
+      properties:
+        status: { type: string, const: NOT_FINISHED }
+        runId: { $ref: '#/components/schemas/Uuid' }
+    RunNotFound:
+      type: object
+      required: [status, runId]
+      properties:
+        status: { type: string, const: NOT_FOUND }
+        runId: { $ref: '#/components/schemas/Uuid' }
+    RunReportResult:
+      oneOf:
+        - $ref: '#/components/schemas/RunReportReady'
+        - $ref: '#/components/schemas/RunReportBuilding'
+        - $ref: '#/components/schemas/RunNotFinished'
+        - $ref: '#/components/schemas/RunNotFound'
+      discriminator:
+        propertyName: status
+        mapping:
+          READY: '#/components/schemas/RunReportReady'
+          BUILDING: '#/components/schemas/RunReportBuilding'
+          NOT_FINISHED: '#/components/schemas/RunNotFinished'
+          NOT_FOUND: '#/components/schemas/RunNotFound'

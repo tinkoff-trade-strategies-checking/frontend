@@ -3,6 +3,8 @@ import { inject, Injectable, InjectionToken } from '@angular/core';
 import { Api } from '../../../api/api';
 import { exportReport$VndOpenxmlformatsOfficedocumentSpreadsheetmlSheet as exportXlsx } from '../../../api/fn/analysis/export-report-vnd-openxmlformats-officedocument-spreadsheetml-sheet';
 import { exportReport$Zip as exportZip } from '../../../api/fn/analysis/export-report-zip';
+import { exportRunReport$VndOpenxmlformatsOfficedocumentSpreadsheetmlSheet as exportRunXlsx } from '../../../api/fn/analysis/export-run-report-vnd-openxmlformats-officedocument-spreadsheetml-sheet';
+import { exportRunReport$Zip as exportRunZip } from '../../../api/fn/analysis/export-run-report-zip';
 
 export type ReportExportFormat = 'xlsx' | 'csv';
 
@@ -24,14 +26,15 @@ export const FILE_SAVER = new InjectionToken<FileSaver>('FILE_SAVER', {
   },
 });
 
-/** Имя файла из `Content-Disposition`, иначе по умолчанию (`report-<id>.xlsx`, для CSV — `.zip`). */
+/** Имя файла из `Content-Disposition`, иначе по умолчанию (`report-<id>.xlsx` / `run-<id>.xlsx`, для CSV — `.zip`). */
 export function exportFileName(
   header: string | null,
-  sessionId: string,
+  id: string,
   format: ReportExportFormat,
+  prefix: 'report' | 'run' = 'report',
 ): string {
   const match = header === null ? null : /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(header);
-  const fallback = `report-${sessionId}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
+  const fallback = `${prefix}-${id}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
   if (!match) {
     return fallback;
   }
@@ -78,6 +81,22 @@ export class ReportExportService {
       this.saveFile(
         response.body,
         exportFileName(response.headers.get('Content-Disposition'), sessionId, format),
+      );
+    } catch (error) {
+      throw await readProblem(error);
+    }
+  }
+
+  /** Выгрузка отчёта завершённого прогона алгоритма (ФТ-17): XLSX или ZIP с CSV. */
+  async downloadRun(runId: string, format: ReportExportFormat): Promise<void> {
+    try {
+      const response =
+        format === 'xlsx'
+          ? await this.api.invoke$Response(exportRunXlsx, { runId, format })
+          : await this.api.invoke$Response(exportRunZip, { runId, format });
+      this.saveFile(
+        response.body,
+        exportFileName(response.headers.get('Content-Disposition'), runId, format, 'run'),
       );
     } catch (error) {
       throw await readProblem(error);

@@ -37,6 +37,18 @@ export const routes: Routes = [
     loadComponent: () => import('./features/workshop/workshop-page').then((m) => m.WorkshopPage),
   },
   {
+    path: 'runs/:id',
+    title: 'Прогон алгоритма',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/runs/run-page').then((m) => m.RunPage),
+  },
+  {
+    path: 'runs/:id/report',
+    title: 'Отчёт прогона',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/runs/run-report-page').then((m) => m.RunReportPage),
+  },
+  {
     path: 'report',
     pathMatch: 'full',
     redirectTo: () => (inject(STUB_MODE) ? `report/${DEFAULT_REPORT_SESSION_ID}` : 'history'),

@@ -53,5 +53,7 @@ describe('api-problem', () => {
     }
     expect(PROBLEM_MESSAGES.TOO_MANY_BARS).toBeNull();
     expect(errorMessage(httpError(422, { code: 'TOO_MANY_BARS' }), 'запасной')).toBe('запасной');
+    expect(errorMessage(httpError(422, { code: 'STRATEGY_INVALID' }), 'запасной')).toContain('DSL');
+    expect(errorMessage(httpError(409, { code: 'CONFLICT' }), 'запасной')).toContain('Конфликт');
   });
 });

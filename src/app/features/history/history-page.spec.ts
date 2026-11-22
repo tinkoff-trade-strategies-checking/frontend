@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
+import { vi } from 'vitest';
+import { RUNS_API, RunsApi } from '../runs/data/runs.models';
+import { StubRunsApi } from '../runs/data/stub-runs.api';
 import {
   HISTORY_API,
   HistoryApi,
@@ -118,6 +121,36 @@ describe('HistoryPage', () => {
 
     expect(el.textContent).toContain('Страница 2 из 2');
     expect(el.querySelectorAll('tbody tr').length).toBe(5);
+  });
+
+  it('для algo_run ведёт в /runs/:id, /runs/:id/report и вызывает repeatRun по кнопке «Повторить»', async () => {
+    const router = TestBed.inject(Router);
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const runningRow = el.querySelector('tr[data-session-id="R-0203"]');
+    expect(runningRow?.querySelector('a[href="/runs/R-0203"]')?.textContent?.trim()).toBe(
+      'Прогресс',
+    );
+
+    const doneRow = el.querySelector('tr[data-session-id="R-0205"]');
+    expect(doneRow?.querySelector('a[href="/runs/R-0205/report"]')?.textContent?.trim()).toBe(
+      'Открыть отчёт',
+    );
+
+    const repeatBtn = Array.from(doneRow?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Повторить',
+    );
+    expect(repeatBtn).toBeDefined();
+    repeatBtn?.click();
+
+    await vi.waitFor(() => expect(navSpy).toHaveBeenCalled());
+    expect(navSpy).toHaveBeenCalledWith(['/runs', expect.stringMatching(/^R-\d{4}$/)]);
   });
 });
 
@@ -297,6 +330,7 @@ describe('HistoryPage: ошибка и утечки', () => {
             provide: HISTORY_API,
             useValue: { list: async () => ({ ...emptyPage(), items: [leaky], total: 1 }) },
           },
+          { provide: RUNS_API, useClass: StubRunsApi },
           HistoryStore,
         ],
       },
@@ -316,6 +350,7 @@ describe('HistoryPage: ошибка и утечки', () => {
       set: {
         providers: [
           { provide: HISTORY_API, useValue: { list: () => Promise.reject(new Error('x')) } },
+          { provide: RUNS_API, useClass: StubRunsApi },
           HistoryStore,
         ],
       },
@@ -328,5 +363,74 @@ describe('HistoryPage: ошибка и утечки', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Не удалось загрузить историю сессий.');
     expect(text).not.toContain('под выбранные фильтры нет');
+  });
+
+  it('отображает статусы invalid/failed и показывает ошибку если repeatRun не удался', async () => {
+    const items: HistoryEntry[] = [
+      {
+        id: 'R-INV',
+        kind: 'algo_run',
+        owner: 'USER',
+        blind: false,
+        status: 'invalid',
+        createdAt: '2026-11-18T10:00:00+03:00',
+        regime: 'calm',
+        title: 'Битая стратегия',
+        papers: ['SBER'],
+        periodLabel: '10.04.2023 — 05.07.2023',
+        netReturnPct: null,
+        playedDays: 0,
+        totalDays: 60,
+        algoName: 'Битая стратегия',
+      },
+      {
+        id: 'R-FAIL',
+        kind: 'algo_run',
+        owner: 'USER',
+        blind: false,
+        status: 'failed',
+        createdAt: '2026-11-18T09:00:00+03:00',
+        regime: 'stress',
+        title: 'Сбой воркера',
+        papers: ['GAZP'],
+        periodLabel: '10.04.2023 — 05.07.2023',
+        netReturnPct: null,
+        playedDays: 5,
+        totalDays: 60,
+        algoName: 'Сбой воркера',
+      },
+    ];
+    const failingRuns: Pick<RunsApi, 'repeatRun'> = {
+      repeatRun: () => Promise.reject(new Error('boom')),
+    };
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          {
+            provide: HISTORY_API,
+            useValue: { list: async () => ({ ...emptyPage(), items, total: 2 }) },
+          },
+          { provide: RUNS_API, useValue: failingRuns },
+          HistoryStore,
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Невалидный');
+    expect(el.textContent).toContain('Ошибка');
+
+    const repeatBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('tr[data-session-id="R-INV"] button'),
+    ).find((b) => b.textContent?.trim() === 'Повторить');
+    repeatBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Не удалось повторить прогон.');
   });
 });

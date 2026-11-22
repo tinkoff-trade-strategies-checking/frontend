@@ -1,0 +1,161 @@
+<section class="run-page">
+  @if (store.error(); as message) {
+    <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+  }
+  @if (store.actionError(); as message) {
+    <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+  }
+  @if (store.streamError(); as message) {
+    <div tuiNotification appearance="warning" size="s" role="alert">{{ message }}</div>
+  }
+
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка прогона…</div>
+  } @else if (store.run(); as run) {
+    <header class="run-header">
+      <div class="title-group">
+        <h1 class="tui-text_h3">{{ run.algoName }}</h1>
+        <span class="tui-text_body-xs muted">{{ run.runId }}</span>
+        <span class="tui-text_body-xs muted">версия {{ run.strategyVersionId }}</span>
+        <span tuiBadge size="s" [appearance]="run.blind ? 'info' : 'neutral'">
+          {{ run.blind ? 'Слепой' : 'Неслепой' }}
+        </span>
+        <span tuiBadge size="s" [appearance]="statusAppearance(run.status)">
+          {{ statusLabels[run.status] }}
+        </span>
+        @if (run.repeatOfRunId !== null) {
+          @if (run.repeatMatch === true) {
+            <span tuiBadge size="s" appearance="positive">Повтор совпал</span>
+          } @else if (run.repeatMatch === false) {
+            <span tuiBadge size="s" appearance="negative">
+              Повтор не совпал (расхождение INV-4)
+            </span>
+          } @else {
+            <span tuiBadge size="s" appearance="neutral">Сравнение выполняется</span>
+          }
+        }
+      </div>
+
+      <div class="actions-group">
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          [appearance]="store.reportReady() ? 'primary' : 'outline'"
+          [disabled]="!store.isTerminal()"
+          (click)="openReport(run.runId)"
+        >
+          Открыть отчёт
+        </button>
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          appearance="outline"
+          [disabled]="store.repeating()"
+          (click)="repeat(run.runId)"
+        >
+          Повторить прогон
+        </button>
+        <a tuiButton size="m" appearance="flat" routerLink="/history">К истории</a>
+      </div>
+    </header>
+
+    @if (store.reportReady()) {
+      <div tuiNotification appearance="positive" size="s">
+        Отчёт сформирован и готов к просмотру.
+      </div>
+    }
+
+    @if (run.repeatOfRunId; as baseId) {
+      <div class="tui-text_body-s muted">
+        Контрольный повтор прогона
+        <a [routerLink]="['/runs', baseId]">{{ baseId }}</a>
+      </div>
+    }
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="tui-text_h6">Прогресс выполнения</h2>
+        <span class="tui-text_body-s num">
+          {{ run.doneSteps }} / {{ run.totalSteps ?? '—' }} шагов ({{ store.progressPct() }} %)
+        </span>
+      </div>
+      <div class="panel-body">
+        <progress tuiProgressBar [max]="100" [value]="store.progressPct()"></progress>
+      </div>
+    </section>
+
+    @if (
+      run.status === 'invalid' ||
+      run.status === 'failed' ||
+      run.errorCode !== null ||
+      run.diagnostics.length > 0
+    ) {
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="tui-text_h6">Диагностики и ошибки</h2>
+        </div>
+        <div class="panel-body">
+          @if (run.errorCode; as code) {
+            <div tuiNotification appearance="negative" size="s">
+              Код ошибки выполнения: <strong>{{ code }}</strong>
+            </div>
+          }
+          @for (diag of run.diagnostics; track $index) {
+            <div class="diag-row">
+              <span tuiBadge size="s" [appearance]="levelAppearance(diag.level)">
+                {{ levelLabels[diag.level] }}
+              </span>
+              <strong class="tui-text_body-s">{{ diag.code }}</strong>
+              @if (diag.startLine > 0) {
+                <span class="tui-text_body-xs muted">
+                  стр. {{ diag.startLine }}:{{ diag.startColumn }}
+                </span>
+              }
+              <span class="tui-text_body-s">{{ diag.message }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @if (run.period !== null || run.papers !== null) {
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="tui-text_h6">
+            {{ run.blind ? 'Период и бумаги раскрыты' : 'Период и бумаги' }}
+          </h2>
+        </div>
+        <div class="reveal-grid">
+          @if (run.period; as period) {
+            <div class="reveal-card">
+              <span class="tui-text_body-xs muted">Период</span>
+              <strong class="tui-text_body-l">{{ period.label }}</strong>
+            </div>
+          }
+          @if (run.papers; as papers) {
+            @for (paper of papers; track paper.id) {
+              <div class="reveal-card">
+                <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
+                @if (run.blind) {
+                  <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
+                }
+                <strong class="tui-text_body-l">{{ paper.ticker }}</strong>
+                <span class="tui-text_body-xs muted">
+                  {{ paper.name }} · лот {{ paper.lotSize }}
+                </span>
+              </div>
+            }
+          }
+        </div>
+      </section>
+    } @else if (run.blind) {
+      <div tuiNotification appearance="info" size="s">
+        В слепом режиме период и бумаги скрыты до завершения прогона.
+      </div>
+    }
+  } @else if (!store.error()) {
+    <div tuiNotification appearance="info" size="s">Прогон не найден.</div>
+  }
+</section>

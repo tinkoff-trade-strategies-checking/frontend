@@ -1,0 +1,488 @@
+<section class="run-report-page">
+  @if (store.error(); as message) {
+    <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+  }
+  @if (store.actionError(); as message) {
+    <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+  }
+
+  @if (store.loading()) {
+    <div tuiNotification appearance="info" size="s">Загрузка отчёта прогона…</div>
+  } @else if (store.result(); as res) {
+    @if (res.status === 'BUILDING') {
+      <header class="report-header">
+        <h1 class="tui-text_h3">Отчёт прогона</h1>
+        <span class="tui-text_body-xs muted">{{ res.runId }}</span>
+      </header>
+      <div tuiNotification appearance="info" size="s">
+        <strong>Отчёт строится</strong>
+        <div class="tui-text_body-s">{{ res.message }}</div>
+      </div>
+      <div>
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          appearance="primary"
+          (click)="store.load(res.runId)"
+        >
+          Обновить
+        </button>
+      </div>
+    } @else if (res.status === 'NOT_FINISHED') {
+      <header class="report-header">
+        <h1 class="tui-text_h3">Отчёт прогона</h1>
+        <span class="tui-text_body-xs muted">{{ res.runId }}</span>
+      </header>
+      <div tuiNotification appearance="warning" size="s">
+        <strong>Отчёт недоступен до завершения прогона</strong>
+        <div class="tui-text_body-s">
+          Откройте страницу выполнения, чтобы дождаться завершения расчёта.
+        </div>
+      </div>
+      <div>
+        <a tuiButton size="m" appearance="primary" [routerLink]="['/runs', res.runId]">
+          Перейти к прогону
+        </a>
+      </div>
+    } @else if (res.status === 'NOT_FOUND') {
+      <header class="report-header">
+        <h1 class="tui-text_h3">Отчёт прогона не найден</h1>
+      </header>
+      <div tuiNotification appearance="info" size="s">Прогон {{ res.runId }} не найден.</div>
+      <div>
+        <a tuiButton size="m" appearance="primary" routerLink="/history">К истории</a>
+      </div>
+    } @else {
+      @let rep = res.report;
+
+      <header class="report-header">
+        <div class="title-group">
+          <h1 class="tui-text_h3">{{ rep.algoName }}</h1>
+          <span class="tui-text_body-xs muted">{{ rep.runId }}</span>
+          <span tuiBadge size="s" [appearance]="rep.blind ? 'info' : 'neutral'">
+            {{ rep.blind ? 'Слепой (раскрыт)' : 'Неслепой' }}
+          </span>
+          <span tuiBadge size="s" appearance="neutral">{{ regimeLabels[rep.regime] }}</span>
+          <span tuiBadge size="s" appearance="neutral">{{ timeframeLabels[rep.timeframe] }}</span>
+          <span tuiBadge size="s" [appearance]="statusAppearance(rep.status)">
+            {{ statusLabels[rep.status] }}
+          </span>
+          <span tuiBadge size="s" [appearance]="levelAppearance(rep.level)">
+            {{ levelLabels[rep.level] }}
+          </span>
+          @if (rep.repeatOfRunId !== null) {
+            @if (rep.repeatMatch === true) {
+              <span tuiBadge size="s" appearance="positive">Повтор совпал</span>
+            } @else if (rep.repeatMatch === false) {
+              <span tuiBadge size="s" appearance="negative">
+                Повтор не совпал (расхождение INV-4)
+              </span>
+            } @else {
+              <span tuiBadge size="s" appearance="neutral">Сравнение выполняется</span>
+            }
+          }
+        </div>
+
+        <div class="export-group">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            [disabled]="store.repeating()"
+            (click)="repeat(rep.runId)"
+          >
+            Повторить прогон
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            [disabled]="exporting()"
+            (click)="download(rep.runId, 'xlsx')"
+          >
+            Скачать XLSX
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            [disabled]="exporting()"
+            (click)="download(rep.runId, 'csv')"
+          >
+            Скачать CSV
+          </button>
+          <a tuiButton size="s" appearance="flat" [routerLink]="['/runs', rep.runId]">К прогону</a>
+          @if (exportError(); as message) {
+            <span class="tui-text_body-xs export-error" role="alert">{{ message }}</span>
+          }
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="tui-text_h6">Проверки и находки (ФТ-14)</h2>
+          <span tuiBadge size="s" [appearance]="levelAppearance(rep.level)">
+            {{ levelLabels[rep.level] }}
+          </span>
+        </div>
+        <div class="panel-body">
+          @if (rep.findings.length === 0) {
+            <div class="tui-text_body-s muted">Находок времени выполнения нет.</div>
+          } @else {
+            @for (finding of rep.findings; track $index) {
+              <div class="finding-row">
+                <span tuiBadge size="s" [appearance]="levelAppearance(finding.level)">
+                  {{ levelLabels[finding.level] }}
+                </span>
+                <strong class="tui-text_body-s">{{ finding.code }}</strong>
+                <span class="tui-text_body-xs muted">шаг {{ finding.step }}</span>
+                <span class="tui-text_body-s">{{ finding.message }}</span>
+              </div>
+            }
+          }
+          @if (rep.diagnostics.length > 0) {
+            <h3 class="tui-text_body-m subheading">Диагностики стратегии</h3>
+            @for (diag of rep.diagnostics; track $index) {
+              <div class="finding-row">
+                <span tuiBadge size="s" [appearance]="levelAppearance(diag.level)">
+                  {{ levelLabels[diag.level] }}
+                </span>
+                <strong class="tui-text_body-s">{{ diag.code }}</strong>
+                @if (diag.startLine > 0) {
+                  <span class="tui-text_body-xs muted">
+                    стр. {{ diag.startLine }}:{{ diag.startColumn }}
+                  </span>
+                }
+                <span class="tui-text_body-s">{{ diag.message }}</span>
+              </div>
+            }
+          }
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="tui-text_h6">
+            {{ rep.blind ? 'Период и бумаги раскрыты' : 'Период и бумаги' }}
+          </h2>
+        </div>
+        <div class="reveal-grid">
+          <div class="reveal-card">
+            <span class="tui-text_body-xs muted">Период</span>
+            <strong class="tui-text_body-l">{{ rep.period.label }}</strong>
+            <span class="tui-text_body-xs muted">
+              {{ rep.playedDays }} из {{ rep.totalDays }} дн.
+            </span>
+          </div>
+          @for (paper of rep.papers; track paper.id) {
+            <div class="reveal-card">
+              <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
+              @if (rep.blind) {
+                <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
+              }
+              <strong class="tui-text_body-l">{{ paper.ticker }}</strong>
+              <span class="tui-text_body-xs muted">
+                {{ paper.name }} · старт {{ formatRub(paper.startPriceRub) }} · лот
+                {{ paper.lotSize }}
+              </span>
+            </div>
+          }
+        </div>
+      </section>
+
+      @if (rep.metrics; as m) {
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="tui-text_h6">Метрики и издержки</h2>
+          </div>
+          <div class="metrics-grid">
+            <div class="metrics-col">
+              <h3 class="tui-text_body-m subheading">Показатели эффективности</h3>
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <td>Начальный капитал</td>
+                    <td class="num">{{ formatRub(m.initialCapitalRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Итоговый капитал</td>
+                    <td class="num">{{ formatRub(m.finalCapitalRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Total (итоговая доходность)</td>
+                    <td class="num">{{ formatPct(m.totalReturnPct, true) }}</td>
+                  </tr>
+                  <tr>
+                    <td>CAGR (годовая)</td>
+                    <td class="num">{{ formatPct(m.cagrPct, true) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Gross / Net</td>
+                    <td class="num">
+                      {{ formatPct(m.grossReturnPct, true) }} /
+                      {{ formatPct(m.netReturnPct, true) }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Макс. просадка</td>
+                    <td class="num neg">−{{ formatPct(m.maxDrawdownPct) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Длительность просадки</td>
+                    <td class="num">
+                      {{
+                        formatDrawdownDuration(
+                          m.maxDrawdownDurationDays,
+                          m.maxDrawdownDurationSteps
+                        )
+                      }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Волатильность (год.)</td>
+                    <td class="num">{{ formatPct(m.volatilityPct) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Sharpe / Sortino</td>
+                    <td class="num">{{ formatRatio(m.sharpe) }} / {{ formatRatio(m.sortino) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Бенчмарк IMOEX</td>
+                    <td class="num">{{ formatPct(m.benchmarkImoexPct, true) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="metrics-col">
+              <h3 class="tui-text_body-m subheading">Активность и издержки</h3>
+              <table class="data-table">
+                <tbody>
+                  <tr>
+                    <td>Оборот</td>
+                    <td class="num">{{ formatRatio(m.turnover) }}×</td>
+                  </tr>
+                  <tr>
+                    <td>Закрытых сделок (пары FIFO)</td>
+                    <td class="num">{{ m.tradesCount }}</td>
+                  </tr>
+                  <tr>
+                    <td>Win rate</td>
+                    <td class="num">{{ formatPct(m.winRatePct) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Отказов / частичных исполнений</td>
+                    <td class="num">{{ m.rejectedOrdersCount }} / {{ m.partialFillsCount }}</td>
+                  </tr>
+                  <tr>
+                    <td>HHI / Крупнейшая позиция</td>
+                    <td class="num">
+                      {{ formatRatio(m.hhi) }} / {{ formatPct(m.largestPositionPct) }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Издержки: комиссия брокера</td>
+                    <td class="num">{{ formatRub(m.costsRub.commissionRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Издержки: биржевой сбор</td>
+                    <td class="num">{{ formatRub(m.costsRub.exchangeFeeRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Издержки: спред</td>
+                    <td class="num">{{ formatRub(m.costsRub.spreadRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td>Издержки: проскальзывание</td>
+                    <td class="num">{{ formatRub(m.costsRub.slippageRub) }}</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Издержки всего</strong></td>
+                    <td class="num">
+                      <strong>{{ formatRub(m.costsRub.totalRub) }}</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      } @else {
+        <div tuiNotification appearance="warning" size="s">
+          Метрики недоступны для прогона со статусом «{{ statusLabels[rep.status] }}».
+        </div>
+      }
+
+      <div class="charts-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="tui-text_h6">Кривая капитала</h2>
+          </div>
+          <div class="chart-pad">
+            @if (store.equityPoints().length > 0) {
+              <app-report-equity-chart [points]="store.equityPoints()" />
+            } @else {
+              <div class="empty-state tui-text_body-s muted">Нет данных</div>
+            }
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="tui-text_h6">Underwater-просадка</h2>
+          </div>
+          <div class="chart-pad">
+            @if (store.underwaterPoints().length > 0) {
+              <app-report-underwater-chart [points]="store.underwaterPoints()" />
+            } @else {
+              <div class="empty-state tui-text_body-s muted">Нет данных</div>
+            }
+          </div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="panel-header">
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="tabIndex(store.activeTab())"
+            (activeItemIndexChange)="onTabIndexChange($event)"
+          >
+            @for (tab of tabs; track tab.id) {
+              <button type="button">{{ tab.label }}</button>
+            }
+          </tui-segmented>
+        </div>
+
+        @if (store.activeTab() === 'fills') {
+          <div class="tab-body">
+            @if (rep.fills.length === 0) {
+              <div tuiNotification appearance="info" size="s">Исполненных сделок нет.</div>
+            } @else {
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>День</th>
+                      <th>Бумага</th>
+                      <th>Сторона</th>
+                      <th>Тип</th>
+                      <th class="num">Лоты</th>
+                      <th class="num">Цена</th>
+                      <th class="num">Издержки</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (fill of rep.fills; track fill.id) {
+                      <tr>
+                        <td>День {{ fill.day }} ({{ fill.dateLabel }})</td>
+                        <td>{{ fill.paperTicker }}</td>
+                        <td [class.pos]="fill.side === 'buy'" [class.neg]="fill.side === 'sell'">
+                          {{ fill.side === 'buy' ? 'Покупка' : 'Продажа' }}
+                        </td>
+                        <td>{{ orderTypeLabels[fill.orderType] }}</td>
+                        <td class="num">{{ fill.lots }}</td>
+                        <td class="num">{{ formatRub(fill.priceRub) }}</td>
+                        <td class="num">{{ formatRub(fill.costRub) }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+            <h3 class="tui-text_h6">Результаты сделок</h3>
+            @if (rep.roundTrips.length === 0) {
+              <div tuiNotification appearance="info" size="s">Закрытых сделок нет.</div>
+            } @else {
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Бумага</th>
+                      <th>Вход</th>
+                      <th>Выход</th>
+                      <th class="num">Лоты</th>
+                      <th class="num">Цена входа</th>
+                      <th class="num">Цена выхода</th>
+                      <th class="num">Издержки</th>
+                      <th class="num">Результат</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (trip of rep.roundTrips; track $index) {
+                      <tr>
+                        <td>{{ trip.paperTicker }}</td>
+                        <td>{{ trip.entryDateLabel }}</td>
+                        <td>{{ trip.exitDateLabel }}</td>
+                        <td class="num">{{ trip.lots }}</td>
+                        <td class="num">{{ formatRub(trip.entryPriceRub) }}</td>
+                        <td class="num">{{ formatRub(trip.exitPriceRub) }}</td>
+                        <td class="num">{{ formatRub(trip.costsRub) }}</td>
+                        <td
+                          class="num"
+                          [class.pos]="trip.netPnlRub > 0"
+                          [class.neg]="trip.netPnlRub < 0"
+                        >
+                          {{ formatRub(trip.netPnlRub, true) }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        } @else {
+          <div class="tab-body">
+            @if (rep.orders.length === 0) {
+              <div tuiNotification appearance="info" size="s">Заявок алгоритма нет.</div>
+            } @else {
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Шаг</th>
+                      <th>Бумага</th>
+                      <th>Сторона</th>
+                      <th>Тип / условие</th>
+                      <th class="num">Лоты</th>
+                      <th>Статус</th>
+                      <th>Правило</th>
+                      <th>Причина (because)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (order of rep.orders; track order.id) {
+                      <tr>
+                        <td class="num">
+                          {{ order.placedStep
+                          }}{{ order.closedStep !== null ? ' → ' + order.closedStep : '' }}
+                        </td>
+                        <td>{{ order.paperTicker }}</td>
+                        <td [class.pos]="order.side === 'buy'" [class.neg]="order.side === 'sell'">
+                          {{ order.side === 'buy' ? 'Покупка' : 'Продажа' }}
+                        </td>
+                        <td>
+                          {{ orderTypeLabels[order.orderType] }} · {{ formatOrderCondition(order) }}
+                        </td>
+                        <td class="num">{{ order.lots }}</td>
+                        <td>{{ orderStatusLabels[order.status] }}</td>
+                        <td>
+                          <code>{{ order.ruleName }}</code>
+                        </td>
+                        <td>{{ order.because }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+</section>

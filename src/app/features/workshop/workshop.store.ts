@@ -1,14 +1,22 @@
 import { computed, inject, Injectable, OnDestroy, signal } from '@angular/core';
+import { errorMessage } from '../../core/api-problem';
+import { applyTextEdits } from './data/apply-text-edits';
 import {
+  CheckStrategyResult,
+  DiagnosticFix,
   WORKSHOP_API,
   WORKSHOP_COMPARE_LIMIT,
   WORKSHOP_DEFAULT_PAGE_SIZE,
   WorkshopAlgorithmDetail,
+  WorkshopAlgorithmSummary,
+  WorkshopDraft,
   WorkshopPage as WorkshopPageData,
   WorkshopSortField,
 } from './data/workshop.models';
 
 export const WORKSHOP_SEARCH_DEBOUNCE_MS = 300;
+
+export type WorkshopEditorMode = 'closed' | 'create' | 'edit';
 
 export interface CompareEntry {
   readonly id: string;
@@ -16,11 +24,21 @@ export interface CompareEntry {
   readonly latestVersion: number;
 }
 
+function hasErrorDiagnostics(result: CheckStrategyResult | null): boolean {
+  if (!result) {
+    return false;
+  }
+  return (
+    result.lookaheadLevel === 'ERROR' || result.diagnostics.some((diag) => diag.level === 'ERROR')
+  );
+}
+
 @Injectable()
 export class WorkshopStore implements OnDestroy {
   private readonly api = inject(WORKSHOP_API);
   private loadSeq = 0;
   private detailSeq = 0;
+  private draftSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly loading = signal(false);
@@ -41,6 +59,26 @@ export class WorkshopStore implements OnDestroy {
 
   readonly compareList = signal<readonly CompareEntry[]>([]);
 
+  readonly editorMode = signal<WorkshopEditorMode>('closed');
+  readonly draft = signal<WorkshopDraft | null>(null);
+  readonly draftLoading = signal(false);
+  readonly draftSaving = signal(false);
+  readonly draftChecking = signal(false);
+  readonly draftPublishing = signal(false);
+  readonly draftError = signal<string | null>(null);
+  readonly publishError = signal<string | null>(null);
+  readonly draftSuccess = signal<string | null>(null);
+  readonly draftName = signal('');
+  readonly draftDescription = signal('');
+  readonly draftSource = signal('');
+  readonly publishSummary = signal('');
+  readonly checkResult = signal<CheckStrategyResult | null>(null);
+
+  readonly runFormOpen = signal(false);
+  readonly forking = signal(false);
+  readonly visibilityPending = signal(false);
+  readonly actionError = signal<string | null>(null);
+
   readonly items = computed(() => this.pageData()?.items ?? []);
   readonly authors = computed(() => this.pageData()?.authors ?? []);
   readonly total = computed(() => this.pageData()?.total ?? 0);
@@ -52,6 +90,19 @@ export class WorkshopStore implements OnDestroy {
   readonly compareLimitReached = computed(
     () => this.compareList().length >= WORKSHOP_COMPARE_LIMIT,
   );
+  readonly hasCheckErrors = computed(() => hasErrorDiagnostics(this.checkResult()));
+  readonly checkErrorReason = computed<string | null>(() => {
+    const check = this.checkResult();
+    if (!hasErrorDiagnostics(check) || !check) {
+      return null;
+    }
+    const messages = check.diagnostics
+      .filter((diag) => diag.level === 'ERROR')
+      .map((diag) => `${diag.code}: ${diag.message}`);
+    return messages.length > 0
+      ? `Публикация невозможна — ошибки DSL: ${messages.join('; ')}`
+      : 'Публикация невозможна: проверка завершилась с уровнем ERROR.';
+  });
 
   ngOnDestroy(): void {
     this.clearSearchTimer();
@@ -94,6 +145,13 @@ export class WorkshopStore implements OnDestroy {
     this.selectedId.set(id);
     this.detailLoading.set(true);
     this.detailError.set(null);
+    this.actionError.set(null);
+    if (this.runFormOpen()) {
+      this.runFormOpen.set(false);
+    }
+    if (this.editorMode() === 'create' || this.draft()?.strategyId !== id) {
+      this.closeEditor();
+    }
 
     try {
       const result = await this.api.getById(id);
@@ -125,6 +183,9 @@ export class WorkshopStore implements OnDestroy {
     this.selectedDetail.set(null);
     this.detailLoading.set(false);
     this.detailError.set(null);
+    this.actionError.set(null);
+    this.runFormOpen.set(false);
+    this.closeEditor();
   }
 
   setSort(sort: WorkshopSortField): void {
@@ -220,6 +281,294 @@ export class WorkshopStore implements OnDestroy {
 
   clearCompare(): void {
     this.compareList.set([]);
+  }
+
+  openRunForm(): void {
+    const detail = this.selectedDetail();
+    if (!detail || detail.latestVersion === 0) {
+      return;
+    }
+    this.closeEditor();
+    this.actionError.set(null);
+    this.runFormOpen.set(true);
+  }
+
+  closeRunForm(): void {
+    this.runFormOpen.set(false);
+  }
+
+  openCreateDraft(): void {
+    this.draftSeq++;
+    this.runFormOpen.set(false);
+    this.actionError.set(null);
+    this.draft.set(null);
+    this.draftName.set('');
+    this.draftDescription.set('');
+    this.draftSource.set('');
+    this.publishSummary.set('');
+    this.checkResult.set(null);
+    this.clearDraftNotices();
+    this.editorMode.set('create');
+  }
+
+  closeEditor(): void {
+    this.draftSeq++;
+    this.editorMode.set('closed');
+    this.draftLoading.set(false);
+    this.clearDraftNotices();
+  }
+
+  setDraftName(value: string): void {
+    this.draftName.set(value);
+    this.draftSuccess.set(null);
+  }
+
+  setDraftDescription(value: string): void {
+    this.draftDescription.set(value);
+    this.draftSuccess.set(null);
+  }
+
+  setDraftSource(value: string): void {
+    this.draftSource.set(value);
+    this.checkResult.set(null);
+    this.draftSuccess.set(null);
+    this.publishError.set(null);
+  }
+
+  setPublishSummary(value: string): void {
+    this.publishSummary.set(value);
+    this.publishError.set(null);
+  }
+
+  async createDraft(): Promise<boolean> {
+    const name = this.draftName().trim();
+    if (!name || this.draftSaving()) {
+      return false;
+    }
+    this.draftSaving.set(true);
+    this.clearDraftNotices();
+
+    try {
+      const created = await this.api.createAlgorithm({
+        name,
+        description: this.draftDescription().trim(),
+        source: this.draftSource(),
+      });
+      this.applyDraftSnapshot(created);
+      this.editorMode.set('edit');
+      this.draftSuccess.set('Черновик создан.');
+      await Promise.all([this.load(), this.selectAlgorithm(created.strategyId)]);
+      return true;
+    } catch (error) {
+      this.draftError.set(errorMessage(error, 'Не удалось создать черновик алгоритма.'));
+      return false;
+    } finally {
+      this.draftSaving.set(false);
+    }
+  }
+
+  async openDraft(id: string): Promise<void> {
+    const seq = ++this.draftSeq;
+    this.runFormOpen.set(false);
+    this.actionError.set(null);
+    this.draftLoading.set(true);
+    this.clearDraftNotices();
+    this.editorMode.set('edit');
+
+    try {
+      const loaded = await this.api.getDraft(id);
+      if (seq !== this.draftSeq) {
+        return;
+      }
+      this.applyDraftSnapshot(loaded);
+    } catch (error) {
+      if (seq !== this.draftSeq) {
+        return;
+      }
+      this.draftError.set(errorMessage(error, 'Не удалось загрузить черновик.'));
+    } finally {
+      if (seq === this.draftSeq) {
+        this.draftLoading.set(false);
+      }
+    }
+  }
+
+  async saveDraft(): Promise<boolean> {
+    const current = this.draft();
+    const name = this.draftName().trim();
+    if (!current || !name || this.draftSaving()) {
+      return false;
+    }
+    this.draftSaving.set(true);
+    this.clearDraftNotices();
+
+    try {
+      const saved = await this.api.saveDraft(current.strategyId, {
+        name,
+        description: this.draftDescription().trim(),
+        source: this.draftSource(),
+      });
+      this.applyDraftSnapshot(saved);
+      this.draftSuccess.set('Черновик сохранён.');
+      await Promise.all([this.load(), this.selectAlgorithm(saved.strategyId)]);
+      return true;
+    } catch (error) {
+      this.draftError.set(errorMessage(error, 'Не удалось сохранить черновик.'));
+      return false;
+    } finally {
+      this.draftSaving.set(false);
+    }
+  }
+
+  async checkDraft(): Promise<void> {
+    if (this.draftChecking()) {
+      return;
+    }
+    this.draftChecking.set(true);
+    this.draftError.set(null);
+    this.publishError.set(null);
+
+    try {
+      const result = await this.api.check({ source: this.draftSource() });
+      this.checkResult.set(result);
+    } catch (error) {
+      this.draftError.set(errorMessage(error, 'Не удалось проверить стратегию DSL.'));
+    } finally {
+      this.draftChecking.set(false);
+    }
+  }
+
+  async applyFix(fix: DiagnosticFix): Promise<void> {
+    if (this.draftChecking()) {
+      return;
+    }
+    this.draftError.set(null);
+    this.publishError.set(null);
+    this.draftSuccess.set(null);
+
+    try {
+      const updatedSource = applyTextEdits(this.draftSource(), fix.edits);
+      this.draftSource.set(updatedSource);
+      await this.checkDraft();
+    } catch (error) {
+      this.draftError.set(
+        error instanceof Error ? error.message : 'Не удалось применить автоисправление.',
+      );
+    }
+  }
+
+  async publishDraft(): Promise<boolean> {
+    const current = this.draft();
+    if (!current || this.draftPublishing()) {
+      return false;
+    }
+    if (this.hasCheckErrors()) {
+      this.publishError.set(
+        this.checkErrorReason() ?? 'Публикация невозможна при наличии ошибок DSL.',
+      );
+      return false;
+    }
+
+    this.draftPublishing.set(true);
+    this.draftError.set(null);
+    this.publishError.set(null);
+    this.draftSuccess.set(null);
+
+    try {
+      const summary = this.publishSummary().trim();
+      const result = await this.api.publish(current.strategyId, {
+        summary: summary || undefined,
+        source: this.draftSource(),
+      });
+      if (!result.ok) {
+        this.publishError.set(
+          result.detail?.trim() || 'Стратегия содержит ошибки DSL и не может быть опубликована.',
+        );
+        return false;
+      }
+
+      this.publishSummary.set('');
+      this.draftSuccess.set(`Опубликована версия v${result.version.version}.`);
+      if (result.version.lookaheadLevel) {
+        this.checkResult.set({
+          lookaheadLevel: result.version.lookaheadLevel,
+          diagnostics: result.version.diagnostics ?? [],
+          params: result.version.params ?? [],
+        });
+      }
+      await Promise.all([this.load(), this.selectAlgorithm(current.strategyId)]);
+      return true;
+    } catch (error) {
+      this.publishError.set(errorMessage(error, 'Не удалось опубликовать версию алгоритма.'));
+      return false;
+    } finally {
+      this.draftPublishing.set(false);
+    }
+  }
+
+  async forkAlgorithm(id: string, version?: number): Promise<void> {
+    if (this.forking()) {
+      return;
+    }
+    this.draftSeq++;
+    this.forking.set(true);
+    this.actionError.set(null);
+    this.runFormOpen.set(false);
+    this.clearDraftNotices();
+
+    try {
+      const forked = await this.api.fork(id, version === undefined ? {} : { version });
+      this.applyDraftSnapshot(forked);
+      this.editorMode.set('edit');
+      this.draftSuccess.set('Создан форк — отредактируйте и опубликуйте версию.');
+      await Promise.all([this.load(), this.selectAlgorithm(forked.strategyId)]);
+    } catch (error) {
+      this.actionError.set(errorMessage(error, 'Не удалось создать форк алгоритма.'));
+    } finally {
+      this.forking.set(false);
+    }
+  }
+
+  async toggleVisibility(algo: WorkshopAlgorithmSummary): Promise<void> {
+    if (!algo.isMine || algo.isSystem || this.visibilityPending()) {
+      return;
+    }
+    const next = algo.visibility === 'public' ? 'hidden' : 'public';
+    this.visibilityPending.set(true);
+    this.actionError.set(null);
+
+    try {
+      const updated = await this.api.setVisibility(algo.id, next);
+      this.selectedDetail.update((detail) =>
+        detail && detail.id === algo.id ? { ...detail, visibility: updated.visibility } : detail,
+      );
+      this.pageData.update((page) =>
+        page
+          ? {
+              ...page,
+              items: page.items.map((item) => (item.id === algo.id ? updated : item)),
+            }
+          : null,
+      );
+    } catch (error) {
+      this.actionError.set(errorMessage(error, 'Не удалось изменить видимость алгоритма.'));
+    } finally {
+      this.visibilityPending.set(false);
+    }
+  }
+
+  private applyDraftSnapshot(draft: WorkshopDraft): void {
+    this.draft.set(draft);
+    this.draftName.set(draft.name);
+    this.draftDescription.set(draft.description);
+    this.draftSource.set(draft.source);
+    this.checkResult.set(draft.check);
+  }
+
+  private clearDraftNotices(): void {
+    this.draftError.set(null);
+    this.publishError.set(null);
+    this.draftSuccess.set(null);
   }
 
   private clearSearchTimer(): void {
