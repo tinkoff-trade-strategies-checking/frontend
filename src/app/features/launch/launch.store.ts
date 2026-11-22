@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   CandleTimeframe,
@@ -12,6 +12,7 @@ import {
   StartMode,
   TraderKind,
 } from './data/launch.models';
+import { WORKSHOP_API, WorkshopAlgorithmSummary } from '../workshop/data/workshop.models';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
 import { isFeatureOpen } from '../../core/real-features';
@@ -20,17 +21,24 @@ import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 @Injectable()
 export class LaunchStore {
   private readonly api = inject(LAUNCH_API);
+  private readonly workshopApi = inject(WORKSHOP_API, { optional: true });
   private readonly router = inject(Router);
   private readonly stubMode = inject(STUB_MODE);
+  private readonly destroyRef = inject(DestroyRef);
   private customPapersLoadSeq = 0;
+  private backgroundAlgorithmsLoadSeq = 0;
+  private destroyed = false;
 
   readonly loading = signal(false);
   readonly loadingCustomPapers = signal(false);
+  readonly loadingBackgroundAlgorithms = signal(false);
+  readonly backgroundAlgorithmsError = signal(false);
   readonly submitting = signal(false);
   readonly error = signal<string | null>(null);
   readonly rejection = signal<LaunchRejectMessage | null>(null);
   readonly options = signal<LaunchOptions | null>(null);
   readonly customPapers = signal<readonly LaunchCustomPaper[]>([]);
+  readonly backgroundAlgorithms = signal<readonly WorkshopAlgorithmSummary[]>([]);
 
   readonly traderKind = signal<TraderKind>('human');
   readonly durationDays = signal<SessionDurationDays>(60);
@@ -41,6 +49,15 @@ export class LaunchStore {
   readonly paperCount = signal(3);
   readonly selectedPaperIds = signal<readonly string[]>([]);
   readonly initialCapitalRub = signal<number | null>(1_000_000);
+  readonly backgroundAlgorithmId = signal<string | null>(null);
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.customPapersLoadSeq++;
+      this.backgroundAlgorithmsLoadSeq++;
+    });
+  }
 
   readonly capitalError = computed<string | null>(() => {
     const value = this.initialCapitalRub();
@@ -73,6 +90,14 @@ export class LaunchStore {
   readonly selectedCustomPapers = computed(() => {
     const selected = new Set(this.selectedPaperIds());
     return this.customPapers().filter((p) => selected.has(p.id));
+  });
+
+  readonly selectedBackgroundAlgorithm = computed<WorkshopAlgorithmSummary | null>(() => {
+    const id = this.backgroundAlgorithmId();
+    if (id === null) {
+      return null;
+    }
+    return this.backgroundAlgorithms().find((item) => item.id === id) ?? null;
   });
 
   /** Выбранная пара «шаг × длительность» всегда превышает лимит свечей (только для случайной даты). */
@@ -135,10 +160,17 @@ export class LaunchStore {
   }
 
   async init(): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
     this.loading.set(true);
     this.error.set(null);
+    const algorithmsPromise = this.loadBackgroundAlgorithms();
     try {
       const opts = await this.api.getLaunchOptions();
+      if (this.destroyed) {
+        return;
+      }
       this.options.set(opts);
       this.durationDays.set(opts.defaultDuration);
       this.timeframe.set(opts.defaultTimeframe);
@@ -146,9 +178,49 @@ export class LaunchStore {
       this.initialCapitalRub.set(opts.defaultCapitalRub);
       this.paperCount.set(opts.defaultPaperCount);
     } catch (error) {
-      this.error.set(errorMessage(error, 'Не удалось загрузить параметры запуска.'));
+      if (!this.destroyed) {
+        this.error.set(errorMessage(error, 'Не удалось загрузить параметры запуска.'));
+      }
     } finally {
-      this.loading.set(false);
+      if (!this.destroyed) {
+        this.loading.set(false);
+      }
+    }
+    await algorithmsPromise;
+  }
+
+  private async loadBackgroundAlgorithms(): Promise<void> {
+    if (!this.workshopApi || this.destroyed) {
+      return;
+    }
+    const seq = ++this.backgroundAlgorithmsLoadSeq;
+    this.loadingBackgroundAlgorithms.set(true);
+    this.backgroundAlgorithmsError.set(false);
+    try {
+      const page = await this.workshopApi.list({
+        page: 1,
+        pageSize: 100,
+        sort: 'published_desc',
+      });
+      if (this.destroyed || seq !== this.backgroundAlgorithmsLoadSeq) {
+        return;
+      }
+      const published = page.items.filter((item) => item.latestVersion > 0 && !item.isSystem);
+      this.backgroundAlgorithms.set(published);
+      const selectedId = this.backgroundAlgorithmId();
+      if (selectedId !== null && !published.some((item) => item.id === selectedId)) {
+        this.backgroundAlgorithmId.set(null);
+      }
+    } catch {
+      if (!this.destroyed && seq === this.backgroundAlgorithmsLoadSeq) {
+        this.backgroundAlgorithms.set([]);
+        this.backgroundAlgorithmsError.set(true);
+        this.backgroundAlgorithmId.set(null);
+      }
+    } finally {
+      if (!this.destroyed && seq === this.backgroundAlgorithmsLoadSeq) {
+        this.loadingBackgroundAlgorithms.set(false);
+      }
     }
   }
 
@@ -226,6 +298,11 @@ export class LaunchStore {
     this.rejection.set(null);
   }
 
+  setBackgroundAlgorithm(algorithmId: string | null): void {
+    this.backgroundAlgorithmId.set(algorithmId);
+    this.rejection.set(null);
+  }
+
   togglePaper(paperId: string): void {
     const opts = this.options();
     const min = opts?.minPapers ?? 1;
@@ -268,6 +345,7 @@ export class LaunchStore {
         paperCount: blind ? this.paperCount() : null,
         paperIds: blind ? null : this.selectedPaperIds(),
         initialCapital: initialCapitalRub.toFixed(2),
+        backgroundAlgorithmId: this.backgroundAlgorithmId(),
       });
 
       if (!result.accepted) {

@@ -265,7 +265,7 @@ test('INV-1: график не содержит свечей дальше тек
   expect(switched.lastSeriesTime).toBe(expectedChartTime(switched.storeStep));
 });
 
-test.fixme('INV-8: восстановление состояния арены после F5 — заглушка живёт в памяти, требуется API (frontend#8)', async ({
+test.fixme('INV-8: восстановление состояния арены после F5 — e2e прогон идёт на HTTP-заглушках в памяти (frontend#57)', async ({
   page,
 }) => {
   await page.goto('/arena');

@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
+import { WORKSHOP_API } from '../workshop/data/workshop.models';
+import { StubWorkshopApi } from '../workshop/data/stub-workshop.api';
 import { LAUNCH_API } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
 import { LaunchPage } from './launch-page';
@@ -9,21 +11,31 @@ import { LaunchStore } from './launch.store';
 
 describe('LaunchPage', () => {
   let stubApi: StubLaunchApi;
+  let stubWorkshopApi: StubWorkshopApi;
   let router: Router;
 
   beforeEach(async () => {
     stubApi = new StubLaunchApi();
+    stubWorkshopApi = new StubWorkshopApi();
 
     await TestBed.configureTestingModule({
       imports: [LaunchPage],
       providers: [provideTaiga(), provideRouter([])],
+      // TuiNativeSelect (select[tuiSelect]) наследует TuiInputDirective с [readOnly], которого нет у HTMLSelectElement в jsdom при overrideComponent.
+      errorOnUnknownProperties: false,
     })
       .overrideComponent(LaunchPage, {
         remove: {
-          providers: [{ provide: LAUNCH_API, useClass: StubLaunchApi }],
+          providers: [
+            { provide: LAUNCH_API, useClass: StubLaunchApi },
+            { provide: WORKSHOP_API, useClass: StubWorkshopApi },
+          ],
         },
         add: {
-          providers: [{ provide: LAUNCH_API, useValue: stubApi }],
+          providers: [
+            { provide: LAUNCH_API, useValue: stubApi },
+            { provide: WORKSHOP_API, useValue: stubWorkshopApi },
+          ],
         },
       })
       .compileComponents();
@@ -300,5 +312,117 @@ describe('LaunchPage', () => {
     await fixture.whenStable();
 
     expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-0105']);
+  });
+
+  it('отображает селектор фонового алгоритма без черновиков/дубля эталона и передаёт выбор в startSession', async () => {
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi.spyOn(stubApi, 'startSession');
+    vi.spyOn(stubWorkshopApi, 'list').mockResolvedValueOnce({
+      items: [
+        {
+          id: 'A-0001',
+          name: 'Эталон платформы',
+          description: '',
+          authorId: 'platform',
+          author: 'Эталон платформы',
+          isMine: false,
+          isSystem: true,
+          visibility: 'public',
+          latestVersion: 2,
+          latestVersionId: 'A-0001-v2',
+          publishedAt: '2026-11-18T14:00:00+03:00',
+          license: 'MIT',
+          linterWarnings: [],
+        },
+        {
+          id: 'A-DRAFT',
+          name: 'Черновик',
+          description: '',
+          authorId: 'user',
+          author: 'Вы',
+          isMine: true,
+          isSystem: false,
+          visibility: 'hidden',
+          latestVersion: 0,
+          latestVersionId: null,
+          publishedAt: null,
+          license: 'MIT',
+          linterWarnings: [],
+        },
+        {
+          id: 'A-0002',
+          name: 'Momentum RSI',
+          description: '',
+          authorId: 'user',
+          author: 'Вы',
+          isMine: true,
+          isSystem: false,
+          visibility: 'public',
+          latestVersion: 2,
+          latestVersionId: 'A-0002-v2',
+          publishedAt: '2026-11-18T12:30:00+03:00',
+          license: 'MIT',
+          linterWarnings: [],
+        },
+      ],
+      authors: [],
+      total: 3,
+      page: 1,
+      pageSize: 100,
+      totalPages: 1,
+    });
+
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    expect(root.textContent ?? '').not.toContain('Выбор алгоритма из каталога пока недоступен');
+
+    const select = root.querySelector<HTMLSelectElement>('#launch-background-algorithm');
+    expect(select).not.toBeNull();
+    expect(store.backgroundAlgorithmId()).toBeNull();
+    expect(store.backgroundAlgorithms().map((item) => item.id)).toEqual(['A-0002']);
+
+    store.setBackgroundAlgorithm('A-0002');
+    fixture.detectChanges();
+    expect(root.querySelector('aside.summary-col')?.textContent ?? '').toContain(
+      'Momentum RSI · v2 · Вы',
+    );
+
+    expect(await store.launch()).toBe(true);
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ backgroundAlgorithmId: 'A-0002' }),
+    );
+  });
+
+  it('сохраняет запуск с эталоном по умолчанию при ошибке загрузки каталога алгоритмов', async () => {
+    vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi.spyOn(stubApi, 'startSession');
+    vi.spyOn(stubWorkshopApi, 'list').mockRejectedValueOnce(new Error('Network error'));
+
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    expect(store.error()).toBeNull();
+    expect(store.backgroundAlgorithmsError()).toBe(true);
+    expect(root.textContent ?? '').toContain(
+      'Не удалось загрузить каталог алгоритмов — доступен эталон платформы по умолчанию.',
+    );
+
+    const launchBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Запустить'),
+    );
+    expect(launchBtn?.disabled).toBe(false);
+    launchBtn!.click();
+    await fixture.whenStable();
+
+    expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ backgroundAlgorithmId: null }));
   });
 });

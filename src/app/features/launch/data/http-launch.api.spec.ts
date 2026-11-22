@@ -14,6 +14,7 @@ const COMMAND: StartSessionCommand = {
   paperCount: null,
   paperIds: ['0190-aaa', '0190-bbb'],
   initialCapital: '1000000.00',
+  backgroundAlgorithmId: null,
 };
 
 describe('HttpLaunchApi', () => {
@@ -77,9 +78,24 @@ describe('HttpLaunchApi', () => {
       initialCapital: '1000000.00',
       paperIds: ['0190-aaa', '0190-bbb'],
       startMode: 'custom',
+      backgroundAlgorithmId: null,
     });
     req.flush({ sessionId: '0190-sess' }, { status: 201, statusText: 'Created' });
     expect(await pending).toEqual({ accepted: true, sessionId: '0190-sess' });
+  });
+
+  it('запуск: передаёт выбранный backgroundAlgorithmId в POST /sessions', async () => {
+    const pending = api.startSession({
+      ...COMMAND,
+      backgroundAlgorithmId: '0190-algo-1',
+    });
+    const req = controller.expectOne('/api/v1/sessions');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toMatchObject({
+      backgroundAlgorithmId: '0190-algo-1',
+    });
+    req.flush({ sessionId: '0190-sess-algo' }, { status: 201, statusText: 'Created' });
+    expect(await pending).toEqual({ accepted: true, sessionId: '0190-sess-algo' });
   });
 
   it('запуск: 422 с кодом отказа — это ответ пользователю, а не сбой', async () => {

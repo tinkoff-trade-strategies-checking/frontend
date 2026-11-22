@@ -45,6 +45,7 @@ describe('StubLaunchApi', () => {
       paperCount: 3,
       paperIds: null,
       initialCapital: '1000000.00',
+      backgroundAlgorithmId: null,
     });
     expect(blindRes.accepted).toBe(true);
 
@@ -61,6 +62,7 @@ describe('StubLaunchApi', () => {
       paperCount: null,
       paperIds: ['SBER'],
       initialCapital: '500000.00',
+      backgroundAlgorithmId: 'A-0002',
     });
     expect(customRes.accepted).toBe(true);
   });
@@ -76,6 +78,7 @@ describe('StubLaunchApi', () => {
       customStartDate: null,
       paperCount: 3,
       paperIds: null,
+      backgroundAlgorithmId: null,
     } as const;
 
     for (const initialCapital of ['9999.99', '100000000.01', '1000.123', 'abc', '']) {
@@ -104,6 +107,7 @@ describe('StubLaunchApi', () => {
       paperCount: 2,
       paperIds: null,
       initialCapital: '1000000.00',
+      backgroundAlgorithmId: null,
     });
 
     expect(res.accepted).toBe(false);
@@ -127,6 +131,7 @@ describe('StubLaunchApi', () => {
       paperCount: 4,
       paperIds: null,
       initialCapital: '1000000.00',
+      backgroundAlgorithmId: null,
     });
     expect(noPeriod).toEqual({
       accepted: false,
@@ -146,6 +151,7 @@ describe('StubLaunchApi', () => {
       paperCount: null,
       paperIds: ['SBER'],
       initialCapital: '1000000.00',
+      backgroundAlgorithmId: null,
     });
     expect(corpAction).toEqual({
       accepted: false,
@@ -165,6 +171,7 @@ describe('StubLaunchApi', () => {
       paperCount: 0,
       paperIds: null,
       initialCapital: '1000000.00',
+      backgroundAlgorithmId: null,
     });
     expect(badCount).toEqual({
       accepted: false,
