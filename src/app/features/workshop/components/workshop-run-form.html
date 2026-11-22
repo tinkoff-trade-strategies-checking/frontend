@@ -1,0 +1,252 @@
+<div class="run-form-body">
+  <div class="run-form-header">
+    <div>
+      <h2 class="tui-text_h5">Запуск прогона: {{ algorithm().name }}</h2>
+      <span class="tui-text_body-xs muted"
+        >Настройка версии, параметров DSL и рыночных условий</span
+      >
+    </div>
+    <button tuiButton type="button" size="xs" appearance="flat" (click)="closed.emit()">
+      К карточке
+    </button>
+  </div>
+
+  @if (error(); as err) {
+    <div tuiNotification appearance="negative" size="s" role="alert" class="error-row">
+      <span>{{ err }}</span>
+      @if (!options()) {
+        <button tuiButton type="button" size="xs" appearance="outline" (click)="loadOptions()">
+          Повторить
+        </button>
+      }
+    </div>
+  }
+
+  @if (rejection(); as rej) {
+    <div tuiNotification appearance="negative" size="s" role="alert">
+      <strong>{{ rej.title }}</strong>
+      <div class="tui-text_body-s">{{ rej.suggestion }}</div>
+    </div>
+  }
+
+  @if (loading() && !options()) {
+    <div class="tui-text_body-m muted">Загрузка параметров запуска…</div>
+  } @else if (options(); as opts) {
+    <section class="run-section">
+      <label tuiLabel for="run-version-select" class="field-block">
+        Версия алгоритма
+        <tui-textfield
+          tuiTextfieldSize="s"
+          [tuiTextfieldCleaner]="false"
+          [stringify]="versionStringify"
+        >
+          <select
+            id="run-version-select"
+            tuiSelect
+            [items]="versionNumbers()"
+            [ngModel]="selectedVersionNumber()"
+            (ngModelChange)="onVersionChange($event)"
+          ></select>
+        </tui-textfield>
+      </label>
+
+      @if (selectedParams().length > 0) {
+        <div class="params-grid">
+          <h3 class="tui-text_h6">Параметры стратегии</h3>
+          @for (param of selectedParams(); track param.name) {
+            @let pErr = paramErrors()[param.name];
+            <div class="param-item">
+              <label [for]="'run-param-' + param.name" class="tui-text_body-s param-label">
+                <span>{{ param.name }}</span>
+                <span class="tui-text_body-xs muted">{{ formatParamHint(param) }}</span>
+              </label>
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  [id]="'run-param-' + param.name"
+                  tuiInput
+                  type="number"
+                  [attr.step]="param.step ?? (param.integer ? '1' : 'any')"
+                  [ngModel]="paramValues()[param.name] ?? null"
+                  (ngModelChange)="onParamValueChange(param.name, $event)"
+                />
+              </tui-textfield>
+              @if (pErr) {
+                <span class="tui-text_body-xs field-error" role="alert">{{ pErr }}</span>
+              }
+            </div>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="run-section">
+      <div class="field-block">
+        <span class="tui-text_body-xs muted">Длительность</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="optionIndex(opts.durations, durationDays())"
+          (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
+        >
+          @for (days of opts.durations; track days) {
+            <button type="button" [disabled]="isPairDisabled(days, timeframe())">
+              {{ days }} дн.
+            </button>
+          }
+        </tui-segmented>
+      </div>
+
+      <div class="field-block">
+        <span class="tui-text_body-xs muted">Шаг свечей</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="optionIndex(opts.availableTimeframes, timeframe())"
+          (activeItemIndexChange)="onTimeframeIndexChange(opts.availableTimeframes, $event)"
+        >
+          @for (tf of opts.availableTimeframes; track tf) {
+            <button type="button" [disabled]="isPairDisabled(durationDays(), tf)">
+              {{ timeframeLabels[tf] }}
+            </button>
+          }
+        </tui-segmented>
+      </div>
+
+      <div class="field-block">
+        <span class="tui-text_body-xs muted">Тип периода</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="optionIndex(opts.regimes, regime())"
+          (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
+        >
+          @for (item of opts.regimes; track item) {
+            <button type="button">{{ regimeLabels[item] }}</button>
+          }
+        </tui-segmented>
+      </div>
+    </section>
+
+    <section class="run-section">
+      <div class="field-block">
+        <span class="tui-text_body-xs muted">Начало периода</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="startMode() === 'custom' ? 1 : 0"
+          (activeItemIndexChange)="onStartModeIndexChange($event)"
+        >
+          <button type="button">Случайная дата</button>
+          <button type="button">Своя дата</button>
+        </tui-segmented>
+      </div>
+
+      @if (startMode() === 'random') {
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Количество бумаг</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="optionIndex(paperCountOptions(), paperCount())"
+            (activeItemIndexChange)="onPaperCountIndexChange(paperCountOptions(), $event)"
+          >
+            @for (count of paperCountOptions(); track count) {
+              <button type="button">{{ count }}</button>
+            }
+          </tui-segmented>
+        </div>
+      } @else {
+        <label tuiLabel for="run-custom-date" class="field-block">
+          Дата начала
+          <tui-textfield tuiTextfieldSize="s">
+            <input
+              id="run-custom-date"
+              tuiInputDate
+              [ngModel]="customStartDay()"
+              (ngModelChange)="onCustomStartDayChange($event)"
+            />
+            <tui-calendar *tuiDropdown />
+          </tui-textfield>
+        </label>
+
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">
+            Бумаги ({{ selectedPaperIds().length }} из {{ opts.maxPapers }})
+          </span>
+          @if (loadingPapers()) {
+            <span class="tui-text_body-s muted">Загрузка списка бумаг…</span>
+          } @else {
+            <div class="papers-list">
+              @for (paper of availablePapers(); track paper.id) {
+                @let selected = selectedPaperIds().includes(paper.id);
+                <button
+                  tuiButton
+                  type="button"
+                  size="xs"
+                  [appearance]="selected ? 'primary' : 'outline'"
+                  (click)="togglePaper(paper.id)"
+                >
+                  {{ paper.ticker }} ({{ paper.name }})
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <label class="checkbox-row">
+        <input
+          id="run-blind-checkbox"
+          type="checkbox"
+          tuiCheckbox
+          [ngModel]="blind()"
+          (ngModelChange)="onBlindChange($event)"
+        />
+        <span class="tui-text_body-s">Слепой прогон</span>
+        @if (blind()) {
+          <span tuiBadge size="s" appearance="warning">Слепой</span>
+        }
+      </label>
+    </section>
+
+    <section class="run-section">
+      <div class="field-block">
+        <span class="tui-text_body-xs muted">Начальный капитал</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="capitalIndex(opts.capitalPresetsRub, initialCapitalRub())"
+          (activeItemIndexChange)="onCapitalIndexChange(opts.capitalPresetsRub, $event)"
+        >
+          @for (preset of opts.capitalPresetsRub; track preset) {
+            <button type="button">{{ formatRub(preset) }}</button>
+          }
+        </tui-segmented>
+      </div>
+
+      <label tuiLabel for="run-capital-input" class="field-block">
+        Своё значение, ₽
+        <tui-textfield tuiTextfieldSize="s">
+          <input
+            id="run-capital-input"
+            tuiInputNumber
+            [min]="minCapital"
+            [max]="maxCapital"
+            [ngModel]="initialCapitalRub()"
+            (ngModelChange)="onCapitalInput($event)"
+          />
+        </tui-textfield>
+      </label>
+      @if (capitalError(); as capErr) {
+        <span class="tui-text_body-xs field-error" role="alert">{{ capErr }}</span>
+      }
+    </section>
+
+    <div class="run-actions">
+      <button
+        tuiButton
+        type="button"
+        size="m"
+        appearance="primary"
+        [disabled]="submitting() || !canSubmit()"
+        (click)="submit()"
+      >
+        Запустить
+      </button>
+    </div>
+  }
+</div>

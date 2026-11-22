@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
+import { vi } from 'vitest';
+import { RUNS_API, RunsApi } from '../runs/data/runs.models';
 import {
   WORKSHOP_API,
   WORKSHOP_COMPARE_LIMIT,
@@ -28,7 +31,7 @@ describe('WorkshopPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [WorkshopPage],
-      providers: [provideTaiga()],
+      providers: [provideTaiga(), provideRouter([])],
     }).compileComponents();
   });
 
@@ -101,7 +104,7 @@ describe('WorkshopPage', () => {
     expect(el.querySelectorAll('tbody tr').length).toBe(5);
   });
 
-  it('открывает карточку алгоритма с версиями (INV-5), предупреждениями линтера и неактивными действиями «Форк» и «Запустить прогон»', async () => {
+  it('открывает карточку алгоритма с версиями (INV-5), предупреждениями линтера и активными действиями «Форк» и «Запустить прогон»', async () => {
     const fixture = TestBed.createComponent(WorkshopPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -125,19 +128,17 @@ describe('WorkshopPage', () => {
     expect(detailText).toContain('v3');
     expect(detailText).toContain('v2');
     expect(detailText).toContain('v1');
-    expect(detailText).toContain('пока недоступны');
 
-    const forkBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
-      (b) => b.textContent?.trim() === 'Форк',
-    ) as HTMLButtonElement | undefined;
-    const runBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
-      (b) => b.textContent?.trim() === 'Запустить прогон',
-    ) as HTMLButtonElement | undefined;
+    const buttons = Array.from(detail?.querySelectorAll('button') ?? []);
+    const forkBtn = buttons.find((b) => b.textContent?.trim() === 'Форк') as
+      HTMLButtonElement | undefined;
+    const runBtn = buttons.find((b) => b.textContent?.trim() === 'Запустить прогон') as
+      HTMLButtonElement | undefined;
+    const hideBtn = buttons.find((b) => b.textContent?.trim() === 'Скрыть');
 
-    expect(forkBtn?.disabled).toBe(true);
-    expect(forkBtn?.title).toContain('Пока недоступно');
-    expect(runBtn?.disabled).toBe(true);
-    expect(runBtn?.title).toContain('Пока недоступно');
+    expect(forkBtn?.disabled).toBe(false);
+    expect(runBtn?.disabled).toBe(false);
+    expect(hideBtn).toBeUndefined();
   });
 
   it('ограничивает добавление в сравнение максимум 5 алгоритмами', async () => {
@@ -332,6 +333,248 @@ describe('WorkshopPage', () => {
     expect(versionItems.length).toBe(2);
     expect(versionItems[0].textContent).not.toContain('текущая');
     expect(versionItems[1].textContent).toContain('текущая');
+  });
+
+  it('создаёт черновик, показывает ошибки DSL, применяет fix, публикует версию и разрешает запуск', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const newBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Новый алгоритм',
+    );
+    newBtn?.click();
+    fixture.detectChanges();
+
+    const nameInput = el.querySelector('#workshop-draft-name') as HTMLInputElement;
+    const sourceInput = el.querySelector('#workshop-draft-source') as HTMLTextAreaElement;
+    nameInput.value = 'Мой тест-алгоритм';
+    nameInput.dispatchEvent(new Event('input'));
+    sourceInput.value = 'if rsi(close, 14) > 70 { lookahead }';
+    sourceInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const createBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Создать черновик',
+    );
+    createBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('E-LA01');
+    const publishBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Опубликовать версию',
+    ) as HTMLButtonElement;
+    expect(publishBtn.disabled).toBe(true);
+    expect(el.textContent).toContain('Публикация невозможна');
+
+    sourceInput.value = 'if rsi(close, 14) > 70 { }';
+    sourceInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const checkBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Проверить',
+    );
+    checkBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const fixBtn = Array.from(el.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Исправить:'),
+    );
+    expect(fixBtn).toBeDefined();
+    fixBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(sourceInput.value).toContain('param threshold = 70;');
+    expect(el.textContent).toContain('OK · Без ошибок');
+
+    const saveBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent?.trim() === 'Сохранить черновик',
+    );
+    saveBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const backBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
+      (b) => b.textContent?.trim() === 'К карточке',
+    );
+    backBtn?.click();
+    fixture.detectChanges();
+
+    const runBtnBefore = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Запустить прогон');
+    expect(runBtnBefore?.disabled).toBe(true);
+    expect(el.querySelector('.detail-panel')?.textContent).toContain('Черновик');
+
+    const editDraftBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Редактировать черновик');
+    editDraftBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const summaryInput = el.querySelector('#workshop-publish-summary') as HTMLInputElement;
+    summaryInput.value = 'Первый релиз';
+    summaryInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const publishBtnReady = Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent?.trim() === 'Опубликовать версию',
+    );
+    expect(publishBtnReady?.disabled).toBe(false);
+    publishBtnReady?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const toCardBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'К карточке');
+    toCardBtn?.click();
+    fixture.detectChanges();
+
+    const runBtnAfter = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Запустить прогон');
+    expect(runBtnAfter?.disabled).toBe(false);
+  });
+
+  it('выполняет форк алгоритма и переключает видимость своего алгоритма', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const openOwnBtn = el.querySelector('tr[data-algo-id="A-0002"] button');
+    openOwnBtn?.dispatchEvent(new Event('click'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const hideBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
+      (b) => b.textContent?.trim() === 'Скрыть',
+    );
+    expect(hideBtn).toBeDefined();
+    hideBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('tr[data-algo-id="A-0002"]')?.textContent).toContain('Скрыт');
+    const restoreBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Вернуть в каталог');
+    expect(restoreBtn).toBeDefined();
+
+    const forkBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
+      (b) => b.textContent?.trim() === 'Форк',
+    );
+    forkBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.detail-panel')?.textContent).toContain('Редактор черновика');
+    const nameInput = el.querySelector('#workshop-draft-name') as HTMLInputElement;
+    expect(nameInput.value).toContain('(форк)');
+  });
+
+  it('открывает форму запуска прогона, валидирует параметры DSL, обрабатывает STRATEGY_INVALID и переходит на /runs/:id', async () => {
+    const createdCmds: unknown[] = [];
+    let rejectNext = true;
+    const fakeRunsApi: RunsApi = {
+      async createRun(cmd) {
+        createdCmds.push(cmd);
+        if (rejectNext) {
+          return {
+            accepted: false,
+            reason: 'STRATEGY_INVALID',
+            field: 'strategyVersionId',
+            barsCount: null,
+            maxBars: null,
+            detail: 'Версия не прошла валидацию.',
+          };
+        }
+        return { accepted: true, runId: 'R-9999' };
+      },
+      async getRun() {
+        throw new Error('not used');
+      },
+      events() {
+        throw new Error('not used');
+      },
+      async repeatRun() {
+        throw new Error('not used');
+      },
+      async getRunReport() {
+        throw new Error('not used');
+      },
+    };
+
+    TestBed.overrideProvider(RUNS_API, { useValue: fakeRunsApi });
+    const router = TestBed.inject(Router);
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const openBtn = el.querySelector('tr[data-algo-id="A-0001"] button');
+    openBtn?.dispatchEvent(new Event('click'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const openRunBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Запустить прогон');
+    openRunBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const fastInput = el.querySelector('#run-param-fast') as HTMLInputElement;
+    expect(fastInput).not.toBeNull();
+    fastInput.value = '999';
+    fastInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(el.querySelector('.detail-panel')?.textContent).toContain('Максимальное значение: 50.');
+    const submitBtn = Array.from(el.querySelectorAll('.detail-panel button')).find(
+      (b) => b.textContent?.trim() === 'Запустить',
+    ) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+
+    fastInput.value = '20';
+    fastInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const blindCheckbox = el.querySelector('#run-blind-checkbox') as HTMLInputElement;
+    blindCheckbox.click();
+    fixture.detectChanges();
+
+    expect(submitBtn.disabled).toBe(false);
+    submitBtn.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.detail-panel')?.textContent).toContain('STRATEGY_INVALID');
+    expect(navSpy).not.toHaveBeenCalled();
+
+    rejectNext = false;
+    submitBtn.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(createdCmds.length).toBe(2);
+    expect(createdCmds[1]).toMatchObject({
+      strategyVersionId: 'A-0001-v2',
+      blind: true,
+      paramOverrides: expect.objectContaining({ fast: 20 }),
+    });
+    expect(navSpy).toHaveBeenCalledWith(['/runs', 'R-9999']);
   });
 });
 

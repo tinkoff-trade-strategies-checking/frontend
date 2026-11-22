@@ -1,0 +1,209 @@
+<div class="editor-body">
+  <div class="editor-header">
+    <div>
+      <h2 class="tui-text_h5">
+        {{ store.editorMode() === 'create' ? 'Новый алгоритм' : 'Редактор черновика' }}
+      </h2>
+      @if (store.draft(); as draft) {
+        <span class="tui-text_body-xs muted">
+          Обновлён: {{ formatDateTime(draft.updatedAt) }}
+        </span>
+      }
+    </div>
+    <button tuiButton type="button" size="xs" appearance="flat" (click)="store.closeEditor()">
+      {{ store.selectedId() !== null ? 'К карточке' : 'Закрыть' }}
+    </button>
+  </div>
+
+  @if (store.draftLoading()) {
+    <div class="tui-text_body-m muted">Загрузка черновика…</div>
+  } @else {
+    @if (store.draftError(); as err) {
+      <div tuiNotification appearance="negative" size="s" role="alert">{{ err }}</div>
+    }
+    @if (store.draftSuccess(); as msg) {
+      <div tuiNotification appearance="positive" size="s">{{ msg }}</div>
+    }
+
+    <div class="editor-fields">
+      <label tuiLabel for="workshop-draft-name" class="field-block">
+        Название
+        <tui-textfield tuiTextfieldSize="s">
+          <input
+            id="workshop-draft-name"
+            tuiInput
+            type="text"
+            maxlength="80"
+            placeholder="Например, SMA Crossover"
+            [ngModel]="store.draftName()"
+            (ngModelChange)="store.setDraftName($event ?? '')"
+          />
+        </tui-textfield>
+      </label>
+
+      <label tuiLabel for="workshop-draft-description" class="field-block">
+        Описание
+        <tui-textfield tuiTextfieldSize="s">
+          <input
+            id="workshop-draft-description"
+            tuiInput
+            type="text"
+            maxlength="2000"
+            placeholder="Краткое описание идеи алгоритма"
+            [ngModel]="store.draftDescription()"
+            (ngModelChange)="store.setDraftDescription($event ?? '')"
+          />
+        </tui-textfield>
+      </label>
+
+      <div class="field-block">
+        <label for="workshop-draft-source" class="tui-text_body-s field-label">
+          Исходный код DSL
+        </label>
+        <textarea
+          id="workshop-draft-source"
+          class="dsl-textarea"
+          rows="10"
+          spellcheck="false"
+          placeholder='param fast = 20;&#10;rule enter when sma(close, fast) > sma(close, 50)&#10;  buy 50% market because "Пересечение";'
+          [ngModel]="store.draftSource()"
+          (ngModelChange)="store.setDraftSource($event ?? '')"
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="editor-actions">
+      @if (store.editorMode() === 'create') {
+        <button
+          tuiButton
+          type="button"
+          size="s"
+          appearance="primary"
+          [disabled]="store.draftSaving() || !store.draftName().trim()"
+          (click)="store.createDraft()"
+        >
+          Создать черновик
+        </button>
+      } @else {
+        <button
+          tuiButton
+          type="button"
+          size="s"
+          appearance="outline"
+          [disabled]="store.draftSaving() || !store.draftName().trim()"
+          (click)="store.saveDraft()"
+        >
+          Сохранить черновик
+        </button>
+      }
+
+      <button
+        tuiButton
+        type="button"
+        size="s"
+        appearance="outline"
+        [disabled]="store.draftChecking()"
+        (click)="store.checkDraft()"
+      >
+        Проверить
+      </button>
+    </div>
+
+    @if (store.editorMode() === 'edit') {
+      <section class="editor-section">
+        <h3 class="tui-text_h6">Публикация версии (INV-5)</h3>
+        <label tuiLabel for="workshop-publish-summary" class="field-block">
+          Комментарий к версии
+          <tui-textfield tuiTextfieldSize="s">
+            <input
+              id="workshop-publish-summary"
+              tuiInput
+              type="text"
+              maxlength="500"
+              placeholder="Что изменилось в этой версии"
+              [ngModel]="store.publishSummary()"
+              (ngModelChange)="store.setPublishSummary($event ?? '')"
+            />
+          </tui-textfield>
+        </label>
+
+        @if (store.publishError(); as pubErr) {
+          <div tuiNotification appearance="negative" size="s" role="alert">{{ pubErr }}</div>
+        } @else if (store.hasCheckErrors()) {
+          <div tuiNotification appearance="negative" size="s" role="alert">
+            {{ store.checkErrorReason() }}
+          </div>
+        }
+
+        <div class="editor-actions">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="primary"
+            [disabled]="store.draftPublishing() || store.hasCheckErrors()"
+            (click)="store.publishDraft()"
+          >
+            Опубликовать версию
+          </button>
+        </div>
+      </section>
+    }
+
+    @if (store.checkResult(); as check) {
+      <section class="editor-section" aria-label="Результаты проверки DSL">
+        <div class="check-head">
+          <h3 class="tui-text_h6">Проверка DSL</h3>
+          <span tuiBadge size="s" [appearance]="levelAppearance(check.lookaheadLevel)">
+            {{ check.lookaheadLevel }} · {{ levelLabels[check.lookaheadLevel] }}
+          </span>
+        </div>
+
+        @if (check.params.length > 0) {
+          <p class="tui-text_body-xs muted params-summary">
+            Параметры:
+            @for (param of check.params; track param.name; let last = $last) {
+              <code>{{ param.name }}={{ param.defaultValue }}</code
+              >{{ last ? '' : ', ' }}
+            }
+          </p>
+        }
+
+        @if (check.diagnostics.length === 0) {
+          <p class="tui-text_body-s muted">Ошибок и предупреждений не обнаружено.</p>
+        } @else {
+          <ul class="diagnostics-list">
+            @for (diag of check.diagnostics; track $index) {
+              <li class="diagnostic-item">
+                <div class="diagnostic-meta">
+                  <span tuiBadge size="s" [appearance]="levelAppearance(diag.level)">
+                    {{ diag.level }}
+                  </span>
+                  <span tuiBadge size="s" appearance="neutral">{{ diag.code }}</span>
+                  <span class="tui-text_body-xs muted">{{ formatLocation(diag) }}</span>
+                </div>
+                <span class="tui-text_body-s">{{ diag.message }}</span>
+                @if (diag.fixes.length > 0) {
+                  <div class="fixes-row">
+                    @for (fix of diag.fixes; track fix.description) {
+                      <button
+                        tuiButton
+                        type="button"
+                        size="xs"
+                        appearance="outline"
+                        [disabled]="store.draftChecking()"
+                        (click)="store.applyFix(fix)"
+                      >
+                        Исправить: {{ fix.description }}
+                      </button>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  }
+</div>

@@ -39,10 +39,9 @@ test('фильтры, карточка алгоритма, неизменяем�
   await expect(detail).toContainText('L001');
   await expect(detail).toContainText('W-LA01');
   await expect(detail).toContainText('неизменяема');
-  await expect(detail).toContainText('пока недоступны');
 
-  await expect(detail.getByRole('button', { name: 'Форк' })).toBeDisabled();
-  await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toBeDisabled();
+  await expect(detail.getByRole('button', { name: 'Форк' })).toBeEnabled();
+  await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toBeEnabled();
 
   await detail.getByRole('button', { name: 'Добавить в сравнение' }).click();
   await expect(page.getByText('В сравнении: 1 из 5')).toBeVisible();
@@ -57,4 +56,58 @@ test('фильтры, карточка алгоритма, неизменяем�
   await page.getByRole('button', { name: 'Без предупреждений линтера' }).click();
   await expect(page.locator('tr[data-algo-id="A-0002"]')).toHaveCount(0);
   await expect(page.locator('tr[data-algo-id="A-0004"]')).toBeVisible();
+});
+
+test('форк, проверка DSL с автоисправлением, публикация, видимость и запуск прогона', async ({
+  page,
+}) => {
+  await page.goto('/workshop');
+
+  await page.locator('tr[data-algo-id="A-0001"]').getByRole('button', { name: 'Открыть' }).click();
+  const detail = page.getByRole('complementary', { name: 'Карточка алгоритма' });
+  await expect(detail).toBeVisible();
+
+  // Форк эталона открывает редактор черновика.
+  await detail.getByRole('button', { name: 'Форк' }).click();
+  await expect(detail.getByRole('heading', { name: 'Редактор черновика' })).toBeVisible();
+  await expect(page.locator('#workshop-draft-name')).toHaveValue('Эталон платформы (форк)');
+
+  // Проверяем DSL с магической константой (L001) и применяем автоисправление.
+  await page
+    .locator('#workshop-draft-source')
+    .fill('rule enter when rsi(close, 14) > 70 buy 50% market because "Перекупленность";');
+  await detail.getByRole('button', { name: 'Проверить' }).click();
+
+  const checkSection = detail.getByRole('region', { name: 'Результаты проверки DSL' });
+  await expect(checkSection).toContainText('L001');
+  await detail.getByRole('button', { name: 'Исправить: Вынести 70 в параметр threshold' }).click();
+
+  await expect(checkSection).toContainText('OK · Без ошибок');
+  await expect(checkSection).toContainText('Ошибок и предупреждений не обнаружено.');
+  await expect(checkSection).toContainText('threshold=70');
+
+  // Публикуем версию v1 и возвращаемся в карточку алгоритма.
+  await page.locator('#workshop-publish-summary').fill('Вынес порог в параметр');
+  await detail.getByRole('button', { name: 'Опубликовать версию' }).click();
+  await expect(detail).toContainText('Опубликована версия v1.');
+
+  await detail.getByRole('button', { name: 'К карточке' }).click();
+  await expect(detail).toContainText('v1');
+  await expect(detail).toContainText('неизменяема');
+
+  // Скрываем свой алгоритм и возвращаем обратно в каталог.
+  await detail.getByRole('button', { name: 'Скрыть' }).click();
+  await expect(detail).toContainText('Скрыт');
+  await detail.getByRole('button', { name: 'Вернуть в каталог' }).click();
+  await expect(detail.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+
+  // Открываем форму запуска прогона и запускаем прогон.
+  await detail.getByRole('button', { name: 'Запустить прогон' }).click();
+  await expect(
+    detail.getByRole('heading', { name: 'Запуск прогона: Эталон платформы (форк)' }),
+  ).toBeVisible();
+
+  await detail.getByRole('button', { name: 'Запустить' }).click();
+  await expect(page).toHaveURL(/\/runs\/R-\d{4}$/);
+  await expect(page.getByText('Отчёт сформирован и готов к просмотру.')).toBeVisible();
 });

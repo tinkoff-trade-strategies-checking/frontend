@@ -7,6 +7,9 @@
         неизменяемы.
       </p>
     </div>
+    <button tuiButton type="button" size="m" appearance="primary" (click)="store.openCreateDraft()">
+      Новый алгоритм
+    </button>
   </header>
 
   @if (store.error()) {
@@ -46,7 +49,7 @@
     </section>
   }
 
-  <div class="workshop-layout" [class.with-detail]="store.selectedId() !== null">
+  <div class="workshop-layout" [class.with-detail]="showSidePanel()">
     <section class="panel catalog-panel">
       <div class="filters-bar">
         <div class="filter-group">
@@ -166,6 +169,9 @@
                         @if (item.isSystem) {
                           <span tuiBadge size="s" appearance="info">Эталон</span>
                         }
+                        @if (item.latestVersion === 0) {
+                          <span tuiBadge size="s" appearance="warning">Черновик</span>
+                        }
                         @if (item.visibility === 'hidden') {
                           <span tuiBadge size="s" appearance="warning">Скрыт</span>
                         }
@@ -174,7 +180,9 @@
                     </div>
                   </td>
                   <td class="nowrap col-secondary">{{ item.author }}</td>
-                  <td class="nowrap num col-secondary">v{{ item.latestVersion }}</td>
+                  <td class="nowrap num col-secondary">
+                    {{ item.latestVersion > 0 ? 'v' + item.latestVersion : 'Черновик' }}
+                  </td>
                   <td class="date-col muted col-secondary">
                     {{ formatDateTime(item.publishedAt) }}
                   </td>
@@ -234,9 +242,13 @@
       }
     </section>
 
-    @if (store.selectedId() !== null) {
+    @if (showSidePanel()) {
       <aside class="panel detail-panel" aria-label="Карточка алгоритма">
-        @if (store.detailLoading()) {
+        @if (store.editorMode() !== 'closed') {
+          <app-workshop-draft-editor />
+        } @else if (store.runFormOpen() && store.selectedDetail(); as runAlgo) {
+          <app-workshop-run-form [algorithm]="runAlgo" (closed)="store.closeRunForm()" />
+        } @else if (store.detailLoading()) {
           <div class="empty-state tui-text_body-m muted">Загрузка карточки…</div>
         } @else if (store.detailError()) {
           <div class="detail-body">
@@ -261,7 +273,11 @@
                 <h2 class="tui-text_h5">{{ algo.name }}</h2>
                 <div class="title-top">
                   <span tuiBadge size="s" appearance="neutral">{{ algo.license }}</span>
-                  <span tuiBadge size="s" appearance="info">v{{ algo.latestVersion }}</span>
+                  @if (algo.latestVersion > 0) {
+                    <span tuiBadge size="s" appearance="info">v{{ algo.latestVersion }}</span>
+                  } @else {
+                    <span tuiBadge size="s" appearance="warning">Черновик</span>
+                  }
                   @if (algo.visibility === 'hidden') {
                     <span tuiBadge size="s" appearance="warning">Скрыт</span>
                   }
@@ -284,6 +300,10 @@
             </div>
 
             <p class="tui-text_body-m detail-desc">{{ algo.description }}</p>
+
+            @if (store.actionError(); as actErr) {
+              <div tuiNotification appearance="negative" size="s" role="alert">{{ actErr }}</div>
+            }
 
             <div class="detail-actions">
               <button
@@ -313,27 +333,61 @@
                 type="button"
                 size="s"
                 appearance="outline"
-                disabled
-                [title]="dslPendingHint"
+                [disabled]="algo.latestVersion === 0 || store.forking()"
+                [title]="
+                  algo.latestVersion === 0 ? 'Нельзя сделать форк неопубликованного черновика' : ''
+                "
+                (click)="store.forkAlgorithm(algo.id, algo.latestVersion)"
               >
                 Форк
               </button>
+
+              @if (algo.isMine && !algo.isSystem) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  (click)="store.openDraft(algo.id)"
+                >
+                  Редактировать черновик
+                </button>
+
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  [disabled]="store.visibilityPending()"
+                  (click)="store.toggleVisibility(algo)"
+                >
+                  {{ algo.visibility === 'public' ? 'Скрыть' : 'Вернуть в каталог' }}
+                </button>
+              }
 
               <button
                 tuiButton
                 type="button"
                 size="s"
-                appearance="outline"
-                disabled
-                [title]="dslPendingHint"
+                appearance="primary"
+                [disabled]="algo.latestVersion === 0"
+                [title]="
+                  algo.latestVersion === 0
+                    ? 'Нельзя запустить черновик без опубликованной версии'
+                    : ''
+                "
+                (click)="store.openRunForm()"
               >
                 Запустить прогон
               </button>
             </div>
 
-            <p class="tui-text_body-xs muted">
-              Действия «Форк» и «Запустить прогон» пока недоступны.
-            </p>
+            @if (algo.latestVersion === 0) {
+              <p class="tui-text_body-xs muted">
+                Черновик без опубликованной версии — для запуска прогона или форка сначала
+                опубликуйте версию.
+              </p>
+            }
 
             <section class="detail-section">
               <div class="section-head">
@@ -373,23 +427,27 @@
                 <span class="tui-text_body-xs muted">Всего: {{ algo.versions.length }}</span>
               </div>
 
-              <ul class="versions-list">
-                @for (ver of algo.versions; track ver.version) {
-                  <li class="version-item">
-                    <div class="version-top">
-                      <strong>v{{ ver.version }}</strong>
-                      <span class="tui-text_body-xs muted">
-                        {{ formatDateTime(ver.publishedAt) }}
-                      </span>
-                      @if (ver.version === algo.latestVersion) {
-                        <span tuiBadge size="s" appearance="positive">текущая</span>
-                      }
-                      <span tuiBadge size="s" appearance="neutral">неизменяема</span>
-                    </div>
-                    <p class="tui-text_body-s muted version-summary">{{ ver.summary }}</p>
-                  </li>
-                }
-              </ul>
+              @if (algo.versions.length === 0) {
+                <p class="tui-text_body-s muted">Опубликованных версий пока нет.</p>
+              } @else {
+                <ul class="versions-list">
+                  @for (ver of algo.versions; track ver.version) {
+                    <li class="version-item">
+                      <div class="version-top">
+                        <strong>v{{ ver.version }}</strong>
+                        <span class="tui-text_body-xs muted">
+                          {{ formatDateTime(ver.publishedAt) }}
+                        </span>
+                        @if (ver.version === algo.latestVersion) {
+                          <span tuiBadge size="s" appearance="positive">текущая</span>
+                        }
+                        <span tuiBadge size="s" appearance="neutral">неизменяема</span>
+                      </div>
+                      <p class="tui-text_body-s muted version-summary">{{ ver.summary }}</p>
+                    </li>
+                  }
+                </ul>
+              }
             </section>
           </div>
         }

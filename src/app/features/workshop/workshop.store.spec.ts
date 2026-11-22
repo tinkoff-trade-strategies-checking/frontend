@@ -310,4 +310,229 @@ describe('WorkshopStore', () => {
     store.toggleCompare({ id: 'A-1', name: 'Algo 1', latestVersion: 1 });
     expect(store.compareCount()).toBe(WORKSHOP_COMPARE_LIMIT - 1);
   });
+
+  it('создаёт черновик, применяет автоисправление fix и перепроверяет DSL', async () => {
+    const checkCalls: string[] = [];
+    const fixedSource = 'param threshold = 70;\nif rsi(close, 14) > threshold {}';
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-NEW', 'Draft Algo')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return {
+            status: 'READY',
+            algorithm: { ...makeAlgo(id, 'Draft Algo'), latestVersion: 0, versions: [] },
+          };
+        },
+      }),
+      async createAlgorithm(cmd) {
+        return {
+          strategyId: 'A-NEW',
+          name: cmd.name,
+          description: cmd.description ?? '',
+          source: cmd.source,
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: {
+            lookaheadLevel: 'WARNING',
+            params: [],
+            diagnostics: [
+              {
+                code: 'L001',
+                level: 'WARNING',
+                startLine: 1,
+                startColumn: 21,
+                endLine: 1,
+                endColumn: 23,
+                message: 'Магическая константа 70',
+                fixes: [
+                  {
+                    description: 'Вынести 70 в параметр threshold',
+                    edits: [
+                      {
+                        startLine: 1,
+                        startColumn: 1,
+                        endLine: 1,
+                        endColumn: 1,
+                        replacement: 'param threshold = 70;\n',
+                      },
+                      {
+                        startLine: 1,
+                        startColumn: 21,
+                        endLine: 1,
+                        endColumn: 23,
+                        replacement: 'threshold',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        };
+      },
+      async check(cmd) {
+        checkCalls.push(cmd.source);
+        return { lookaheadLevel: 'OK', diagnostics: [], params: [] };
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    store.openCreateDraft();
+    store.setDraftName('Draft Algo');
+    store.setDraftSource('if rsi(close, 14) > 70 {}');
+    const created = await store.createDraft();
+
+    expect(created).toBe(true);
+    expect(store.editorMode()).toBe('edit');
+    expect(store.selectedId()).toBe('A-NEW');
+
+    const fix = store.checkResult()?.diagnostics[0]?.fixes[0];
+    expect(fix).toBeDefined();
+    await store.applyFix(fix!);
+
+    expect(store.draftSource()).toBe(fixedSource);
+    expect(checkCalls).toEqual([fixedSource]);
+    expect(store.checkResult()?.lookaheadLevel).toBe('OK');
+  });
+
+  it('блокирует публикацию при ERROR и обрабатывает STRATEGY_INVALID, но публикует чистую стратегию', async () => {
+    let publishCalls = 0;
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-1')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: makeAlgo(id) };
+        },
+      }),
+      async getDraft(id: string) {
+        return {
+          strategyId: id,
+          name: 'Algo A-1',
+          description: 'Desc',
+          source: 'lookahead',
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: {
+            lookaheadLevel: 'ERROR',
+            params: [],
+            diagnostics: [
+              {
+                code: 'E-LA01',
+                level: 'ERROR',
+                startLine: 1,
+                startColumn: 1,
+                endLine: 1,
+                endColumn: 9,
+                message: 'Заглядывание в будущее',
+                fixes: [],
+              },
+            ],
+          },
+        };
+      },
+      async check() {
+        return { lookaheadLevel: 'OK', diagnostics: [], params: [] };
+      },
+      async publish() {
+        publishCalls++;
+        if (publishCalls === 1) {
+          return { ok: false, code: 'STRATEGY_INVALID', detail: 'Синтаксическая ошибка' };
+        }
+        return {
+          ok: true,
+          version: {
+            id: 'A-1-v2',
+            version: 2,
+            publishedAt: '2026-11-22T13:00:00Z',
+            summary: 'Исправлено',
+            immutable: true,
+            lookaheadLevel: 'OK',
+            diagnostics: [],
+            params: [],
+          },
+        };
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.openDraft('A-1');
+    expect(await store.publishDraft()).toBe(false);
+    expect(publishCalls).toBe(0);
+    expect(store.publishError()).toContain('E-LA01');
+
+    await store.checkDraft();
+    expect(await store.publishDraft()).toBe(false);
+    expect(publishCalls).toBe(1);
+    expect(store.publishError()).toBe('Синтаксическая ошибка');
+
+    store.setPublishSummary('Исправлено');
+    expect(await store.publishDraft()).toBe(true);
+    expect(store.publishError()).toBeNull();
+    expect(store.draftSuccess()).toContain('v2');
+  });
+
+  it('выполняет fork, открывает черновик и переключает видимость только для своих несистемных алгоритмов', async () => {
+    const forkCalls: { id: string; version?: number | null }[] = [];
+    const visCalls: { id: string; visibility: 'public' | 'hidden' }[] = [];
+
+    const ownAlgo = makeAlgo('A-OWN', 'Own Algo');
+    const systemAlgo = { ...makeAlgo('A-SYS', 'System'), isMine: false, isSystem: true };
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([ownAlgo, systemAlgo]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: id === 'A-SYS' ? systemAlgo : ownAlgo };
+        },
+      }),
+      async fork(id, cmd = {}) {
+        forkCalls.push({ id, version: cmd.version });
+        return {
+          strategyId: 'A-FORK',
+          name: 'Own Algo (форк)',
+          description: 'Desc',
+          source: 'param fast = 10;',
+          updatedAt: '2026-11-22T12:00:00Z',
+          check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+        };
+      },
+      async setVisibility(id, visibility) {
+        visCalls.push({ id, visibility });
+        return { ...ownAlgo, visibility };
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+    await store.load();
+    await store.selectAlgorithm('A-OWN');
+
+    await store.toggleVisibility(systemAlgo);
+    expect(visCalls.length).toBe(0);
+
+    await store.toggleVisibility(ownAlgo);
+    expect(visCalls).toEqual([{ id: 'A-OWN', visibility: 'hidden' }]);
+    expect(store.selectedDetail()?.visibility).toBe('hidden');
+    expect(store.items()[0]?.visibility).toBe('hidden');
+
+    await store.forkAlgorithm('A-OWN', 1);
+    expect(forkCalls).toEqual([{ id: 'A-OWN', version: 1 }]);
+    expect(store.editorMode()).toBe('edit');
+    expect(store.draft()?.strategyId).toBe('A-FORK');
+  });
 });

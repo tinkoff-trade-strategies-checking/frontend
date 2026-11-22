@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
@@ -71,6 +71,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
 export class ReportPage implements OnInit {
   protected readonly store = inject(ReportStore);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly exportService = inject(ReportExportService);
 
@@ -145,5 +146,9 @@ export class ReportPage implements OnInit {
 
   protected divergenceTypeLabel(type: DivergenceType): string {
     return this.divergenceLabels[type];
+  }
+
+  protected openWorkshop(): void {
+    void this.router.navigate(['/workshop']);
   }
 }

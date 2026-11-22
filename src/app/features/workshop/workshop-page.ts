@@ -2,7 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@a
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
-import { StubWorkshopApi } from './data/stub-workshop.api';
+import { LAUNCH_API_IMPL, RUNS_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
+import { LAUNCH_API } from '../launch/data/launch.models';
+import { RUNS_API } from '../runs/data/runs.models';
+import { WorkshopDraftEditor } from './components/workshop-draft-editor';
+import { WorkshopRunForm } from './components/workshop-run-form';
 import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
 import {
   formatLinterSummary,
@@ -28,8 +32,15 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
     TuiSegmented,
     TuiSelect,
     TuiTextfield,
+    WorkshopDraftEditor,
+    WorkshopRunForm,
   ],
-  providers: [{ provide: WORKSHOP_API, useClass: StubWorkshopApi }, WorkshopStore],
+  providers: [
+    { provide: WORKSHOP_API, useClass: WORKSHOP_API_IMPL },
+    { provide: RUNS_API, useClass: RUNS_API_IMPL },
+    { provide: LAUNCH_API, useClass: LAUNCH_API_IMPL },
+    WorkshopStore,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workshop-page.html',
   styleUrl: './workshop-page.less',
@@ -39,7 +50,12 @@ export class WorkshopPage implements OnInit {
 
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
-  protected readonly dslPendingHint = 'Пока недоступно';
+  protected readonly showSidePanel = computed(
+    () =>
+      this.store.selectedId() !== null ||
+      this.store.editorMode() !== 'closed' ||
+      this.store.runFormOpen(),
+  );
   protected readonly authorOptions = computed<readonly (string | null)[]>(() => [
     null,
     ...this.store.authors().map((author) => author.id),
