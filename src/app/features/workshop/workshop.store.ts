@@ -88,6 +88,12 @@ export class WorkshopStore implements OnDestroy {
   readonly hasPrevPage = computed(() => this.currentPage() > 1);
   readonly hasNextPage = computed(() => this.currentPage() < this.totalPages());
   readonly compareCount = computed(() => this.compareList().length);
+  readonly canCompare = computed(() => this.compareList().length >= 2);
+  readonly compareIdsParam = computed(() =>
+    this.compareList()
+      .map((item) => item.id)
+      .join(','),
+  );
   readonly compareLimitReached = computed(
     () => this.compareList().length >= WORKSHOP_COMPARE_LIMIT,
   );
@@ -280,6 +286,35 @@ export class WorkshopStore implements OnDestroy {
 
   clearCompare(): void {
     this.compareList.set([]);
+  }
+
+  async restoreCompare(ids: readonly string[]): Promise<void> {
+    const unique = Array.from(new Set(ids.filter(Boolean))).slice(0, WORKSHOP_COMPARE_LIMIT);
+    if (unique.length === 0) {
+      return;
+    }
+    const resolved = await Promise.all(
+      unique.map(async (id): Promise<CompareEntry | null> => {
+        const fromList = this.items().find((item) => item.id === id);
+        if (fromList) {
+          return { id: fromList.id, name: fromList.name, latestVersion: fromList.latestVersion };
+        }
+        try {
+          const res = await this.api.getById(id);
+          if (res.status === 'READY') {
+            return {
+              id: res.algorithm.id,
+              name: res.algorithm.name,
+              latestVersion: res.algorithm.latestVersion,
+            };
+          }
+        } catch {
+          // Недоступный алгоритм просто пропускается при восстановлении выбора.
+        }
+        return null;
+      }),
+    );
+    this.compareList.set(resolved.filter((item): item is CompareEntry => item !== null));
   }
 
   openRunForm(): void {

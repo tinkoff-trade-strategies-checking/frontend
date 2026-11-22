@@ -67,12 +67,14 @@ describe('маршруты по режимам', () => {
     expect(await go(router, '/replay/S-0103')).toBe('/replay/S-0103');
     expect(await go(router, '/runs/R-0203')).toBe('/runs/R-0203');
     expect(await go(router, '/runs/R-0205/report')).toBe('/runs/R-0205/report');
+    expect(await go(router, '/workshop/compare')).toBe('/workshop/compare');
   });
 
   it('настоящий режим: маршруты прогонов /runs/:id и /runs/:id/report открыты при авторизации', async () => {
     const router = await setup(false);
     expect(await go(router, '/runs/run-1')).toBe('/runs/run-1');
     expect(await go(router, '/runs/run-1/report')).toBe('/runs/run-1/report');
+    expect(await go(router, '/workshop/compare')).toBe('/workshop/compare');
   });
 
   it('вход всегда доступен', async () => {

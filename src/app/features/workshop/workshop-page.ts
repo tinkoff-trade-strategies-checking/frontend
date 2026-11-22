@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { LAUNCH_API_IMPL, RUNS_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
@@ -34,6 +34,7 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
   selector: 'app-workshop-page',
   imports: [
     FormsModule,
+    RouterLink,
     TuiButton,
     TuiBadge,
     TuiInput,
@@ -87,7 +88,22 @@ export class WorkshopPage implements OnInit {
       if (params.get('create') === '1') {
         this.store.openCreateDraft();
       }
+      const compareParam = params.get('compare');
+      if (compareParam) {
+        void this.store.restoreCompare(compareParam.split(','));
+      }
+      const algoId = params.get('algo');
+      if (algoId) {
+        void this.openFromQuery(algoId, params.get('run') === '1');
+      }
     });
+  }
+
+  private async openFromQuery(algoId: string, openRun: boolean): Promise<void> {
+    await this.store.selectAlgorithm(algoId);
+    if (openRun) {
+      this.store.openRunForm();
+    }
   }
 
   protected sortIndex(current: WorkshopSortField): number {

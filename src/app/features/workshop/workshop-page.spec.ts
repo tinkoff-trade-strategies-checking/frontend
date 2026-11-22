@@ -180,6 +180,40 @@ describe('WorkshopPage', () => {
     expect(addSixthBtn?.disabled).toBe(true);
   });
 
+  it('при 1 выбранном алгоритме кнопка «Сравнить (1)» отключена с подсказкой, при 2 — активна ссылка на /workshop/compare', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const addAlgo = async (id: string) => {
+      el.querySelector(`tr[data-algo-id="${id}"] button`)?.dispatchEvent(new Event('click'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const addBtn = Array.from(el.querySelectorAll('.detail-panel button')).find((b) =>
+        b.textContent?.includes('Добавить в сравнение'),
+      ) as HTMLButtonElement | undefined;
+      addBtn?.click();
+      fixture.detectChanges();
+    };
+
+    await addAlgo('A-0002');
+    const compareBtn = Array.from(el.querySelectorAll('.compare-bar button')).find((b) =>
+      b.textContent?.includes('Сравнить (1)'),
+    ) as HTMLButtonElement | undefined;
+    expect(compareBtn?.disabled).toBe(true);
+    expect(el.querySelector('.compare-bar')?.textContent).toContain(
+      'Выберите ещё минимум один алгоритм',
+    );
+
+    await addAlgo('A-0003');
+    const compareLink = el.querySelector('.compare-bar a') as HTMLAnchorElement | null;
+    expect(compareLink?.textContent).toContain('Сравнить (2)');
+    expect(compareLink?.getAttribute('href')).toContain('/workshop/compare');
+    expect(compareLink?.getAttribute('href')).toContain('ids=A-0002,A-0003');
+  });
+
   it('при ошибке первой загрузки не показывает таблицу и «Страница 1 из 1», кнопка «Повторить» перезагружает', async () => {
     let shouldFail = true;
     const fakeApi = stubApi({

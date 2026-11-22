@@ -24,12 +24,40 @@
   @if (store.compareCount() > 0) {
     <section class="panel compare-bar" aria-label="Выбранные для сравнения алгоритмы">
       <div class="compare-head">
-        <strong class="tui-text_body-s">
-          В сравнении: {{ store.compareCount() }} из {{ compareLimit }}
-        </strong>
-        <button tuiButton type="button" size="xs" appearance="flat" (click)="store.clearCompare()">
-          Очистить
-        </button>
+        <div class="compare-title">
+          <strong class="tui-text_body-s">
+            В сравнении: {{ store.compareCount() }} из {{ compareLimit }}
+          </strong>
+          @if (!store.canCompare()) {
+            <span class="tui-text_body-xs muted">Выберите ещё минимум один алгоритм</span>
+          }
+        </div>
+        <div class="compare-actions">
+          @if (store.canCompare()) {
+            <a
+              tuiButton
+              size="xs"
+              appearance="primary"
+              routerLink="/workshop/compare"
+              [queryParams]="{ ids: store.compareIdsParam() }"
+            >
+              Сравнить ({{ store.compareCount() }})
+            </a>
+          } @else {
+            <button tuiButton type="button" size="xs" appearance="primary" [disabled]="true">
+              Сравнить ({{ store.compareCount() }})
+            </button>
+          }
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="flat"
+            (click)="store.clearCompare()"
+          >
+            Очистить
+          </button>
+        </div>
       </div>
       <div class="compare-chips">
         @for (item of store.compareList(); track item.id) {

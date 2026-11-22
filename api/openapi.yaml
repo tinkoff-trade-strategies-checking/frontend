@@ -498,6 +498,38 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+  /sessions/{sessionId}/report/compare:
+    post:
+      tags: [analysis]
+      operationId: compareSessionWithAlgorithms
+      summary: Постфактум-сравнение завершённой сессии с алгоритмами (UC-9 п. 1а/1б)
+      description: |
+        Сравнивает завершённую ручную сессию сразу с 1–5 алгоритмами из каталога Мастерской без изменения
+        исходной сессии и сохранённого отчёта (INV-3, INV-5). В запросе передаются идентификаторы стратегий
+        (`algorithmIds`), для каждой берётся последняя доступная пользователю опубликованная версия.
+        Идущая сессия — 409 `NOT_FINISHED` без раскрытия (INV-1, INV-7); чужая или несуществующая сессия, а также
+        недоступный/неопубликованный алгоритм — 404 `NOT_FOUND`.
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompareSessionRequest' }
+      responses:
+        '200':
+          description: Результат сравнения с алгоритмами и сводный консенсус
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionCompareResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
   /history:
     get:
       tags: [analysis]
@@ -2223,6 +2255,79 @@ components:
           BUILDING: '#/components/schemas/ReportBuilding'
           NOT_FINISHED: '#/components/schemas/NotFinished'
           NOT_FOUND: '#/components/schemas/NotFound'
+    CompareSessionRequest:
+      type: object
+      required: [algorithmIds]
+      properties:
+        algorithmIds:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Идентификаторы стратегий из каталога Мастерской (порядок сохраняется)
+    HumanEquityPoint:
+      type: object
+      required: [step, date, humanCapital, benchmarkCapital]
+      properties:
+        step: { type: integer }
+        date: { type: string, format: date-time }
+        humanCapital: { $ref: '#/components/schemas/Money' }
+        benchmarkCapital: { $ref: '#/components/schemas/MoneyOrNull' }
+    ComparedAlgorithmReport:
+      type: object
+      required:
+        - algorithmId
+        - strategyVersionId
+        - algorithmName
+        - version
+        - algoMetrics
+        - comparison
+        - equityCurve
+        - underwaterCurve
+        - divergenceSummary
+        - divergences
+        - reverseCheckTrades
+      properties:
+        algorithmId: { $ref: '#/components/schemas/Uuid' }
+        strategyVersionId: { $ref: '#/components/schemas/Uuid' }
+        algorithmName: { type: string }
+        version: { type: integer, minimum: 1 }
+        algoMetrics: { $ref: '#/components/schemas/ReportMetrics' }
+        comparison: { $ref: '#/components/schemas/Comparison' }
+        equityCurve: { type: array, items: { $ref: '#/components/schemas/EquityPoint' } }
+        underwaterCurve: { type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' } }
+        divergenceSummary: { $ref: '#/components/schemas/DivergenceSummary' }
+        divergences: { type: array, items: { $ref: '#/components/schemas/Divergence' } }
+        reverseCheckTrades: { type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }
+    ConsensusItem:
+      type: object
+      description: Сводное согласие выбранных алгоритмов на шаге (маппинг `ConsensusItem` из core)
+      required: [step, day, date, paperTicker, side, humanAction, agreeing, total, medianCost]
+      properties:
+        step: { type: integer }
+        day: { type: integer }
+        date: { type: string, format: date-time }
+        paperTicker: { type: string }
+        side: { $ref: '#/components/schemas/OrderSide' }
+        humanAction: { type: boolean }
+        agreeing: { type: integer, minimum: 0 }
+        total: { type: integer, minimum: 1 }
+        medianCost: { $ref: '#/components/schemas/Money' }
+    SessionCompareResponse:
+      type: object
+      description: Постфактум-сравнение завершённой сессии с 1–5 алгоритмами (UC-9 п. 1а/1б)
+      required: [sessionId, humanMetrics, humanEquityCurve, algorithms, consensus]
+      properties:
+        sessionId: { $ref: '#/components/schemas/Uuid' }
+        humanMetrics: { $ref: '#/components/schemas/ReportMetrics' }
+        humanEquityCurve: { type: array, items: { $ref: '#/components/schemas/HumanEquityPoint' } }
+        algorithms:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: { $ref: '#/components/schemas/ComparedAlgorithmReport' }
+        consensus: { type: array, items: { $ref: '#/components/schemas/ConsensusItem' } }
     # ---------- история ----------
     HistoryEntryBase:
       type: object

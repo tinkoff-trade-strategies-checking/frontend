@@ -18,24 +18,127 @@ interface StubRunRecord {
   readonly blind: boolean;
 }
 
-function defaultMetrics(initialRub: number, finalRub: number, bankrupt = false): ReportMetrics {
+interface SeedReportOverrides {
+  readonly timeframe?: '1d' | '1h';
+  readonly regime?: 'calm' | 'medium' | 'stress';
+  readonly totalDays?: number;
+  readonly period?: {
+    readonly startDate: string;
+    readonly endDate: string;
+    readonly label: string;
+  };
+  readonly finalRub: number;
+  readonly maxDrawdownPct: number;
+  readonly sharpe: number | null;
+  readonly sortino: number | null;
+  readonly tradesCount: number;
+  readonly winRatePct: number | null;
+  readonly costsTotalRub: number;
+  readonly equityCurve: readonly {
+    readonly step: number;
+    readonly dateLabel: string;
+    readonly capitalRub: number;
+    readonly benchmarkCapitalRub: number | null;
+  }[];
+}
+
+const SEED_REPORT_OVERRIDES: Readonly<Record<string, SeedReportOverrides>> = {
+  'R-0204': {
+    regime: 'medium',
+    period: { startDate: '2022-09-12', endDate: '2022-12-05', label: '12.09.2022 — 05.12.2022' },
+    finalRub: 978_600,
+    maxDrawdownPct: 6.8,
+    sharpe: -0.45,
+    sortino: -0.62,
+    tradesCount: 9,
+    winRatePct: 44.4,
+    costsTotalRub: 1840,
+    equityCurve: [
+      { step: 0, dateLabel: '12.09.2022', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
+      { step: 20, dateLabel: '10.10.2022', capitalRub: 964_000, benchmarkCapitalRub: 982_000 },
+      { step: 40, dateLabel: '07.11.2022', capitalRub: 991_000, benchmarkCapitalRub: 995_000 },
+      { step: 60, dateLabel: '05.12.2022', capitalRub: 978_600, benchmarkCapitalRub: 1_004_000 },
+    ],
+  },
+  'R-0202': {
+    regime: 'stress',
+    period: { startDate: '2020-01-20', endDate: '2020-03-18', label: '20.01.2020 — 18.03.2020' },
+    finalRub: 1_010_700,
+    maxDrawdownPct: 3.1,
+    sharpe: 0.58,
+    sortino: 0.81,
+    tradesCount: 4,
+    winRatePct: 50,
+    costsTotalRub: 820,
+    equityCurve: [
+      { step: 0, dateLabel: '20.01.2020', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
+      { step: 15, dateLabel: '10.02.2020', capitalRub: 1_018_000, benchmarkCapitalRub: 990_000 },
+      { step: 30, dateLabel: '03.03.2020', capitalRub: 989_000, benchmarkCapitalRub: 935_000 },
+      { step: 41, dateLabel: '18.03.2020', capitalRub: 1_010_700, benchmarkCapitalRub: 912_000 },
+    ],
+  },
+  'R-0200': {
+    regime: 'calm',
+    period: { startDate: '2023-07-11', endDate: '2023-10-03', label: '11.07.2023 — 03.10.2023' },
+    finalRub: 1_037_400,
+    maxDrawdownPct: 5.4,
+    sharpe: 0.94,
+    sortino: 1.29,
+    tradesCount: 11,
+    winRatePct: 54.5,
+    costsTotalRub: 2150,
+    equityCurve: [
+      { step: 0, dateLabel: '11.07.2023', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
+      { step: 20, dateLabel: '08.08.2023', capitalRub: 1_012_000, benchmarkCapitalRub: 1_010_000 },
+      { step: 40, dateLabel: '05.09.2023', capitalRub: 1_024_500, benchmarkCapitalRub: 1_022_000 },
+      { step: 60, dateLabel: '03.10.2023', capitalRub: 1_037_400, benchmarkCapitalRub: 1_028_000 },
+    ],
+  },
+  'R-0199': {
+    regime: 'stress',
+    period: { startDate: '2020-02-24', endDate: '2020-05-19', label: '24.02.2020 — 19.05.2020' },
+    finalRub: 15_000,
+    maxDrawdownPct: 98.5,
+    sharpe: -2.4,
+    sortino: -2.9,
+    tradesCount: 14,
+    winRatePct: 21.4,
+    costsTotalRub: 4600,
+    equityCurve: [
+      { step: 0, dateLabel: '24.02.2020', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
+      { step: 6, dateLabel: '03.03.2020', capitalRub: 710_000, benchmarkCapitalRub: 960_000 },
+      { step: 12, dateLabel: '12.03.2020', capitalRub: 280_000, benchmarkCapitalRub: 890_000 },
+      { step: 18, dateLabel: '20.03.2020', capitalRub: 15_000, benchmarkCapitalRub: 860_000 },
+    ],
+  },
+};
+
+function defaultMetrics(
+  initialRub: number,
+  finalRub: number,
+  bankrupt = false,
+  overrides?: SeedReportOverrides,
+): ReportMetrics {
   const netPct = Math.round(((finalRub - initialRub) / initialRub) * 10_000) / 100;
+  const totalCosts = overrides?.costsTotalRub ?? 1250;
   return {
     initialCapitalRub: initialRub,
     finalCapitalRub: finalRub,
     totalReturnPct: netPct,
     cagrPct: null,
-    grossReturnPct: netPct + 0.35,
+    grossReturnPct: Math.round((netPct + 0.35) * 100) / 100,
     netReturnPct: netPct,
-    maxDrawdownPct: bankrupt ? 100 : 4.2,
+    maxDrawdownPct: bankrupt
+      ? (overrides?.maxDrawdownPct ?? 100)
+      : (overrides?.maxDrawdownPct ?? 4.2),
     maxDrawdownDurationDays: 6,
     maxDrawdownDurationSteps: 6,
     volatilityPct: 14.5,
-    sharpe: 1.32,
-    sortino: 1.85,
+    sharpe: overrides !== undefined ? overrides.sharpe : 1.32,
+    sortino: overrides !== undefined ? overrides.sortino : 1.85,
     turnover: 1.4,
-    tradesCount: 6,
-    winRatePct: 66.7,
+    tradesCount: overrides?.tradesCount ?? 6,
+    winRatePct: overrides !== undefined ? overrides.winRatePct : 66.7,
     rejectedOrdersCount: 0,
     partialFillsCount: 0,
     stopTakeSameBarCount: 0,
@@ -43,11 +146,15 @@ function defaultMetrics(initialRub: number, finalRub: number, bankrupt = false):
     largestPositionPct: 35,
     bankrupt,
     costsRub: {
-      totalRub: 1250,
-      commissionRub: 600,
-      exchangeFeeRub: 50,
-      spreadRub: 300,
-      slippageRub: 300,
+      totalRub: totalCosts,
+      commissionRub: Math.round(totalCosts * 0.48),
+      exchangeFeeRub: Math.round(totalCosts * 0.04),
+      spreadRub: Math.round(totalCosts * 0.24),
+      slippageRub:
+        totalCosts -
+        Math.round(totalCosts * 0.48) -
+        Math.round(totalCosts * 0.04) -
+        Math.round(totalCosts * 0.24),
     },
     benchmarkImoexPct: 3.1,
   };
@@ -56,6 +163,7 @@ function defaultMetrics(initialRub: number, finalRub: number, bankrupt = false):
 function buildStubReport(record: StubRunRecord): AlgoRunReport {
   const { info } = record;
   const isInvalidOrFailed = info.status === 'invalid' || info.status === 'failed';
+  const overrides = SEED_REPORT_OVERRIDES[info.runId];
   return {
     runId: info.runId,
     strategyVersionId: info.strategyVersionId,
@@ -63,9 +171,9 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
     blind: info.blind,
     status: info.status,
     playedDays: info.doneSteps,
-    totalDays: info.totalSteps ?? 60,
-    timeframe: '1d',
-    regime: 'calm',
+    totalDays: overrides?.totalDays ?? info.totalSteps ?? 60,
+    timeframe: overrides?.timeframe ?? '1d',
+    regime: overrides?.regime ?? 'calm',
     createdAt: info.createdAt,
     repeatOfRunId: info.repeatOfRunId,
     repeatMatch: info.repeatMatch,
@@ -88,11 +196,12 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
           },
         ],
     diagnostics: info.diagnostics,
-    period: info.period ?? {
-      startDate: '2023-04-10',
-      endDate: '2023-07-05',
-      label: '10.04.2023 — 05.07.2023',
-    },
+    period: overrides?.period ??
+      info.period ?? {
+        startDate: '2023-04-10',
+        endDate: '2023-07-05',
+        label: '10.04.2023 — 05.07.2023',
+      },
     papers: info.papers ?? [
       {
         id: 'SBER',
@@ -113,8 +222,15 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
         lotSize: 1,
       },
     ],
-    metrics: isInvalidOrFailed ? null : defaultMetrics(1_000_000, 1_081_500),
-    equityCurve: [
+    metrics: isInvalidOrFailed
+      ? null
+      : defaultMetrics(
+          1_000_000,
+          overrides?.finalRub ?? 1_081_500,
+          info.status === 'bankrupt',
+          overrides,
+        ),
+    equityCurve: overrides?.equityCurve ?? [
       { step: 0, dateLabel: '10.04.2023', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
       { step: 30, dateLabel: '24.05.2023', capitalRub: 1_038_000, benchmarkCapitalRub: 1_015_000 },
       { step: 60, dateLabel: '05.07.2023', capitalRub: 1_081_500, benchmarkCapitalRub: 1_031_000 },
@@ -231,6 +347,9 @@ export class StubRunsStore {
     ['R-0204', makeSeedRecord('R-0204', 'Mean Reversion Bands v1', false, 'completed', 60)],
     ['R-0203', makeSeedRecord('R-0203', 'Breakout ATR v3', true, 'running', 22)],
     ['R-0202', makeSeedRecord('R-0202', 'SMA Cross 20/50 v1', false, 'completed', 41)],
+    ['R-0201', makeSeedRecord('R-0201', 'Momentum RSI v2', true, 'completed', 60)],
+    ['R-0200', makeSeedRecord('R-0200', 'Breakout ATR v3', true, 'completed', 60)],
+    ['R-0199', makeSeedRecord('R-0199', 'Aggressive Martingale v1', false, 'bankrupt', 18)],
   ]);
   seq = 301;
 }

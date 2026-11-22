@@ -842,4 +842,29 @@ describe('WorkshopStore', () => {
     expect(store.editorMode()).toBe('closed');
     expect(store.draft()?.strategyId).toBe('A-1');
   });
+
+  it('restoreCompare дедуплицирует id, ограничивает до 5 и подтягивает карточки отсутствующих в списке алгоритмов', async () => {
+    const api = stubApi({
+      async list(): Promise<WorkshopPageData> {
+        return makePage([makeAlgo('A-1', 'Alpha')]);
+      },
+      async getById(id: string): Promise<WorkshopDetailResult> {
+        if (id === 'A-MISSING') {
+          return { status: 'NOT_FOUND' };
+        }
+        return { status: 'READY', algorithm: makeAlgo(id, `Loaded ${id}`) };
+      },
+    });
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+    await store.load();
+    await store.restoreCompare(['A-1', 'A-1', 'A-2', 'A-MISSING', 'A-3', 'A-4', 'A-5', 'A-6']);
+
+    expect(store.compareList().map((x) => x.id)).toEqual(['A-1', 'A-2', 'A-3', 'A-4']);
+    expect(store.canCompare()).toBe(true);
+    expect(store.compareIdsParam()).toBe('A-1,A-2,A-3,A-4');
+  });
 });
