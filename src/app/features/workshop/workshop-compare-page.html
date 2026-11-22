@@ -33,7 +33,13 @@
       @for (item of store.entries(); track item.id) {
         <span class="compare-chip">
           <span class="tui-text_body-s">
-            {{ item.status === 'not_found' ? item.id : item.name + ' v' + item.latestVersion }}
+            {{
+              item.status === 'not_found'
+                ? item.id
+                : item.latestVersion > 0
+                  ? item.name + ' v' + item.latestVersion
+                  : item.name + ' (Черновик)'
+            }}
           </span>
           <button
             type="button"
@@ -57,8 +63,8 @@
 
     @if (store.hasDifferentContexts()) {
       <div tuiNotification appearance="warning" size="s">
-        Последние прогоны алгоритмов выполнялись на разных периодах или наборах бумаг — учитывайте
-        это при сопоставлении метрик и кривых.
+        Последние прогоны алгоритмов выполнялись на разных периодах, таймфреймах или наборах бумаг —
+        учитывайте это при сопоставлении метрик и кривых.
       </div>
     }
 
@@ -91,7 +97,8 @@
                     } @else {
                       <strong>{{ item.name }}</strong>
                       <span class="tui-text_body-xs muted">
-                        {{ item.author }} · v{{ item.latestVersion }}
+                        {{ item.author }} ·
+                        {{ item.latestVersion > 0 ? 'v' + item.latestVersion : 'Черновик' }}
                       </span>
                     }
                     <button
@@ -125,15 +132,28 @@
                   } @else if (item.status === 'no_run') {
                     <div class="no-run-cell">
                       <span tuiBadge size="s" appearance="neutral">Нет прогона</span>
-                      <a
-                        tuiButton
-                        size="xs"
-                        appearance="outline"
-                        routerLink="/workshop"
-                        [queryParams]="{ algo: item.id, run: '1' }"
-                      >
-                        Запустить прогон
-                      </a>
+                      @if (item.latestVersion > 0) {
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="outline"
+                          routerLink="/workshop"
+                          [queryParams]="{ algo: item.id, run: '1' }"
+                        >
+                          Запустить прогон
+                        </a>
+                      } @else {
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="outline"
+                          routerLink="/workshop"
+                          [queryParams]="{ algo: item.id }"
+                        >
+                          Открыть карточку
+                        </a>
+                        <span class="tui-text_body-xs muted"> Опубликуйте версию для прогона </span>
+                      }
                     </div>
                   } @else {
                     <span class="tui-text_body-s muted">Алгоритм скрыт или удалён</span>

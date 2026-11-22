@@ -26,6 +26,7 @@ import { WORKSHOP_API } from './data/workshop.models';
 import {
   CompareMetricKey,
   ComparedWorkshopItem,
+  normalizeCompareIds,
   WorkshopCompareStore,
 } from './workshop-compare.store';
 
@@ -125,8 +126,16 @@ export class WorkshopComparePage implements OnInit {
 
   ngOnInit(): void {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const raw = params.get('ids') ?? '';
-      void this.store.load(raw.split(','));
+      const ids = normalizeCompareIds((params.get('ids') ?? '').split(','));
+      const current = this.store.remainingIds();
+      const sameAsLoaded =
+        !this.store.error() &&
+        !this.store.loading() &&
+        ids.length === current.length &&
+        ids.every((id, i) => id === current[i]);
+      if (!sameAsLoaded) {
+        void this.store.load(ids);
+      }
     });
   }
 

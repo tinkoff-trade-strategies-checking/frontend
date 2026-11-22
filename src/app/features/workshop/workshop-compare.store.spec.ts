@@ -86,14 +86,57 @@ describe('WorkshopCompareStore', () => {
     expect(store.readyEntries()[0].runId).toBe('R-0202');
   });
 
-  it('при ошибке загрузки выставляет error и сбрасывает loading', async () => {
-    const failingHistory: HistoryApi = {
-      list: vi.fn().mockRejectedValue(new Error('network down')),
+  it('учитывает различие таймфрейма в hasDifferentContexts даже при совпадающем периоде и бумагах', async () => {
+    const baseRuns = new StubRunsApi();
+    const samePeriodDiffTfRuns: RunsApi = {
+      ...baseRuns,
+      createRun: baseRuns.createRun.bind(baseRuns),
+      getRun: baseRuns.getRun.bind(baseRuns),
+      events: baseRuns.events.bind(baseRuns),
+      repeatRun: baseRuns.repeatRun.bind(baseRuns),
+      async getRunReport(runId) {
+        const res = await baseRuns.getRunReport(runId);
+        if (res.status !== 'READY') {
+          return res;
+        }
+        return {
+          status: 'READY',
+          report: {
+            ...res.report,
+            timeframe: runId === 'R-0205' ? '1d' : '1h',
+            period: {
+              startDate: '2023-04-10',
+              endDate: '2023-07-05',
+              label: '10.04.2023 — 05.07.2023',
+            },
+            papers: res.report.papers.slice(0, 1),
+          },
+        };
+      },
     };
-    const store = setup({ historyApi: failingHistory });
+    const store = setup({ runsApi: samePeriodDiffTfRuns });
+    await store.load(['A-0002', 'A-0003']);
+
+    expect(store.hasDifferentContexts()).toBe(true);
+  });
+
+  it('при ошибке загрузки очищает прежние entries, выставляет error и сбрасывает loading', async () => {
+    let shouldFail = false;
+    const baseHistory = new StubHistoryApi();
+    const flakyHistory: HistoryApi = {
+      list: vi.fn((q) =>
+        shouldFail ? Promise.reject(new Error('network down')) : baseHistory.list(q),
+      ),
+    };
+    const store = setup({ historyApi: flakyHistory });
 
     await store.load(['A-0002', 'A-0003']);
+    expect(store.entries().length).toBe(2);
+
+    shouldFail = true;
+    await store.load(['A-0002', 'A-0003']);
     expect(store.loading()).toBe(false);
+    expect(store.entries()).toEqual([]);
     expect(store.error()).toBe('Не удалось загрузить данные для сравнения.');
   });
 });

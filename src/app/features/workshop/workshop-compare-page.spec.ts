@@ -25,9 +25,13 @@ class StubCompareChart {
 
 describe('WorkshopComparePage', () => {
   let queryParamMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let stubWorkshop: StubWorkshopApi;
+  let getByIdSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     queryParamMap$ = new BehaviorSubject(convertToParamMap({ ids: 'A-0002,A-0003,A-0001' }));
+    stubWorkshop = new StubWorkshopApi();
+    getByIdSpy = vi.spyOn(stubWorkshop, 'getById');
 
     await TestBed.configureTestingModule({
       imports: [WorkshopComparePage],
@@ -49,7 +53,7 @@ describe('WorkshopComparePage', () => {
         add: {
           imports: [StubCompareChart],
           providers: [
-            { provide: WORKSHOP_API, useClass: StubWorkshopApi },
+            { provide: WORKSHOP_API, useValue: stubWorkshop },
             { provide: HISTORY_API, useClass: StubHistoryApi },
             { provide: RUNS_API, useClass: StubRunsApi },
           ],
@@ -82,12 +86,12 @@ describe('WorkshopComparePage', () => {
     expect(text).toContain('+3,74 %');
     expect(text).toContain('Нет прогона');
     expect(text).toContain('Запустить прогон');
-    expect(text).toContain('разных периодах или наборах бумаг');
+    expect(text).toContain('разных периодах, таймфреймах или наборах бумаг');
     expect(el.querySelector('.stub-compare-chart')?.textContent).toBe('2');
     expect(el.querySelectorAll('.best-cell').length).toBeGreaterThan(0);
   });
 
-  it('удаляет алгоритм из сравнения и обновляет queryParams', async () => {
+  it('удаляет алгоритм из сравнения и при эмиссии queryParamMap не перезагружает данные и не пересоздаёт график', async () => {
     const router = TestBed.inject(Router);
     const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
@@ -98,6 +102,10 @@ describe('WorkshopComparePage', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
+    const chartElBefore = el.querySelector('app-workshop-compare-chart');
+    expect(chartElBefore).not.toBeNull();
+    const callsBefore = getByIdSpy.mock.calls.length;
+
     const removeChipBtn = el.querySelector(
       'button[aria-label="Убрать Эталон платформы из сравнения"]',
     ) as HTMLButtonElement | null;
@@ -113,6 +121,39 @@ describe('WorkshopComparePage', () => {
         replaceUrl: true,
       }),
     );
+
+    // Имитируем реакцию ActivatedRoute.queryParamMap на router.navigate:
+    // повторная загрузка не должна запускаться, график остаётся тем же DOM-элементом.
+    queryParamMap$.next(convertToParamMap({ ids: 'A-0002,A-0003' }));
+    await flushAsync();
+    fixture.detectChanges();
+
+    expect(getByIdSpy.mock.calls.length).toBe(callsBefore);
+    expect(el.querySelector('app-workshop-compare-chart')).toBe(chartElBefore);
+    expect(el.querySelector('.stub-compare-chart')?.textContent).toBe('2');
+  });
+
+  it('для черновика с latestVersion === 0 показывает «Черновик» и «Опубликуйте версию для прогона» вместо v0', async () => {
+    const draft = await stubWorkshop.createAlgorithm({
+      name: 'Новый черновик',
+      description: 'Без версии',
+      source: 'rule x when close > open buy 10% market because "тест";',
+    });
+    queryParamMap$.next(convertToParamMap({ ids: `A-0002,${draft.strategyId}` }));
+
+    const fixture = TestBed.createComponent(WorkshopComparePage);
+    fixture.detectChanges();
+    await flushAsync();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const text = el.textContent ?? '';
+    expect(text).toContain('Новый черновик (Черновик)');
+    expect(text).toContain('Опубликуйте версию для прогона');
+    expect(text).toContain('Открыть карточку');
+    expect(text).not.toContain('v0');
+    expect(text).not.toContain('Запустить прогон');
   });
 
   it('при пустом списке показывает пустое состояние со ссылкой в Мастерскую', async () => {

@@ -40,6 +40,7 @@ export class WorkshopStore implements OnDestroy {
   private loadSeq = 0;
   private detailSeq = 0;
   private draftSeq = 0;
+  private compareRestoreSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly loading = signal(false);
@@ -289,7 +290,11 @@ export class WorkshopStore implements OnDestroy {
   }
 
   async restoreCompare(ids: readonly string[]): Promise<void> {
-    const unique = Array.from(new Set(ids.filter(Boolean))).slice(0, WORKSHOP_COMPARE_LIMIT);
+    const seq = ++this.compareRestoreSeq;
+    const unique = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean))).slice(
+      0,
+      WORKSHOP_COMPARE_LIMIT,
+    );
     if (unique.length === 0) {
       return;
     }
@@ -314,6 +319,9 @@ export class WorkshopStore implements OnDestroy {
         return null;
       }),
     );
+    if (seq !== this.compareRestoreSeq) {
+      return;
+    }
     this.compareList.set(resolved.filter((item): item is CompareEntry => item !== null));
   }
 

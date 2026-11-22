@@ -147,7 +147,7 @@ test('сравнение выбранных алгоритмов (UC-22): пер
   await expect(page.locator('.compare-table')).toContainText('+3,74 %');
   await expect(page.locator('.compare-table')).toContainText('Нет прогона');
   await expect(page.locator('.compare-table .best-cell').first()).toBeVisible();
-  await expect(page.getByText('разных периодах или наборах бумаг')).toBeVisible();
+  await expect(page.getByText('разных периодах, таймфреймах или наборах бумаг')).toBeVisible();
 
   // Наложение кривых доходности (canvas), переключение режима и скрытие серии.
   const chart = page.locator('app-workshop-compare-chart');
@@ -158,10 +158,11 @@ test('сравнение выбранных алгоритмов (UC-22): пер
   await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
   await chart.getByRole('button', { name: 'Капитал, ₽' }).click();
 
-  // Убираем алгоритм без прогона прямо на экране сравнения и возвращаемся в Мастерскую.
+  // Убираем алгоритм без прогона прямо на экране сравнения: состояние графика сохраняется.
   await page.getByRole('button', { name: 'Убрать Эталон платформы из сравнения' }).click();
   await expect(page.locator('th[data-compare-algo="A-0001"]')).toHaveCount(0);
   await expect(page).toHaveURL(/\/workshop\/compare\?ids=A-0002,A-0003/);
+  await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
 
   await page.getByRole('link', { name: 'Назад в Мастерскую' }).click();
   await expect(page).toHaveURL(/\/workshop\?compare=A-0002,A-0003/);

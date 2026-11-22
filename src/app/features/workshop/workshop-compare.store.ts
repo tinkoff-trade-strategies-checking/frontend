@@ -58,6 +58,13 @@ export type CompareMetricKey =
 const FINISHED_STATUSES = new Set(['completed', 'finished_early', 'bankrupt']);
 const MAX_HISTORY_PAGES = 3;
 
+export function normalizeCompareIds(rawIds: readonly string[]): readonly string[] {
+  return Array.from(new Set(rawIds.map((id) => id.trim()).filter(Boolean))).slice(
+    0,
+    WORKSHOP_COMPARE_LIMIT,
+  );
+}
+
 function normalizeName(name: string): string {
   return name
     .replace(/\s*\(черновик\)$/i, '')
@@ -126,6 +133,7 @@ export class WorkshopCompareStore {
       return false;
     }
     const periods = new Set(ready.map((r) => r.report.period.label));
+    const timeframes = new Set(ready.map((r) => r.report.timeframe));
     const papers = new Set(
       ready.map((r) =>
         r.report.papers
@@ -135,7 +143,7 @@ export class WorkshopCompareStore {
           .join(','),
       ),
     );
-    return periods.size > 1 || papers.size > 1;
+    return periods.size > 1 || timeframes.size > 1 || papers.size > 1;
   });
 
   readonly chartSeries = computed<readonly CompareChartSeries[]>(() =>
@@ -178,10 +186,7 @@ export class WorkshopCompareStore {
     if (this.destroyed) {
       return;
     }
-    const ids = Array.from(new Set(rawIds.map((id) => id.trim()).filter(Boolean))).slice(
-      0,
-      WORKSHOP_COMPARE_LIMIT,
-    );
+    const ids = normalizeCompareIds(rawIds);
     const seq = ++this.loadSeq;
     this.error.set(null);
 
@@ -249,6 +254,7 @@ export class WorkshopCompareStore {
       this.entries.set(items);
     } catch (err) {
       if (!this.destroyed && seq === this.loadSeq) {
+        this.entries.set([]);
         this.error.set(errorMessage(err, 'Не удалось загрузить данные для сравнения.'));
       }
     } finally {
