@@ -9,6 +9,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
 
   // Открываем вкладку «Расхождения».
   await page.getByRole('button', { name: 'Расхождения' }).click();
+  await expect(page.locator('main')).toContainText('Расхождения обошлись вам в');
 
   const mainText = ((await page.locator('main').textContent()) ?? '').replace(/\u00a0/g, ' ');
   expect(mainText).toContain('Расхождения обошлись вам в 24 819,38 ₽');

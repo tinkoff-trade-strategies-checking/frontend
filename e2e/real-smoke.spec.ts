@@ -145,7 +145,7 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   await page
     .locator('#workshop-draft-source')
     .fill(
-      `rule "вход" when position == 0 and close > 0 then buy 10 % cash because "${becauseText}"`,
+      `rule "вход" when position == 0 and close >= low then buy 10 % cash because "${becauseText}"`,
     );
 
   await detail.getByRole('button', { name: 'Создать черновик' }).click();
