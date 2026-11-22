@@ -159,6 +159,9 @@ export class RunReportPage implements OnInit {
   }
 
   protected async download(runId: string, format: ReportExportFormat): Promise<void> {
+    if (this.exporting()) {
+      return;
+    }
     this.exporting.set(true);
     this.exportError.set(null);
     try {

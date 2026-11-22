@@ -10,6 +10,7 @@ export class RunReportStore {
   private readonly api = inject(RUNS_API);
   private readonly destroyRef = inject(DestroyRef);
   private loadSeq = 0;
+  private destroyed = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
 
   pollIntervalMs = 2000;
@@ -56,10 +57,17 @@ export class RunReportStore {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.stopPolling());
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.loadSeq++;
+      this.stopPolling();
+    });
   }
 
   async load(runId: string): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
@@ -70,7 +78,7 @@ export class RunReportStore {
 
     try {
       const res = await this.api.getRunReport(runId);
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.result.set(res);
@@ -78,12 +86,12 @@ export class RunReportStore {
         this.schedulePoll(runId, seq, 1);
       }
     } catch (err) {
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.error.set(errorMessage(err, 'Не удалось загрузить отчёт прогона.'));
     } finally {
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
@@ -111,17 +119,20 @@ export class RunReportStore {
   }
 
   private schedulePoll(runId: string, seq: number, attempt: number, failures = 0): void {
+    if (this.destroyed || seq !== this.loadSeq) {
+      return;
+    }
     if (attempt > RunReportStore.MAX_POLLS) {
       this.error.set('Отчёт собирается дольше обычного. Обновите страницу позже.');
       return;
     }
     this.pollTimer = setTimeout(async () => {
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       try {
         const res = await this.api.getRunReport(runId);
-        if (seq !== this.loadSeq) {
+        if (this.destroyed || seq !== this.loadSeq) {
           return;
         }
         this.result.set(res);
@@ -129,7 +140,7 @@ export class RunReportStore {
           this.schedulePoll(runId, seq, attempt + 1);
         }
       } catch (err) {
-        if (seq !== this.loadSeq) {
+        if (this.destroyed || seq !== this.loadSeq) {
           return;
         }
         if (failures + 1 < RunReportStore.MAX_POLL_FAILURES) {

@@ -38,6 +38,7 @@ export class WorkshopStore implements OnDestroy {
   private readonly api = inject(WORKSHOP_API);
   private loadSeq = 0;
   private detailSeq = 0;
+  private draftSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly loading = signal(false);
@@ -297,6 +298,7 @@ export class WorkshopStore implements OnDestroy {
   }
 
   openCreateDraft(): void {
+    this.draftSeq++;
     this.runFormOpen.set(false);
     this.actionError.set(null);
     this.draft.set(null);
@@ -310,6 +312,7 @@ export class WorkshopStore implements OnDestroy {
   }
 
   closeEditor(): void {
+    this.draftSeq++;
     this.editorMode.set('closed');
     this.draftLoading.set(false);
     this.clearDraftNotices();
@@ -327,6 +330,7 @@ export class WorkshopStore implements OnDestroy {
 
   setDraftSource(value: string): void {
     this.draftSource.set(value);
+    this.checkResult.set(null);
     this.draftSuccess.set(null);
     this.publishError.set(null);
   }
@@ -364,6 +368,7 @@ export class WorkshopStore implements OnDestroy {
   }
 
   async openDraft(id: string): Promise<void> {
+    const seq = ++this.draftSeq;
     this.runFormOpen.set(false);
     this.actionError.set(null);
     this.draftLoading.set(true);
@@ -372,11 +377,19 @@ export class WorkshopStore implements OnDestroy {
 
     try {
       const loaded = await this.api.getDraft(id);
+      if (seq !== this.draftSeq) {
+        return;
+      }
       this.applyDraftSnapshot(loaded);
     } catch (error) {
+      if (seq !== this.draftSeq) {
+        return;
+      }
       this.draftError.set(errorMessage(error, 'Не удалось загрузить черновик.'));
     } finally {
-      this.draftLoading.set(false);
+      if (seq === this.draftSeq) {
+        this.draftLoading.set(false);
+      }
     }
   }
 
@@ -497,6 +510,7 @@ export class WorkshopStore implements OnDestroy {
     if (this.forking()) {
       return;
     }
+    this.draftSeq++;
     this.forking.set(true);
     this.actionError.set(null);
     this.runFormOpen.set(false);

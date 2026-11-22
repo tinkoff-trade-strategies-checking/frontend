@@ -16,8 +16,8 @@ info:
     Необязательные поля отчёта и истории — `null`, а не пропуск.
     Производные величины (проценты портфеля, позиций и сделок, издержки, `changePct`, кривая просадки, длительность
     просадки в днях) считает core (core#54), backend только передаёт результат без арифметики; проценты уже ×100.
-    Они есть всегда. `null` остаётся только у отложенного (разбор расхождений, обратная проверка, сравнение,
-    фоновый алгоритм — ФТ-18…20) и у `changePct` бумаги без бара на курсоре.
+    Они есть всегда. `null` остаётся у `changePct` бумаги без бара на курсоре, а также у полей фонового алгоритма
+    для старых сессий без привязанного алгоритма (до ФТ-18…20).
 
     CSRF (Spring Security, cookie-токен). Токен — cookie `XSRF-TOKEN` (без HttpOnly, его читает Angular),
     клиент без токена получает его из ответа `GET /me`, в том числе из `401`. Заголовок `X-XSRF-TOKEN`
@@ -1176,6 +1176,9 @@ components:
           type: [array, 'null']
           items: { $ref: '#/components/schemas/Uuid' }
         initialCapital: { $ref: '#/components/schemas/Money' }
+        backgroundAlgorithmId:
+          oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
+          description: Необязательный идентификатор алгоритма из каталога мастерской для фонового сравнения (по умолчанию — «Эталон платформы»)
     CreatedSession:
       type: object
       required: [sessionId]
@@ -2053,7 +2056,7 @@ components:
         step: { type: integer }
         date: { type: string, format: date-time }
         humanCapital: { $ref: '#/components/schemas/Money' }
-        algoCapital: { $ref: '#/components/schemas/MoneyOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoCapital: { $ref: '#/components/schemas/MoneyOrNull', description: 'Капитал фонового алгоритма (ФТ-18); null, если на шаге нет точки или у старой сессии нет алгоритма' }
         benchmarkCapital: { $ref: '#/components/schemas/MoneyOrNull' }
     UnderwaterPoint:
       type: object
@@ -2062,7 +2065,7 @@ components:
         step: { type: integer }
         date: { type: string, format: date-time }
         humanDrawdownPct: { $ref: '#/components/schemas/Pct', description: 'Глубина просадки от пика в %, считает core (core#54)' }
-        algoDrawdownPct: { $ref: '#/components/schemas/PctOrNull', description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoDrawdownPct: { $ref: '#/components/schemas/PctOrNull', description: 'Просадка фонового алгоритма в % (ФТ-18); null, если на шаге нет точки или у старой сессии нет алгоритма' }
     DivergenceType:
       type: string
       enum: [extra, missed, size, timing]
@@ -2172,17 +2175,17 @@ components:
         timeframe: { $ref: '#/components/schemas/Timeframe' }
         regime: { $ref: '#/components/schemas/Regime' }
         createdAt: { type: string, format: date-time }
-        backgroundAlgorithmName: { type: [string, 'null'], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        backgroundAlgorithmName: { type: [string, 'null'], description: 'Название фонового алгоритма сессии (ФТ-18); null для старых сессий без алгоритма' }
         period: { $ref: '#/components/schemas/Period' }
         papers: { type: array, items: { $ref: '#/components/schemas/PaperReveal' } }
         humanMetrics: { $ref: '#/components/schemas/ReportMetrics' }
-        algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        algoMetrics: { oneOf: [{ $ref: '#/components/schemas/ReportMetrics' }, { type: 'null' }], description: 'Метрики фонового алгоритма (ФТ-18); null для старых сессий без алгоритма' }
+        comparison: { oneOf: [{ $ref: '#/components/schemas/Comparison' }, { type: 'null' }], description: 'Сравнение результатов человека и фонового алгоритма (ФТ-18); null для старых сессий без алгоритма' }
         equityCurve: { type: array, items: { $ref: '#/components/schemas/EquityPoint' } }
         underwaterCurve: { type: array, items: { $ref: '#/components/schemas/UnderwaterPoint' }, description: 'Кривая просадки: точка на каждую точку `equityCurve`, считает core (core#54)' }
-        divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
-        reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'ФТ-18…20 отложены до решения по DSL (`decisions.md`); null, пока фонового прогона нет' }
+        divergenceSummary: { oneOf: [{ $ref: '#/components/schemas/DivergenceSummary' }, { type: 'null' }], description: 'Сводка по расхождениям (ФТ-19); null для старых сессий без алгоритма' }
+        divergences: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/Divergence' } }, { type: 'null' }], description: 'Список расхождений (ФТ-18…19); null для старых сессий без алгоритма' }
+        reverseCheckTrades: { oneOf: [{ type: array, items: { $ref: '#/components/schemas/ReverseCheckTrade' } }, { type: 'null' }], description: 'Пропущенные алгоритмом прибыльные сделки человека (ФТ-20); null для старых сессий без алгоритма' }
         roundTrips: { type: array, items: { $ref: '#/components/schemas/RoundTrip' } }
         fills: { type: array, items: { $ref: '#/components/schemas/ReportFill' } }
     ReportReady:

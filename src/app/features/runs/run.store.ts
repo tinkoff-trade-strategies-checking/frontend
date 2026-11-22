@@ -8,6 +8,7 @@ export class RunStore {
   private readonly api = inject(RUNS_API);
   private readonly destroyRef = inject(DestroyRef);
   private loadSeq = 0;
+  private destroyed = false;
   private eventsSub: Subscription | null = null;
 
   readonly loading = signal(false);
@@ -37,10 +38,17 @@ export class RunStore {
   });
 
   constructor() {
-    this.destroyRef.onDestroy(() => this.closeEvents());
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      this.loadSeq++;
+      this.closeEvents();
+    });
   }
 
   async load(runId: string): Promise<void> {
+    if (this.destroyed) {
+      return;
+    }
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
@@ -51,7 +59,7 @@ export class RunStore {
 
     try {
       const info = await this.api.getRun(runId);
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.run.set(info);
@@ -59,13 +67,13 @@ export class RunStore {
         this.openEvents(runId, info.lastEventId, seq);
       }
     } catch (err) {
-      if (seq !== this.loadSeq) {
+      if (this.destroyed || seq !== this.loadSeq) {
         return;
       }
       this.run.set(null);
       this.error.set(errorMessage(err, 'Не удалось загрузить прогон.'));
     } finally {
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this.loading.set(false);
       }
     }
@@ -89,11 +97,14 @@ export class RunStore {
   }
 
   private openEvents(runId: string, lastEventId: string | null, seq: number): void {
+    if (this.destroyed || seq !== this.loadSeq) {
+      return;
+    }
     this.closeEvents();
     this.eventsSub = this.api.events(runId, lastEventId).subscribe({
       next: (event) => this.handleEvent(runId, seq, event),
       error: (err) => {
-        if (seq === this.loadSeq) {
+        if (!this.destroyed && seq === this.loadSeq) {
           this.streamError.set(errorMessage(err, 'Соединение с потоком событий прервано.'));
         }
       },
@@ -101,7 +112,7 @@ export class RunStore {
   }
 
   private handleEvent(runId: string, seq: number, event: RunStreamEvent): void {
-    if (seq !== this.loadSeq) {
+    if (this.destroyed || seq !== this.loadSeq) {
       return;
     }
     switch (event.type) {
@@ -158,11 +169,11 @@ export class RunStore {
   private async refreshRun(runId: string, seq: number): Promise<void> {
     try {
       const fresh = await this.api.getRun(runId);
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this.run.set(fresh);
       }
     } catch (err) {
-      if (seq === this.loadSeq) {
+      if (!this.destroyed && seq === this.loadSeq) {
         this.streamError.set(errorMessage(err, 'Не удалось обновить данные прогона.'));
       }
     }

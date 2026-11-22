@@ -108,6 +108,7 @@ describe('RunReportPage', () => {
 
     const buttons = Array.from(root.querySelectorAll('button'));
     buttons.find((b) => b.textContent?.includes('Скачать XLSX'))?.click();
+    await fixture.whenStable();
     buttons.find((b) => b.textContent?.includes('Скачать CSV'))?.click();
     await fixture.whenStable();
     expect(downloadRunSpy).toHaveBeenCalledWith('R-0205', 'xlsx');
@@ -118,6 +119,64 @@ describe('RunReportPage', () => {
     buttons.find((b) => b.textContent?.includes('Повторить прогон'))?.click();
     await fixture.whenStable();
     expect(navSpy).toHaveBeenCalledWith(['/runs', 'R-0999']);
+  });
+
+  it('рендерит E-RT01, repeatMatch=false и игнорирует повторный вызов download пока идёт экспорт', async () => {
+    const base = await stubApi.getRunReport('R-0205');
+    if (base.status !== 'READY') {
+      throw new Error('Ожидался READY');
+    }
+    let resolveDownload!: () => void;
+    downloadRunSpy.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDownload = resolve;
+        }),
+    );
+
+    vi.spyOn(stubApi, 'getRunReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        status: 'failed',
+        level: 'ERROR',
+        repeatOfRunId: 'R-0204',
+        repeatMatch: false,
+        findings: [
+          {
+            code: 'E-RT01',
+            level: 'ERROR',
+            message: 'Деление на ноль при расчёте индикатора.',
+            step: 3,
+          },
+        ],
+        metrics: null,
+      },
+    });
+
+    const fixture = TestBed.createComponent(RunReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('E-RT01');
+    expect(root.textContent).toContain('Деление на ноль при расчёте индикатора.');
+    expect(root.textContent).toContain('Повтор не совпал (расхождение INV-4)');
+
+    const buttons = Array.from(root.querySelectorAll('button'));
+    buttons.find((b) => b.textContent?.includes('Скачать XLSX'))?.click();
+    buttons.find((b) => b.textContent?.includes('Скачать CSV'))?.click();
+    expect(downloadRunSpy).toHaveBeenCalledTimes(1);
+    expect(downloadRunSpy).toHaveBeenCalledWith('R-0205', 'xlsx');
+
+    resolveDownload();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    buttons.find((b) => b.textContent?.includes('Скачать CSV'))?.click();
+    await fixture.whenStable();
+    expect(downloadRunSpy).toHaveBeenCalledTimes(2);
+    expect(downloadRunSpy).toHaveBeenLastCalledWith('R-0205', 'csv');
   });
 
   it('обрабатывает NOT_FINISHED и NOT_FOUND', async () => {

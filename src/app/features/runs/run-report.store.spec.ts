@@ -100,4 +100,43 @@ describe('RunReportStore', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(store.error()).toBeTruthy();
   });
+
+  it('не запускает polling после уничтожения стора, если getRunReport(BUILDING) завершился позже', async () => {
+    vi.useFakeTimers();
+    let resolveReport!: (res: RunReportResult) => void;
+    const getRunReport = vi.fn<RunsApi['getRunReport']>().mockImplementation(
+      () =>
+        new Promise<RunReportResult>((resolve) => {
+          resolveReport = resolve;
+        }),
+    );
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: RUNS_API,
+          useValue: {
+            getRunReport,
+            getRun: vi.fn(),
+            createRun: vi.fn(),
+            events: vi.fn(),
+            repeatRun: vi.fn(),
+          },
+        },
+        RunReportStore,
+      ],
+    });
+
+    const store = TestBed.inject(RunReportStore);
+    store.pollIntervalMs = 500;
+    const loadPromise = store.load('R-BUILD');
+    TestBed.resetTestingModule();
+
+    resolveReport({ status: 'BUILDING', runId: 'R-BUILD', message: 'Собирается' });
+    await loadPromise;
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(getRunReport).toHaveBeenCalledTimes(1);
+    expect(store.result()).toBeNull();
+  });
 });

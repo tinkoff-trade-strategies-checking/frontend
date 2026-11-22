@@ -174,4 +174,58 @@ describe('RunStore', () => {
     expect(eventsSpy).not.toHaveBeenCalled();
     expect(store.isTerminal()).toBe(true);
   });
+
+  it('не открывает SSE если стор уничтожен пока getRun ещё в полёте', async () => {
+    let resolveRun!: (info: RunInfo) => void;
+    const getRun = vi.fn<RunsApi['getRun']>().mockImplementation(
+      () =>
+        new Promise<RunInfo>((resolve) => {
+          resolveRun = resolve;
+        }),
+    );
+    const events = vi.fn<RunsApi['events']>().mockReturnValue(of());
+
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: RUNS_API,
+          useValue: {
+            getRun,
+            events,
+            createRun: vi.fn(),
+            repeatRun: vi.fn(),
+            getRunReport: vi.fn(),
+          },
+        },
+        RunStore,
+      ],
+    });
+
+    const store = TestBed.inject(RunStore);
+    const loadPromise = store.load('R-INFLIGHT');
+    TestBed.resetTestingModule();
+
+    resolveRun({
+      runId: 'R-INFLIGHT',
+      strategyVersionId: 'v1',
+      algoName: 'Inflight Algo',
+      blind: false,
+      status: 'running',
+      doneSteps: 1,
+      totalSteps: 10,
+      repeatOfRunId: null,
+      repeatMatch: null,
+      lastEventId: null,
+      createdAt: '2026-11-18T11:30:00+03:00',
+      finishedAt: null,
+      errorCode: null,
+      diagnostics: [],
+      period: null,
+      papers: null,
+    });
+    await loadPromise;
+
+    expect(events).not.toHaveBeenCalled();
+    expect(store.run()).toBeNull();
+  });
 });

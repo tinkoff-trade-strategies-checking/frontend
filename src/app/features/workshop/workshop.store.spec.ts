@@ -535,4 +535,73 @@ describe('WorkshopStore', () => {
     expect(store.editorMode()).toBe('edit');
     expect(store.draft()?.strategyId).toBe('A-FORK');
   });
+
+  it('защищает openDraft от гонки и сбрасывает checkResult при изменении исходного кода', async () => {
+    const draftResolvers: ((draft: Awaited<ReturnType<WorkshopApi['getDraft']>>) => void)[] = [];
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([makeAlgo('A-1'), makeAlgo('A-2')]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: makeAlgo(id) };
+        },
+      }),
+      getDraft(): ReturnType<WorkshopApi['getDraft']> {
+        return new Promise((resolve) => {
+          draftResolvers.push(resolve);
+        });
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    const p1 = store.openDraft('A-1');
+    const p2 = store.openDraft('A-2');
+
+    draftResolvers[1]({
+      strategyId: 'A-2',
+      name: 'Fresh A-2',
+      description: 'Desc 2',
+      source: 'param x = 2;',
+      updatedAt: '2026-11-22T12:00:00Z',
+      check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+    });
+    await p2;
+
+    draftResolvers[0]({
+      strategyId: 'A-1',
+      name: 'Stale A-1',
+      description: 'Desc 1',
+      source: 'param x = 1;',
+      updatedAt: '2026-11-22T11:00:00Z',
+      check: { lookaheadLevel: 'ERROR', diagnostics: [], params: [] },
+    });
+    await p1;
+
+    expect(store.draft()?.strategyId).toBe('A-2');
+    expect(store.draftSource()).toBe('param x = 2;');
+    expect(store.checkResult()?.lookaheadLevel).toBe('OK');
+
+    store.setDraftSource('param x = 3;');
+    expect(store.checkResult()).toBeNull();
+
+    const p3 = store.openDraft('A-1');
+    store.closeEditor();
+    draftResolvers[2]({
+      strategyId: 'A-1',
+      name: 'Closed A-1',
+      description: 'Desc 1',
+      source: 'param x = 1;',
+      updatedAt: '2026-11-22T11:00:00Z',
+      check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+    });
+    await p3;
+
+    expect(store.editorMode()).toBe('closed');
+    expect(store.draft()?.strategyId).toBe('A-2');
+  });
 });
