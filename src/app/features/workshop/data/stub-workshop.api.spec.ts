@@ -15,8 +15,8 @@ describe('StubWorkshopApi', () => {
     expect(res.items.every((item) => item.license === 'MIT')).toBe(true);
 
     for (let i = 1; i < res.items.length; i++) {
-      const prevTime = Date.parse(res.items[i - 1].publishedAt);
-      const currTime = Date.parse(res.items[i].publishedAt);
+      const prevTime = Date.parse(res.items[i - 1].publishedAt ?? '');
+      const currTime = Date.parse(res.items[i].publishedAt ?? '');
       expect(prevTime).toBeGreaterThanOrEqual(currTime);
     }
   });
@@ -138,5 +138,38 @@ describe('StubWorkshopApi', () => {
     if (breakout.status === 'READY') {
       expect(breakout.algorithm.linterWarnings.map((w) => w.code)).toEqual(['L001', 'W-LA01']);
     }
+  });
+
+  it('поддерживает createAlgorithm, saveDraft, check с fix, publish (и отказ STRATEGY_INVALID), fork и setVisibility', async () => {
+    const api = new StubWorkshopApi();
+    const draft = await api.createAlgorithm({
+      name: 'My Strategy',
+      description: 'Test',
+      source: 'rule enter when close > 70 because "rsi";',
+    });
+    expect(draft.check?.lookaheadLevel).toBe('WARNING');
+    expect(draft.check?.diagnostics[0].fixes.length).toBeGreaterThan(0);
+
+    const badSave = await api.saveDraft(draft.strategyId, { source: 'let x = close[+1];' });
+    expect(badSave.check?.lookaheadLevel).toBe('ERROR');
+    const failedPub = await api.publish(draft.strategyId, { summary: 'bad' });
+    expect(failedPub).toMatchObject({ ok: false, code: 'STRATEGY_INVALID' });
+
+    await api.saveDraft(draft.strategyId, {
+      source: 'param fast = 10;\nrule enter when close > 0 because "ok";',
+    });
+    const pub = await api.publish(draft.strategyId, { summary: 'v1' });
+    expect(pub.ok).toBe(true);
+    if (pub.ok) {
+      expect(pub.version.version).toBe(1);
+      expect(pub.version.immutable).toBe(true);
+    }
+
+    const hidden = await api.setVisibility(draft.strategyId, 'hidden');
+    expect(hidden.visibility).toBe('hidden');
+
+    const forked = await api.fork('A-0001', { version: 2, name: 'Forked Ref' });
+    expect(forked.name).toBe('Forked Ref');
+    expect(forked.strategyId).not.toBe('A-0001');
   });
 });

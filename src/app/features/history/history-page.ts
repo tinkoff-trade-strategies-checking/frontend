@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { errorMessage } from '../../core/api-problem';
 import {
   HISTORY_API,
   HistoryItemStatus,
@@ -9,7 +10,8 @@ import {
   HistoryRegimeFilter,
   HistoryStatusFilter,
 } from './data/history.models';
-import { HISTORY_API_IMPL } from '../../api-impls';
+import { HISTORY_API_IMPL, RUNS_API_IMPL } from '../../api-impls';
+import { RUNS_API } from '../runs/data/runs.models';
 import {
   formatHistoryTitle,
   formatMoscowDateTime,
@@ -35,6 +37,8 @@ const STATUS_FILTERS: readonly { readonly id: HistoryStatusFilter; readonly labe
   { id: 'completed', label: HISTORY_STATUS_LABELS.completed },
   { id: 'finished_early', label: HISTORY_STATUS_LABELS.finished_early },
   { id: 'bankrupt', label: HISTORY_STATUS_LABELS.bankrupt },
+  { id: 'invalid', label: HISTORY_STATUS_LABELS.invalid },
+  { id: 'failed', label: HISTORY_STATUS_LABELS.failed },
 ];
 
 const REGIME_FILTERS: readonly { readonly id: HistoryRegimeFilter; readonly label: string }[] = [
@@ -47,13 +51,21 @@ const REGIME_FILTERS: readonly { readonly id: HistoryRegimeFilter; readonly labe
 @Component({
   selector: 'app-history-page',
   imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiSegmented],
-  providers: [{ provide: HISTORY_API, useClass: HISTORY_API_IMPL }, HistoryStore],
+  providers: [
+    { provide: HISTORY_API, useClass: HISTORY_API_IMPL },
+    { provide: RUNS_API, useClass: RUNS_API_IMPL },
+    HistoryStore,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './history-page.html',
   styleUrl: './history-page.less',
 })
 export class HistoryPage implements OnInit {
+  private readonly runsApi = inject(RUNS_API);
+  private readonly router = inject(Router);
   protected readonly store = inject(HistoryStore);
+  protected readonly repeatingId = signal<string | null>(null);
+  protected readonly actionError = signal<string | null>(null);
 
   protected readonly kindFilters = KIND_FILTERS;
   protected readonly statusFilters = STATUS_FILTERS;
@@ -114,9 +126,27 @@ export class HistoryPage implements OnInit {
       case 'completed':
         return 'positive';
       case 'finished_early':
+      case 'invalid':
         return 'warning';
       case 'bankrupt':
+      case 'failed':
         return 'negative';
+    }
+  }
+
+  protected async repeatRun(runId: string): Promise<void> {
+    if (this.repeatingId() !== null) {
+      return;
+    }
+    this.repeatingId.set(runId);
+    this.actionError.set(null);
+    try {
+      const created = await this.runsApi.repeatRun(runId);
+      await this.router.navigate(['/runs', created.runId]);
+    } catch (error) {
+      this.actionError.set(errorMessage(error, 'Не удалось повторить прогон.'));
+    } finally {
+      this.repeatingId.set(null);
     }
   }
 }

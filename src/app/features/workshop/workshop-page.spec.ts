@@ -11,6 +11,19 @@ import {
 import { WorkshopPage } from './workshop-page';
 import { WorkshopStore } from './workshop.store';
 
+function stubApi(overrides: Pick<WorkshopApi, 'list' | 'getById'>): WorkshopApi {
+  return {
+    ...overrides,
+    createAlgorithm: () => Promise.reject(new Error('not used')),
+    getDraft: () => Promise.reject(new Error('not used')),
+    saveDraft: () => Promise.reject(new Error('not used')),
+    check: () => Promise.reject(new Error('not used')),
+    publish: () => Promise.reject(new Error('not used')),
+    fork: () => Promise.reject(new Error('not used')),
+    setVisibility: () => Promise.reject(new Error('not used')),
+  };
+}
+
 describe('WorkshopPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -167,7 +180,7 @@ describe('WorkshopPage', () => {
 
   it('при ошибке первой загрузки не показывает таблицу и «Страница 1 из 1», кнопка «Повторить» перезагружает', async () => {
     let shouldFail = true;
-    const fakeApi: WorkshopApi = {
+    const fakeApi = stubApi({
       async list(): Promise<WorkshopPageData> {
         if (shouldFail) {
           throw new Error('offline');
@@ -199,7 +212,7 @@ describe('WorkshopPage', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.overrideProvider(WORKSHOP_API, { useValue: fakeApi });
     const fixture = TestBed.createComponent(WorkshopPage);
@@ -227,7 +240,7 @@ describe('WorkshopPage', () => {
 
   it('при пустом результате не показывает таблицу и пагинацию, а «текущая» ставится по latestVersion', async () => {
     let returnEmpty = true;
-    const fakeApi: WorkshopApi = {
+    const fakeApi = stubApi({
       async list(): Promise<WorkshopPageData> {
         if (returnEmpty) {
           return { items: [], authors: [], total: 0, page: 1, pageSize: 20, totalPages: 1 };
@@ -289,7 +302,7 @@ describe('WorkshopPage', () => {
           },
         };
       },
-    };
+    });
 
     TestBed.overrideProvider(WORKSHOP_API, { useValue: fakeApi });
     const fixture = TestBed.createComponent(WorkshopPage);
@@ -328,7 +341,7 @@ describe('WorkshopStore race protection', () => {
     let resolveSecond!: (page: WorkshopPageData) => void;
     let callCount = 0;
 
-    const fakeApi: WorkshopApi = {
+    const fakeApi = stubApi({
       list(): Promise<WorkshopPageData> {
         callCount++;
         return new Promise<WorkshopPageData>((resolve) => {
@@ -342,7 +355,7 @@ describe('WorkshopStore race protection', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: fakeApi }, WorkshopStore],

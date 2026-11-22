@@ -1,16 +1,31 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import {
+  CheckLevel,
+  CheckStrategyResult,
+  CheckWorkshopStrategyCommand,
+  CreateWorkshopAlgorithmCommand,
+  ForkWorkshopAlgorithmCommand,
+  PublishWorkshopAlgorithmCommand,
+  PublishWorkshopResult,
+  SaveWorkshopDraftCommand,
+  StrategyDiagnostic,
+  StrategyParamDecl,
   WORKSHOP_DEFAULT_PAGE_SIZE,
   WORKSHOP_MAX_PAGE_SIZE,
   WORKSHOP_SYSTEM_AUTHOR,
   WorkshopAlgorithmDetail,
   WorkshopAlgorithmSummary,
+  WorkshopAlgorithmVersion,
   WorkshopApi,
   WorkshopAuthorOption,
   WorkshopDetailResult,
+  WorkshopDraft,
+  WorkshopLinterWarning,
   WorkshopPage,
   WorkshopQuery,
   WorkshopSortField,
+  WorkshopVisibility,
 } from './workshop.models';
 
 const AUTHOR_IDS: Readonly<Record<string, string>> = {
@@ -727,10 +742,65 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
   },
 ];
 
-const STUB_ALGORITHMS: readonly WorkshopAlgorithmDetail[] = RAW_STUB_ALGORITHMS.map((item) => ({
-  ...item,
-  authorId: AUTHOR_IDS[item.author] ?? item.author.toLowerCase().replace(/\s+/g, '-'),
-}));
+const DEFAULT_DSL_SOURCE = [
+  'param fast = 20 range 5..50 step 1;',
+  'param slow = 50 range 20..200 step 5;',
+  'param size_pct = 95 range 10..100 step 5;',
+  '',
+  'rule enter when !is_na(sma(close, slow)) and sma(close, fast) > sma(close, slow)',
+  '  buy size_pct% market because "Пересечение быстрой и медленной SMA";',
+  'rule exit when position > 0 and sma(close, fast) < sma(close, slow)',
+  '  sell position market because "Обратное пересечение SMA";',
+].join('\n');
+
+function seedParams(algoId: string): readonly StrategyParamDecl[] {
+  if (algoId === 'A-0001') {
+    return [
+      { name: 'fast', defaultValue: 20, rangeMin: 5, rangeMax: 50, step: '1', integer: true },
+      { name: 'slow', defaultValue: 50, rangeMin: 20, rangeMax: 200, step: '5', integer: true },
+      { name: 'rsi_n', defaultValue: 14, rangeMin: 5, rangeMax: 30, step: '1', integer: true },
+      { name: 'rsi_high', defaultValue: 70, rangeMin: 55, rangeMax: 85, step: '1', integer: true },
+      { name: 'stop_pct', defaultValue: 5, rangeMin: 1, rangeMax: 15, step: '0.5', integer: false },
+      { name: 'size_pct', defaultValue: 95, rangeMin: 10, rangeMax: 100, step: '5', integer: true },
+    ];
+  }
+  return [
+    { name: 'fast', defaultValue: 20, rangeMin: 5, rangeMax: 50, step: '1', integer: true },
+    { name: 'slow', defaultValue: 50, rangeMin: 20, rangeMax: 200, step: '5', integer: true },
+    { name: 'size_pct', defaultValue: 95, rangeMin: 10, rangeMax: 100, step: '5', integer: true },
+  ];
+}
+
+function seedAlgorithms(): WorkshopAlgorithmDetail[] {
+  return RAW_STUB_ALGORITHMS.map((item) => {
+    const warnings: readonly StrategyDiagnostic[] = item.linterWarnings.map((w) => ({
+      code: w.code,
+      level: 'WARNING',
+      startLine: w.line,
+      startColumn: 1,
+      endLine: w.line,
+      endColumn: 20,
+      message: w.message,
+      fixes: [],
+    }));
+    const lookaheadLevel: CheckLevel = warnings.length > 0 ? 'WARNING' : 'OK';
+    const params = seedParams(item.id);
+    const versions: WorkshopAlgorithmVersion[] = item.versions.map((v) => ({
+      ...v,
+      id: `${item.id}-v${v.version}`,
+      source: DEFAULT_DSL_SOURCE,
+      lookaheadLevel,
+      diagnostics: warnings,
+      params,
+    }));
+    return {
+      ...item,
+      authorId: AUTHOR_IDS[item.author] ?? item.author.toLowerCase().replace(/\s+/g, '-'),
+      latestVersionId: item.latestVersion > 0 ? `${item.id}-v${item.latestVersion}` : null,
+      versions,
+    };
+  });
+}
 
 function toSummary(detail: WorkshopAlgorithmDetail): WorkshopAlgorithmSummary {
   return {
@@ -743,6 +813,7 @@ function toSummary(detail: WorkshopAlgorithmDetail): WorkshopAlgorithmSummary {
     isSystem: detail.isSystem,
     visibility: detail.visibility,
     latestVersion: detail.latestVersion,
+    latestVersionId: detail.latestVersionId ?? null,
     publishedAt: detail.publishedAt,
     license: detail.license,
     linterWarnings: detail.linterWarnings,
@@ -760,7 +831,9 @@ function compareAlgorithms(
 ): number {
   switch (sort) {
     case 'published_desc': {
-      const diff = Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
+      const aTime = a.publishedAt === null ? Number.MAX_SAFE_INTEGER : Date.parse(a.publishedAt);
+      const bTime = b.publishedAt === null ? Number.MAX_SAFE_INTEGER : Date.parse(b.publishedAt);
+      const diff = bTime - aTime;
       return diff !== 0 ? diff : a.id.localeCompare(b.id);
     }
     case 'name_asc': {
@@ -774,8 +847,109 @@ function compareAlgorithms(
   }
 }
 
+function problemError(status: number, code: string, detail: string): HttpErrorResponse {
+  return new HttpErrorResponse({ status, error: { code, detail } });
+}
+
+function analyzeStubSource(source: string): CheckStrategyResult {
+  const diagnostics: StrategyDiagnostic[] = [];
+  const params: StrategyParamDecl[] = [];
+  const lines = source.replaceAll('\r\n', '\n').split('\n');
+
+  if (source.trim().length === 0) {
+    diagnostics.push({
+      code: 'E-SYN',
+      level: 'ERROR',
+      startLine: 0,
+      startColumn: 0,
+      endLine: 0,
+      endColumn: 0,
+      message: 'Исходный код стратегии не может быть пустым.',
+      fixes: [],
+    });
+  }
+
+  lines.forEach((line, idx) => {
+    const lineNo = idx + 1;
+    const paramMatch = /^\s*param\s+([a-zA-Z_]\w*)\s*=\s*(-?\d+(?:\.\d+)?)/.exec(line);
+    if (paramMatch) {
+      const defaultValue = Number(paramMatch[2]);
+      const isInt = !paramMatch[2].includes('.');
+      params.push({
+        name: paramMatch[1],
+        defaultValue,
+        rangeMin: null,
+        rangeMax: null,
+        step: isInt ? '1' : '0.1',
+        integer: isInt,
+      });
+      return;
+    }
+
+    if (/\b(lookahead|future|close\[\s*\+\d+\s*\])/.test(line)) {
+      diagnostics.push({
+        code: 'E-LA01',
+        level: 'ERROR',
+        startLine: lineNo,
+        startColumn: 1,
+        endLine: lineNo,
+        endColumn: Math.max(1, line.length + 1),
+        message: 'Заглядывание в будущее (E-LA01): обращение к будущему бару запрещено.',
+        fixes: [],
+      });
+    }
+
+    const magicMatch = />\s*(70|30)\b/.exec(line);
+    if (magicMatch) {
+      const numCol = magicMatch.index + magicMatch[0].indexOf(magicMatch[1]) + 1;
+      diagnostics.push({
+        code: 'L001',
+        level: 'WARNING',
+        startLine: lineNo,
+        startColumn: numCol,
+        endLine: lineNo,
+        endColumn: numCol + magicMatch[1].length,
+        message: `Магическая константа ${magicMatch[1]} — вынесите в параметр threshold.`,
+        fixes: [
+          {
+            description: `Вынести ${magicMatch[1]} в параметр threshold`,
+            edits: [
+              {
+                startLine: 1,
+                startColumn: 1,
+                endLine: 1,
+                endColumn: 1,
+                replacement: `param threshold = ${magicMatch[1]};\n`,
+              },
+              {
+                startLine: lineNo,
+                startColumn: numCol,
+                endLine: lineNo,
+                endColumn: numCol + magicMatch[1].length,
+                replacement: 'threshold',
+              },
+            ],
+          },
+        ],
+      });
+    }
+  });
+
+  const lookaheadLevel: CheckLevel = diagnostics.some((d) => d.level === 'ERROR')
+    ? 'ERROR'
+    : diagnostics.some((d) => d.level === 'WARNING')
+      ? 'WARNING'
+      : 'OK';
+
+  return { lookaheadLevel, diagnostics, params };
+}
+
 @Injectable()
 export class StubWorkshopApi implements WorkshopApi {
+  private readonly algorithms: WorkshopAlgorithmDetail[] = seedAlgorithms();
+  private readonly drafts = new Map<string, WorkshopDraft>();
+  private nextIdSeq = 26;
+
   async list(query: WorkshopQuery = {}): Promise<WorkshopPage> {
     const sort: WorkshopSortField = query.sort ?? 'published_desc';
     const pageSize = Math.min(
@@ -784,7 +958,7 @@ export class StubWorkshopApi implements WorkshopApi {
     );
     const searchNorm = query.search?.trim().toLowerCase() ?? '';
 
-    const visible = STUB_ALGORITHMS.filter(isVisibleToViewer);
+    const visible = this.algorithms.filter(isVisibleToViewer);
     const authorMap = new Map<string, WorkshopAuthorOption>();
     for (const item of visible) {
       if (!authorMap.has(item.authorId)) {
@@ -838,10 +1012,177 @@ export class StubWorkshopApi implements WorkshopApi {
   }
 
   async getById(id: string): Promise<WorkshopDetailResult> {
-    const found = STUB_ALGORITHMS.find((item) => item.id === id);
+    const found = this.algorithms.find((item) => item.id === id);
     if (!found || !isVisibleToViewer(found)) {
       return { status: 'NOT_FOUND' };
     }
     return { status: 'READY', algorithm: found };
+  }
+
+  async createAlgorithm(command: CreateWorkshopAlgorithmCommand): Promise<WorkshopDraft> {
+    const id = `A-${String(this.nextIdSeq++).padStart(4, '0')}`;
+    const check = analyzeStubSource(command.source);
+    const now = new Date().toISOString();
+    const detail: WorkshopAlgorithmDetail = {
+      id,
+      name: command.name,
+      description: command.description ?? '',
+      authorId: 'user',
+      author: 'Вы',
+      isMine: true,
+      isSystem: false,
+      visibility: 'hidden',
+      latestVersion: 0,
+      latestVersionId: null,
+      publishedAt: null,
+      license: 'MIT',
+      linterWarnings: [],
+      versions: [],
+    };
+    this.algorithms.unshift(detail);
+    const draft: WorkshopDraft = {
+      strategyId: id,
+      name: detail.name,
+      description: detail.description,
+      source: command.source,
+      updatedAt: now,
+      check,
+    };
+    this.drafts.set(id, draft);
+    return draft;
+  }
+
+  async getDraft(id: string): Promise<WorkshopDraft> {
+    const algo = this.requireOwned(id);
+    const existing = this.drafts.get(id);
+    if (existing) {
+      return existing;
+    }
+    const source = algo.versions[0]?.source ?? DEFAULT_DSL_SOURCE;
+    const draft: WorkshopDraft = {
+      strategyId: id,
+      name: algo.name,
+      description: algo.description,
+      source,
+      updatedAt: algo.publishedAt ?? new Date().toISOString(),
+      check: analyzeStubSource(source),
+    };
+    this.drafts.set(id, draft);
+    return draft;
+  }
+
+  async saveDraft(id: string, command: SaveWorkshopDraftCommand): Promise<WorkshopDraft> {
+    const idx = this.algorithms.findIndex((item) => item.id === id);
+    const algo = this.requireOwned(id);
+    const current = await this.getDraft(id);
+    const name = command.name ?? current.name;
+    const description = command.description ?? current.description;
+    const source = command.source ?? current.source;
+    const check = analyzeStubSource(source);
+    const draft: WorkshopDraft = {
+      strategyId: id,
+      name,
+      description,
+      source,
+      updatedAt: new Date().toISOString(),
+      check,
+    };
+    this.drafts.set(id, draft);
+    if (idx !== -1 && algo.latestVersion === 0) {
+      this.algorithms[idx] = { ...algo, name, description };
+    }
+    return draft;
+  }
+
+  async check(command: CheckWorkshopStrategyCommand): Promise<CheckStrategyResult> {
+    return analyzeStubSource(command.source);
+  }
+
+  async publish(
+    id: string,
+    command: PublishWorkshopAlgorithmCommand = {},
+  ): Promise<PublishWorkshopResult> {
+    const idx = this.algorithms.findIndex((item) => item.id === id);
+    const algo = this.requireOwned(id);
+    const draft = await this.getDraft(id);
+    const source = command.source ?? draft.source;
+    const check = analyzeStubSource(source);
+    if (check.lookaheadLevel === 'ERROR') {
+      return {
+        ok: false,
+        code: 'STRATEGY_INVALID',
+        detail: check.diagnostics.find((d) => d.level === 'ERROR')?.message ?? 'Ошибка DSL.',
+      };
+    }
+
+    const nextVer = algo.latestVersion + 1;
+    const now = new Date().toISOString();
+    const version: WorkshopAlgorithmVersion = {
+      id: `${id}-v${nextVer}`,
+      version: nextVer,
+      publishedAt: now,
+      summary: command.summary?.trim() || `Версия v${nextVer}`,
+      immutable: true,
+      source,
+      lookaheadLevel: check.lookaheadLevel,
+      diagnostics: check.diagnostics,
+      params: check.params,
+    };
+    const linterWarnings: readonly WorkshopLinterWarning[] = check.diagnostics
+      .filter((d) => d.level === 'WARNING')
+      .map((d) => ({ code: d.code, line: d.startLine, message: d.message }));
+
+    this.algorithms[idx] = {
+      ...algo,
+      visibility: algo.latestVersion === 0 ? 'public' : algo.visibility,
+      latestVersion: nextVer,
+      latestVersionId: version.id,
+      publishedAt: now,
+      linterWarnings,
+      versions: [version, ...algo.versions],
+    };
+    this.drafts.set(id, { ...draft, source, updatedAt: now, check });
+    return { ok: true, version };
+  }
+
+  async fork(id: string, command: ForkWorkshopAlgorithmCommand = {}): Promise<WorkshopDraft> {
+    const sourceAlgo = this.algorithms.find((item) => item.id === id);
+    if (!sourceAlgo || !isVisibleToViewer(sourceAlgo)) {
+      throw problemError(404, 'NOT_FOUND', 'Алгоритм не найден.');
+    }
+    const ver = command.version
+      ? sourceAlgo.versions.find((v) => v.version === command.version)
+      : sourceAlgo.versions[0];
+    const source = ver?.source ?? DEFAULT_DSL_SOURCE;
+    return this.createAlgorithm({
+      name: command.name?.trim() || `${sourceAlgo.name} (форк)`,
+      description: command.description ?? sourceAlgo.description,
+      source,
+    });
+  }
+
+  async setVisibility(
+    id: string,
+    visibility: WorkshopVisibility,
+  ): Promise<WorkshopAlgorithmSummary> {
+    const idx = this.algorithms.findIndex((item) => item.id === id);
+    const algo = this.requireOwned(id);
+    if (algo.isSystem) {
+      throw problemError(403, 'FORBIDDEN', 'Системный алгоритм нельзя скрыть.');
+    }
+    const updated = { ...algo, visibility };
+    this.algorithms[idx] = updated;
+    return toSummary(updated);
+  }
+
+  private requireOwned(id: string): WorkshopAlgorithmDetail {
+    const algo = this.algorithms.find((item) => item.id === id);
+    if (!algo || !isVisibleToViewer(algo)) {
+      throw problemError(404, 'NOT_FOUND', 'Алгоритм не найден.');
+    }
+    if (!algo.isMine) {
+      throw problemError(403, 'FORBIDDEN', 'Нет прав на изменение чужого алгоритма.');
+    }
+    return algo;
   }
 }

@@ -23,8 +23,11 @@ export const SESSION_FETCH = new InjectionToken<SessionFetch>('SESSION_FETCH', {
 });
 
 /** Сообщение потока: событие контракта или признак «сервер закрыл поток окончательно». */
-export type SessionStreamItem =
-  SessionEvent | { readonly type: 'stream_failed'; readonly status: number };
+export type SseStreamItem<TEvent> =
+  TEvent | { readonly type: 'stream_failed'; readonly status: number };
+
+/** Сообщение потока сессии (обратная совместимость для arena). */
+export type SessionStreamItem = SseStreamItem<SessionEvent>;
 
 /** Ответы, после которых переподключение бессмысленно: не авторизован, нет доступа, нет сессии, плохой запрос. */
 const FATAL_STATUSES = new Set([400, 401, 403, 404]);
@@ -56,17 +59,17 @@ function parseBlock(block: string): Parsed | null {
 }
 
 /**
- * Поток событий сессии (SSE) поверх `fetch`: заголовок `Last-Event-ID` задаётся самим клиентом
+ * Обобщённый SSE-поток поверх `fetch`: заголовок `Last-Event-ID` задаётся самим клиентом
  * (`EventSource` этого не умеет), поэтому поток начинается ровно с номера из снимка (INV-8), а после
  * обрыва продолжается с последнего полученного события — сервер досылает пропущенное из журнала.
  * 400/401/403/404 — поток закрыт окончательно (`stream_failed`), остальное — повтор с нарастающей паузой.
  */
-export function sessionEventStream(
+export function sseEventStream<TEvent extends { readonly eventId?: string }>(
   url: string,
-  lastEventId: number | null,
+  lastEventId: number | string | null,
   fetchFn: SessionFetch,
-): Observable<SessionStreamItem> {
-  return new Observable<SessionStreamItem>((subscriber) => {
+): Observable<SseStreamItem<TEvent>> {
+  return new Observable<SseStreamItem<TEvent>>((subscriber) => {
     const abort = new AbortController();
     let closed = false;
     let last: string | null = lastEventId === null ? null : String(lastEventId);
@@ -86,7 +89,7 @@ export function sessionEventStream(
         return;
       }
       try {
-        const event = JSON.parse(parsed.data) as SessionEvent;
+        const event = JSON.parse(parsed.data) as TEvent;
         last = parsed.id ?? event.eventId ?? last;
         subscriber.next(event);
       } catch {
@@ -155,4 +158,13 @@ export function sessionEventStream(
       (wake as (() => void) | null)?.();
     };
   });
+}
+
+/** Поток событий ручной сессии (SSE) поверх `sseEventStream`. */
+export function sessionEventStream(
+  url: string,
+  lastEventId: number | null,
+  fetchFn: SessionFetch,
+): Observable<SessionStreamItem> {
+  return sseEventStream<SessionEvent>(url, lastEventId, fetchFn);
 }

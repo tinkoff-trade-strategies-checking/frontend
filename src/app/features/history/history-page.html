@@ -19,6 +19,12 @@
     </div>
   }
 
+  @if (actionError()) {
+    <div tuiNotification appearance="negative" size="s" class="error-row">
+      <span>{{ actionError() }}</span>
+    </div>
+  }
+
   <section class="panel">
     <div class="filters-bar">
       <div class="filter-group">
@@ -155,8 +161,34 @@
                           Продолжить
                         </a>
                       } @else {
-                        <span class="tui-text_body-xs muted">Выполняется…</span>
+                        <a
+                          tuiButton
+                          size="xs"
+                          appearance="primary"
+                          [routerLink]="['/runs', item.id]"
+                        >
+                          Прогресс
+                        </a>
                       }
+                    } @else if (item.kind === 'algo_run') {
+                      <a
+                        tuiButton
+                        size="xs"
+                        appearance="outline"
+                        [routerLink]="['/runs', item.id, 'report']"
+                      >
+                        Открыть отчёт
+                      </a>
+                      <button
+                        tuiButton
+                        type="button"
+                        size="xs"
+                        appearance="flat"
+                        [disabled]="repeatingId() !== null"
+                        (click)="repeatRun(item.id)"
+                      >
+                        Повторить
+                      </button>
                     } @else {
                       <a
                         tuiButton
@@ -166,16 +198,9 @@
                       >
                         Открыть отчёт
                       </a>
-                      @if (item.kind === 'session') {
-                        <a
-                          tuiButton
-                          size="xs"
-                          appearance="flat"
-                          [routerLink]="['/replay', item.id]"
-                        >
-                          Воспроизвести
-                        </a>
-                      }
+                      <a tuiButton size="xs" appearance="flat" [routerLink]="['/replay', item.id]">
+                        Воспроизвести
+                      </a>
                     }
                   </div>
                 </td>

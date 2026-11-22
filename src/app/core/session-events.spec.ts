@@ -1,5 +1,11 @@
 import { vi } from 'vitest';
-import { SessionFetch, SessionStreamItem, sessionEventStream } from './session-events';
+import {
+  SessionFetch,
+  SessionStreamItem,
+  SseStreamItem,
+  sessionEventStream,
+  sseEventStream,
+} from './session-events';
 
 const encoder = new TextEncoder();
 
@@ -163,5 +169,26 @@ describe('sessionEventStream', () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(fetchFn).toHaveBeenCalledTimes(1);
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('sseEventStream работает со строковым Last-Event-ID и пользовательским типом события', async () => {
+    interface CustomEvent {
+      readonly type: 'run_progress';
+      readonly eventId: string;
+      readonly doneSteps: number;
+    }
+    const calls: Record<string, string>[] = [];
+    const fetchFn: SessionFetch = vi.fn(async (_url, init) => {
+      calls.push(init.headers);
+      return response(200, sse(event(12, 'run_progress', { doneSteps: 5 })));
+    });
+    const items: SseStreamItem<CustomEvent>[] = [];
+    const sub = sseEventStream<CustomEvent>('/api/v1/runs/r-1/events', '11', fetchFn).subscribe(
+      (i) => items.push(i),
+    );
+    await vi.waitFor(() => expect(items).toHaveLength(1));
+    sub.unsubscribe();
+    expect(calls[0]['Last-Event-ID']).toBe('11');
+    expect(items[0]).toMatchObject({ type: 'run_progress', eventId: '12', doneSteps: 5 });
   });
 });

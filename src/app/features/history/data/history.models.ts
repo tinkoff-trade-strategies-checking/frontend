@@ -4,7 +4,8 @@ export type HistoryItemKind = 'session' | 'algo_run';
 
 export type HistoryItemOwner = 'USER' | 'PLATFORM';
 
-export type HistoryItemStatus = 'running' | 'completed' | 'finished_early' | 'bankrupt';
+export type HistoryItemStatus =
+  'running' | 'completed' | 'finished_early' | 'bankrupt' | 'invalid' | 'failed';
 
 export type HistoryRegime = 'calm' | 'medium' | 'stress';
 

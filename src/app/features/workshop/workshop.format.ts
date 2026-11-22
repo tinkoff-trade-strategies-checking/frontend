@@ -15,7 +15,10 @@ const MOSCOW_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('ru-RU', {
   minute: '2-digit',
 });
 
-export function formatWorkshopDateTime(iso: string): string {
+export function formatWorkshopDateTime(iso: string | null): string {
+  if (iso === null) {
+    return '—';
+  }
   return MOSCOW_DATE_TIME_FORMATTER.format(new Date(iso)).replace(',', '');
 }
 

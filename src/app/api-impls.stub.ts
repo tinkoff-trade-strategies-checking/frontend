@@ -9,6 +9,10 @@ import { ReplayApi } from './features/replay/data/replay.models';
 import { StubReplayApi } from './features/replay/data/stub-replay.api';
 import { ReportApi } from './features/report/data/report.models';
 import { StubReportApi } from './features/report/data/stub-report.api';
+import { RunsApi } from './features/runs/data/runs.models';
+import { StubRunsApi } from './features/runs/data/stub-runs.api';
+import { StubWorkshopApi } from './features/workshop/data/stub-workshop.api';
+import { WorkshopApi } from './features/workshop/data/workshop.models';
 
 // Реализации портов данных на заглушках: подставляется вместо `api-impls.ts` в сборках `stub` и `development-stub`.
 export const LAUNCH_API_IMPL: Type<LaunchApi> = StubLaunchApi;
@@ -16,3 +20,5 @@ export const HISTORY_API_IMPL: Type<HistoryApi> = StubHistoryApi;
 export const ARENA_API_IMPL: Type<ArenaApi> = StubArenaApi;
 export const REPORT_API_IMPL: Type<ReportApi> = StubReportApi;
 export const REPLAY_API_IMPL: Type<ReplayApi> = StubReplayApi;
+export const WORKSHOP_API_IMPL: Type<WorkshopApi> = StubWorkshopApi;
+export const RUNS_API_IMPL: Type<RunsApi> = StubRunsApi;

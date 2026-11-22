@@ -11,6 +11,19 @@ import {
 } from './data/workshop.models';
 import { WORKSHOP_SEARCH_DEBOUNCE_MS, WorkshopStore } from './workshop.store';
 
+function stubApi(overrides: Pick<WorkshopApi, 'list' | 'getById'>): WorkshopApi {
+  return {
+    ...overrides,
+    createAlgorithm: () => Promise.reject(new Error('not used')),
+    getDraft: () => Promise.reject(new Error('not used')),
+    saveDraft: () => Promise.reject(new Error('not used')),
+    check: () => Promise.reject(new Error('not used')),
+    publish: () => Promise.reject(new Error('not used')),
+    fork: () => Promise.reject(new Error('not used')),
+    setVisibility: () => Promise.reject(new Error('not used')),
+  };
+}
+
 function makeAlgo(id: string, name = `Algo ${id}`): WorkshopAlgorithmDetail {
   return {
     id,
@@ -60,7 +73,7 @@ describe('WorkshopStore', () => {
     vi.useFakeTimers();
     const queries: WorkshopQuery[] = [];
 
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(query = {}): Promise<WorkshopPageData> {
         queries.push(query);
         return makePage([makeAlgo('A-1')]);
@@ -68,7 +81,7 @@ describe('WorkshopStore', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -94,7 +107,7 @@ describe('WorkshopStore', () => {
     vi.useFakeTimers();
     let calls = 0;
 
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(): Promise<WorkshopPageData> {
         calls++;
         return makePage([]);
@@ -102,7 +115,7 @@ describe('WorkshopStore', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -118,7 +131,7 @@ describe('WorkshopStore', () => {
 
   it('сбрасывает страницу на 1 при смене любого фильтра и при resetFilters', async () => {
     const queries: WorkshopQuery[] = [];
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(query = {}): Promise<WorkshopPageData> {
         queries.push(query);
         return makePage([makeAlgo('A-1')], query.page ?? 1, 3);
@@ -126,7 +139,7 @@ describe('WorkshopStore', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -163,7 +176,7 @@ describe('WorkshopStore', () => {
 
   it('при ошибке загрузки не стирает уже загруженный список и авторов', async () => {
     let shouldFail = false;
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(): Promise<WorkshopPageData> {
         if (shouldFail) {
           throw new Error('network');
@@ -173,7 +186,7 @@ describe('WorkshopStore', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -197,7 +210,7 @@ describe('WorkshopStore', () => {
     let resolveSecond!: (page: WorkshopPageData) => void;
     let callCount = 0;
 
-    const api: WorkshopApi = {
+    const api = stubApi({
       list(): Promise<WorkshopPageData> {
         callCount++;
         return new Promise<WorkshopPageData>((resolve, reject) => {
@@ -211,7 +224,7 @@ describe('WorkshopStore', () => {
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -235,7 +248,7 @@ describe('WorkshopStore', () => {
   it('защищает от гонки selectAlgorithm и closeDetail', async () => {
     const resolvers: ((res: WorkshopDetailResult) => void)[] = [];
 
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(): Promise<WorkshopPageData> {
         return makePage([]);
       },
@@ -244,7 +257,7 @@ describe('WorkshopStore', () => {
           resolvers.push(resolve);
         });
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
@@ -273,14 +286,14 @@ describe('WorkshopStore', () => {
   });
 
   it('ограничивает сравнение максимум 5 алгоритмами напрямую в toggleCompare', () => {
-    const api: WorkshopApi = {
+    const api = stubApi({
       async list(): Promise<WorkshopPageData> {
         return makePage([]);
       },
       async getById(): Promise<WorkshopDetailResult> {
         return { status: 'NOT_FOUND' };
       },
-    };
+    });
 
     TestBed.configureTestingModule({
       providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
