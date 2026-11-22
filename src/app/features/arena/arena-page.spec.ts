@@ -142,6 +142,7 @@ describe('ArenaPage', () => {
     expect(formatRejectReason('REPLACED')).toBe('Заменена пользователем.');
     expect(formatRejectReason('DAY_EXPIRED')).toBe('Истёк срок заявки (день).');
     expect(formatRejectReason('OCO_SIBLING_FILLED')).toBe('Снята при исполнении второй ноги OCO.');
+    expect(formatRejectReason('POSITION_CLOSED')).toBe('Снята при закрытии позиции.');
     expect(formatRejectReason('SESSION_END')).toBe('Снята при завершении сессии.');
   });
 

@@ -10,6 +10,7 @@ const REJECT_REASON_LABELS: Readonly<Record<ArenaRejectReason, string>> = {
   REPLACED: 'Заменена пользователем',
   DAY_EXPIRED: 'Истёк срок заявки (день)',
   OCO_SIBLING_FILLED: 'Снята при исполнении второй ноги OCO',
+  POSITION_CLOSED: 'Снята при закрытии позиции',
   SESSION_END: 'Снята при завершении сессии',
   CANCELLED_BY_USER: 'Отменена пользователем',
 };
