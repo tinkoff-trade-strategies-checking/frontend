@@ -36,7 +36,8 @@ test('фильтры, карточка алгоритма, неизменяем�
   const detail = page.getByRole('complementary', { name: 'Карточка алгоритма' });
   await expect(detail).toBeVisible();
   await expect(detail).toContainText('Breakout ATR');
-  await expect(detail).toContainText('MAGIC_CONST');
+  await expect(detail).toContainText('L001');
+  await expect(detail).toContainText('W-LA01');
   await expect(detail).toContainText('неизменяема');
   await expect(detail).toContainText('пока недоступны');
 

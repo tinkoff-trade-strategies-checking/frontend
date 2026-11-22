@@ -9,16 +9,16 @@ describe('workshop.format', () => {
   it('форматирует сводку предупреждений линтера с дедупликацией кодов', () => {
     expect(formatLinterSummary([])).toBe('Чисто');
 
-    expect(formatLinterSummary([{ code: 'MAGIC_CONST', line: 10, message: 'Константа 70' }])).toBe(
-      '1 пред. (MAGIC_CONST)',
+    expect(formatLinterSummary([{ code: 'L001', line: 10, message: 'Константа 70' }])).toBe(
+      '1 пред. (L001)',
     );
 
     expect(
       formatLinterSummary([
-        { code: 'MAGIC_CONST', line: 5, message: 'Первая' },
-        { code: 'MAGIC_CONST', line: 9, message: 'Вторая' },
-        { code: 'UNUSED_PARAM', line: 2, message: 'Не используется' },
+        { code: 'L001', line: 5, message: 'Первая' },
+        { code: 'L001', line: 9, message: 'Вторая' },
+        { code: 'W-LA01', line: 2, message: 'Сравнение с уровнем' },
       ]),
-    ).toBe('3 пред. (MAGIC_CONST, UNUSED_PARAM)');
+    ).toBe('3 пред. (L001, W-LA01)');
   });
 });

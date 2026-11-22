@@ -11,8 +11,14 @@ export type WorkshopLicense = 'MIT';
 
 export type WorkshopVisibility = 'public' | 'hidden';
 
+export type DslStaticErrorCode = 'E-SYN' | 'E-TYPE' | 'E-BEC' | 'E-LA01' | 'E-LA02';
+export type DslStaticWarningCode = 'L001' | 'W-LA01';
+export type DslRuntimeDiagnosticCode = 'E-RT01' | 'W-RT01' | 'W-RT02';
+export type DslDiagnosticCode =
+  DslStaticErrorCode | DslStaticWarningCode | DslRuntimeDiagnosticCode;
+
 export interface WorkshopLinterWarning {
-  readonly code: string;
+  readonly code: DslStaticWarningCode | (string & {});
   readonly line: number;
   readonly message: string;
 }

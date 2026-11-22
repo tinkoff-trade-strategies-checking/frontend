@@ -23,13 +23,17 @@ const AUTHOR_IDS: Readonly<Record<string, string>> = {
   'Дмитрий Соколов': 'dmitry-sokolov',
 };
 
-// Коды предупреждений линтера (MAGIC_CONST, UNUSED_PARAM, LOOKAHEAD_GUARD) —
-// коды условные до решения по DSL (documentation#34).
+// Канонические коды диагностик из documentation/dsl.md v1 (documentation#34, #85):
+// - статические предупреждения (допускаются в каталоге): L001 (магическая константа),
+//   W-LA01 (сравнение цены или прямого ценового индикатора с абсолютным уровнем);
+// - статические ошибки (запрещают публикацию и прогон): E-SYN, E-TYPE, E-BEC, E-LA01, E-LA02;
+// - рантайм-диагностики core (формируются при прогоне): E-RT01, W-RT01, W-RT02.
 const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] = [
   {
     id: 'A-0001',
     name: 'Эталон платформы',
-    description: 'Базовый эталонный алгоритм для фонового сравнения в ручных сессиях.',
+    description:
+      'Эталонная стратегия пересечения SMA(fast, slow) с фильтром RSI, стопом stop_pct и прогревом 200 баров. Для N бумаг размер позиции size_pct = floor(95 / N).',
     author: WORKSHOP_SYSTEM_AUTHOR,
     isMine: false,
     isSystem: true,
@@ -42,7 +46,8 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
       {
         version: 2,
         publishedAt: '2026-11-18T14:00:00+03:00',
-        summary: 'Уточнён фильтр волатильности и размер позиции на открытии.',
+        summary:
+          'Параметры fast=20, slow=50 (20..200), rsi_n=14, rsi_high=70, stop_pct=5, size_pct=95 и прогрев 200 баров без L001.',
         immutable: true,
       },
       {
@@ -67,9 +72,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 14,
-        message: 'Константа 70 в условии перекупленности — вынесите в именованный параметр.',
+        message: 'Магическая константа 70 в сравнении с rsi(...) — вынесите в параметр rsi_level.',
       },
     ],
     versions: [
@@ -101,14 +106,15 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 9,
-        message: 'Константа 1.5 в множителе ATR — вынесите в параметр.',
+        message: 'Магическая константа 1.5 в множителе ATR — вынесите в параметр p1.',
       },
       {
-        code: 'UNUSED_PARAM',
-        line: 4,
-        message: 'Параметр lookback_slow объявлен, но не используется в правилах.',
+        code: 'W-LA01',
+        line: 12,
+        message:
+          'Сравнение highest(high, channel_n) с константным уровнем — проверьте риск подгонки по истории.',
       },
     ],
     versions: [
@@ -149,7 +155,8 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
       {
         version: 1,
         publishedAt: '2026-11-18T09:45:00+03:00',
-        summary: 'Первая публикация с параметрами без магических констант.',
+        summary:
+          'Первая публикация без магических констант (L001) с проверкой неполного прогрева через is_na.',
         immutable: true,
       },
     ],
@@ -211,14 +218,14 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 7,
-        message: 'Константа 2 в коэффициенте усреднения — вынесите в параметр.',
+        message: 'Магическая константа 2 в коэффициенте усреднения — вынесите в параметр p1.',
       },
       {
-        code: 'LOOKAHEAD_GUARD',
+        code: 'W-LA01',
         line: 18,
-        message: 'Подозрительное обращение к экстремуму текущей свечи до закрытия.',
+        message: 'Сравнение close с абсолютным ценовым уровнем — возможна подгонка по истории.',
       },
     ],
     versions: [
@@ -306,9 +313,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 11,
-        message: 'Константа 10 в окне выхода — вынесите в параметр exit_period.',
+        message: 'Магическая константа 10 в периоде lowest(...) — вынесите в параметр lowest_n.',
       },
     ],
     versions: [
@@ -362,9 +369,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 12,
-        message: 'Константа 20 в нижней зоне — вынесите в параметр.',
+        message: 'Магическая константа 20 в нижней зоне — вынесите в параметр p1.',
       },
     ],
     versions: [
@@ -412,9 +419,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 8,
-        message: 'Константа 2.5 в всплеске объёма — вынесите в параметр.',
+        message: 'Магическая константа 2.5 во всплеске объёма — вынесите в параметр p1.',
       },
     ],
     versions: [
@@ -512,9 +519,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 10,
-        message: 'Константа 150 в пороге CCI — вынесите в параметр.',
+        message: 'Магическая константа 150 в пороге CCI — вынесите в параметр p1.',
       },
     ],
     versions: [
@@ -589,9 +596,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 6,
-        message: 'Константа 0.02 в шаге ускорения — вынесите в параметр.',
+        message: 'Магическая константа 0.02 в шаге ускорения — вынесите в параметр p1.',
       },
     ],
     versions: [
@@ -660,9 +667,9 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     license: 'MIT',
     linterWarnings: [
       {
-        code: 'MAGIC_CONST',
+        code: 'L001',
         line: 9,
-        message: 'Константа 25 в пороге силы тренда ADX — вынесите в параметр.',
+        message: 'Магическая константа 25 в пороге силы тренда ADX — вынесите в параметр p1.',
       },
     ],
     versions: [
