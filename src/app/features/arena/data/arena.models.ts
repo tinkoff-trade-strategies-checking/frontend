@@ -22,6 +22,7 @@ export type ArenaRejectReason =
   | 'REPLACED'
   | 'DAY_EXPIRED'
   | 'OCO_SIBLING_FILLED'
+  | 'POSITION_CLOSED'
   | 'SESSION_END'
   | 'CANCELLED_BY_USER';
 

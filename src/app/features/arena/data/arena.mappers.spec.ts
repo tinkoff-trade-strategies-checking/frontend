@@ -59,4 +59,30 @@ describe('arena.mappers', () => {
     });
     expect(order.limitPrice).toBeUndefined();
   });
+
+  it('заявка: причина снятия POSITION_CLOSED маппится без потерь', () => {
+    const order = mapOrder({
+      mode: 'OPEN',
+      paperId: 'p1',
+      id: 'o2',
+      side: 'sell',
+      type: 'stop',
+      lots: 1,
+      filledLots: 0,
+      tif: 'gtc',
+      status: 'cancelled',
+      step: 7,
+      seenStep: 7,
+      closedStep: 8,
+      ocoSiblingId: null,
+      limitPrice: null,
+      stopPrice: '100',
+      takeProfitPrice: null,
+      trailingPct: null,
+      trailingStopLevel: null,
+      reason: 'POSITION_CLOSED',
+      rejectField: null,
+    });
+    expect(order.rejectReason).toBe('POSITION_CLOSED');
+  });
 });
