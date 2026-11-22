@@ -13,6 +13,7 @@
     "pretest": "npm run api:gen",
     "test": "ng test --watch=false",
     "e2e": "tsc -p tsconfig.e2e.json --noEmit && playwright test",
+    "e2e:real": "playwright test -c playwright.real.config.ts",
     "lint": "ng lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

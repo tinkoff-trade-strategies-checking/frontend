@@ -751,6 +751,11 @@ paths:
                 oneOf:
                   - $ref: '#/components/schemas/LaunchProblem'
                   - $ref: '#/components/schemas/Problem'
+        '429':
+          description: Превышен лимит очереди прогонов пользователя (код `TOO_MANY_REQUESTS`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '503': { $ref: '#/components/responses/WorkerUnavailable' }
   /runs/{runId}:
     get:
@@ -788,6 +793,11 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/Problem' }
         '409': { $ref: '#/components/responses/Problem' }
+        '429':
+          description: Превышен лимит очереди прогонов пользователя (код `TOO_MANY_REQUESTS`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '503': { $ref: '#/components/responses/WorkerUnavailable' }
   /runs/{runId}/events:
     get:
@@ -2367,9 +2377,18 @@ components:
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         name: { type: string }
+    WorkshopForkSource:
+      type: object
+      required: [versionId, strategyId, strategyName, authorName, version]
+      properties:
+        versionId: { $ref: '#/components/schemas/Uuid' }
+        strategyId: { $ref: '#/components/schemas/Uuid' }
+        strategyName: { type: string }
+        authorName: { type: string }
+        version: { type: integer, minimum: 1 }
     WorkshopAlgorithmSummary:
       type: object
-      required: [id, name, description, authorId, author, isMine, isSystem, visibility, latestVersion, publishedAt, license, linterWarnings]
+      required: [id, name, description, authorId, author, isMine, isSystem, visibility, latestVersion, latestVersionId, versionsCount, publishedAt, license, lookaheadLevel, hasLinterWarnings, linterWarnings, forkedFrom]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         name: { type: string }
@@ -2381,9 +2400,19 @@ components:
         visibility: { $ref: '#/components/schemas/WorkshopVisibility' }
         latestVersion: { type: integer, minimum: 0 }
         latestVersionId: { $ref: '#/components/schemas/UuidOrNull' }
+        versionsCount: { type: integer, minimum: 0 }
         publishedAt: { type: [string, 'null'], format: date-time }
         license: { $ref: '#/components/schemas/WorkshopLicense' }
+        lookaheadLevel:
+          oneOf:
+            - $ref: '#/components/schemas/CheckLevel'
+            - { type: 'null' }
+        hasLinterWarnings: { type: boolean }
         linterWarnings: { type: array, items: { $ref: '#/components/schemas/WorkshopLinterWarning' } }
+        forkedFrom:
+          oneOf:
+            - $ref: '#/components/schemas/WorkshopForkSource'
+            - { type: 'null' }
     WorkshopAlgorithmDetail:
       allOf:
         - $ref: '#/components/schemas/WorkshopAlgorithmSummary'
@@ -2436,13 +2465,19 @@ components:
         source: { type: [string, 'null'] }
     WorkshopDraft:
       type: object
-      required: [strategyId, name, description, source, updatedAt, check]
+      required: [strategyId, name, description, visibility, forkedFrom, source, check, updatedAt, latestVersion]
       properties:
         strategyId: { $ref: '#/components/schemas/Uuid' }
         name: { type: string }
         description: { type: string }
+        visibility: { $ref: '#/components/schemas/WorkshopVisibility' }
+        forkedFrom:
+          oneOf:
+            - $ref: '#/components/schemas/WorkshopForkSource'
+            - { type: 'null' }
         source: { type: string }
         updatedAt: { type: string, format: date-time }
+        latestVersion: { type: integer, minimum: 0 }
         check:
           oneOf:
             - $ref: '#/components/schemas/CheckStrategyResult'

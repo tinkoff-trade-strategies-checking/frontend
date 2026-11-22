@@ -4,5 +4,5 @@
     "outDir": "./out-tsc/e2e",
     "types": ["node", "@playwright/test"]
   },
-  "include": ["playwright.config.ts", "e2e/**/*.ts"]
+  "include": ["playwright.config.ts", "playwright.real.config.ts", "e2e/**/*.ts"]
 }

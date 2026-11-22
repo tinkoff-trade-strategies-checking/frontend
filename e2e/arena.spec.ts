@@ -265,17 +265,6 @@ test('INV-1: график не содержит свечей дальше тек
   expect(switched.lastSeriesTime).toBe(expectedChartTime(switched.storeStep));
 });
 
-test.fixme('INV-8: восстановление состояния арены после F5 — e2e прогон идёт на HTTP-заглушках в памяти (frontend#57)', async ({
-  page,
-}) => {
-  await page.goto('/arena');
-  await page.getByRole('button', { name: 'Следующая свеча' }).click();
-  await expect(page.locator('.day-counter')).toHaveText('День 2 из 60');
-
-  await page.reload();
-  await expect(page.locator('.day-counter')).toHaveText('День 2 из 60');
-});
-
 test('F1: Новая сессия → Запустить → /arena/:id → Завершить → Открыть отчёт этой сессии', async ({
   page,
 }) => {

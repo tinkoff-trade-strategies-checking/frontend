@@ -1,0 +1,146 @@
+name: E2E Real Stack
+
+on:
+  pull_request:
+    paths:
+      - 'e2e/real-smoke.spec.ts'
+      - 'playwright.real.config.ts'
+      - '.github/workflows/e2e-real.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-real-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-real:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_EMAIL: trader@example.com
+      E2E_PASSWORD: E2eRealPassword2026
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: frontend
+      - uses: actions/checkout@v4
+        with:
+          repository: tinkoff-trade-strategies-checking/core
+          path: core
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          repository: tinkoff-trade-strategies-checking/backend
+          path: backend
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.5
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Сборка frontend
+        working-directory: frontend
+        run: |
+          npx -y npm@11.21.2 ci --no-fund --no-audit
+          npm run build
+
+      - name: Браузеры Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Генерация тестовой фикстуры ClickHouse
+        working-directory: backend
+        run: ./gradlew -q devFixtureSql "-PfixtureOut=deploy/fixture.sql" "-PfixtureDays=160" > deploy/snapshot-key
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Образ simulation-worker из core
+        uses: docker/build-push-action@v6
+        with:
+          context: core
+          load: true
+          tags: simulation-worker:latest
+          cache-from: type=gha,scope=simulation-worker
+          cache-to: type=gha,mode=max,scope=simulation-worker
+
+      - name: Образ trainer-backend из backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/deploy/backend.Dockerfile
+          load: true
+          tags: trainer-backend:latest
+          cache-from: type=gha,scope=trainer-backend
+          cache-to: type=gha,mode=max,scope=trainer-backend
+
+      - name: Подготовка окружения и запуск реального стека
+        run: |
+          set -euo pipefail
+          PG_PASS="pg_e2e_secret_2026"
+          CH_PASS="ch_e2e_secret_2026"
+          cat > backend/deploy/.env <<EOF
+          POSTGRES_PASSWORD=$PG_PASS
+          CLICKHOUSE_PASSWORD=$CH_PASS
+          FRONTEND_DIST=../../frontend/dist/frontend/browser
+          CORE_DIR=../../core
+          EOF
+
+          COMPOSE="docker compose -f backend/deploy/docker-compose.yml --env-file backend/deploy/.env"
+          $COMPOSE up -d --no-build --wait postgres clickhouse worker
+
+          sed 's/$/;/' backend/deploy/fixture.sql | \
+            $COMPOSE exec -T clickhouse clickhouse-client --multiquery \
+              --database=ttsc --user=ttsc --password="$CH_PASS"
+
+          $COMPOSE run --rm --no-deps \
+            -e USER_PASSWORD="$E2E_PASSWORD" \
+            backend --spring.profiles.active=create-user --user.email="$E2E_EMAIL"
+
+          SNAPSHOT_KEY="$(tail -n 1 backend/deploy/snapshot-key | tr -d '\r\n')"
+          $COMPOSE exec -T postgres psql -U trainer -d trainer -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO marketdata.snapshot (id, snapshot_key, description) VALUES ('$SNAPSHOT_KEY', '$SNAPSHOT_KEY', 'e2e-real') ON CONFLICT DO NOTHING"
+
+          $COMPOSE up -d --no-build --wait backend caddy
+
+          for _ in $(seq 1 30); do
+            if curl -kfsS https://localhost/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Стенд не ответил на https://localhost/api/health" >&2
+          exit 1
+
+      - name: Сквозной smoke-набор против реального backend (e2e:real)
+        working-directory: frontend
+        env:
+          E2E_REAL_BASE_URL: https://localhost
+        run: npm run e2e:real
+
+      - name: Логи контейнеров при падении
+        if: failure()
+        run: docker compose -f backend/deploy/docker-compose.yml --env-file backend/deploy/.env logs --tail=200
+
+      - name: Отчёт Playwright при падении
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-real-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Остановка стека
+        if: always()
+        run: docker compose -f backend/deploy/docker-compose.yml --env-file backend/deploy/.env down -v

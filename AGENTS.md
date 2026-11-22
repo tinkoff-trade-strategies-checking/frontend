@@ -17,6 +17,7 @@ npm run lint                 # ESLint (angular-eslint)
 npm run format               # Prettier — исправить формат; format:check — проверить
 npm test                     # генерация клиента API + юнит-тесты (Vitest через @angular/build:unit-test), один прогон
 npm run e2e                  # проверка типов + сквозные тесты Playwright на заглушках (start:stub; локально — системный Chrome, в CI — chromium; e2e только против dev-сервера (window.ng))
+npm run e2e:real             # сквозной smoke-набор Playwright против реального backend (e2e/real-smoke.spec.ts, playwright.real.config.ts; E2E_REAL_BASE_URL, E2E_EMAIL, E2E_PASSWORD)
 npm run build                # генерация клиента API + сборка в dist/ (настоящий API)
 npm run build:stub           # сборка на заглушках (демо pak-ui.vercel.app)
 npm run check                # всё, что проверяет CI: формат, линтер, сверка OpenAPI, тесты, сборка
@@ -24,7 +25,7 @@ npm run api:sync             # скопировать контракт в api/op
 npm run api:check            # копия совпадает с backend на GitHub (main) — как в CI
 ```
 
-CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джобы `e2e` и `invariants` (ссылки `documentation/invariants.md` на тесты frontend и core — `check-invariants.py`) обязательны в ruleset `main`; `pr-size` — размер PR в режиме наблюдения, только предупреждение (общий workflow из `.github`).
+CI (`.github/workflows/ci.yml`): формат, линтер, сверка копии OpenAPI с `backend` (GitHub, `main`), тесты, сборка — на PR и `main`; джобы `e2e` и `invariants` (ссылки `documentation/invariants.md` на тесты frontend и core — `check-invariants.py`) обязательны в ruleset `main`; `pr-size` — размер PR в режиме наблюдения, только предупреждение (общий workflow из `.github`). Отдельный workflow `.github/workflows/e2e-real.yml` (по изменениям `e2e/real-smoke.spec.ts`, `playwright.real.config.ts`, `.github/workflows/e2e-real.yml` и `workflow_dispatch`) поднимает полный Docker-стек `caddy` + `frontend` + `backend` + `core` (`simulation-worker`) с тестовым снапшотом и гоняет `npm run e2e:real`.
 
 ## Структура
 

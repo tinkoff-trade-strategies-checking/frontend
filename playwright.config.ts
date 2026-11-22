@@ -6,6 +6,7 @@ const IS_CI = Boolean(process.env['CI']);
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: /real-smoke\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: IS_CI,
   retries: 0,
