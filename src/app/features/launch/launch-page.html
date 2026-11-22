@@ -272,14 +272,34 @@
               }
             </div>
 
-            <div class="kv">
-              <span class="muted">Фоновый алгоритм сравнения</span>
-              <strong>{{ opts.backgroundAlgorithmName }}</strong>
+            <div class="field-group">
+              <label tuiLabel for="launch-background-algorithm" class="field-label">
+                Фоновый алгоритм сравнения
+                <tui-textfield
+                  tuiTextfieldSize="s"
+                  [tuiTextfieldCleaner]="false"
+                  [stringify]="backgroundAlgorithmStringify"
+                >
+                  <select
+                    id="launch-background-algorithm"
+                    tuiSelect
+                    [items]="backgroundAlgorithmOptions()"
+                    [ngModel]="store.backgroundAlgorithmId()"
+                    (ngModelChange)="store.setBackgroundAlgorithm($event ?? null)"
+                  ></select>
+                </tui-textfield>
+              </label>
+              @if (store.backgroundAlgorithmsError()) {
+                <p class="tui-text_body-xs muted hint">
+                  Не удалось загрузить каталог алгоритмов — доступен эталон платформы по умолчанию.
+                </p>
+              } @else {
+                <p class="tui-text_body-s muted hint">
+                  Фоновый алгоритм торгует на том же отрезке с тем же капиталом и правилами
+                  исполнения.
+                </p>
+              }
             </div>
-            <p class="tui-text_body-s muted hint">
-              Фоновый алгоритм торгует на том же отрезке с тем же капиталом и правилами исполнения.
-              Выбор алгоритма из каталога пока недоступен.
-            </p>
           </div>
         </section>
       </div>
@@ -338,7 +358,7 @@
             </div>
             <div class="kv">
               <span class="muted">Фоновый алгоритм</span>
-              <span>{{ opts.backgroundAlgorithmName }}</span>
+              <span>{{ backgroundAlgorithmLabel() }}</span>
             </div>
 
             <div class="divider"></div>

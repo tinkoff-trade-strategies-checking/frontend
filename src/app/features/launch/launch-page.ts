@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented } from '@taiga-ui/kit';
+import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import {
   CandleTimeframe,
   LAUNCH_API,
@@ -14,7 +14,8 @@ import {
   SessionDurationDays,
   TIMEFRAME_LABELS,
 } from './data/launch.models';
-import { LAUNCH_API_IMPL } from '../../api-impls';
+import { LAUNCH_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
+import { WORKSHOP_API } from '../workshop/data/workshop.models';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
 
@@ -42,9 +43,14 @@ function parseIsoDay(isoDate: string): TuiDay | null {
     TuiInputNumber,
     TuiNotification,
     TuiSegmented,
+    TuiSelect,
     TuiTextfield,
   ],
-  providers: [{ provide: LAUNCH_API, useClass: LAUNCH_API_IMPL }, LaunchStore],
+  providers: [
+    { provide: LAUNCH_API, useClass: LAUNCH_API_IMPL },
+    { provide: WORKSHOP_API, useClass: WORKSHOP_API_IMPL },
+    LaunchStore,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './launch-page.html',
   styleUrl: './launch-page.less',
@@ -55,6 +61,25 @@ export class LaunchPage implements OnInit {
   protected readonly customStartDay = computed<TuiDay | null>(() =>
     parseIsoDay(this.store.customStartDate()),
   );
+  protected readonly backgroundAlgorithmOptions = computed<readonly (string | null)[]>(() => [
+    null,
+    ...this.store.backgroundAlgorithms().map((algo) => algo.id),
+  ]);
+  protected readonly backgroundAlgorithmLabel = computed<string>(() => {
+    const selected = this.store.selectedBackgroundAlgorithm();
+    if (selected) {
+      return `${selected.name} · v${selected.latestVersion} · ${selected.author}`;
+    }
+    return this.store.options()?.backgroundAlgorithmName ?? 'Эталон платформы';
+  });
+  protected readonly backgroundAlgorithmStringify = (algorithmId: string | null): string => {
+    const defaultName = this.store.options()?.backgroundAlgorithmName ?? 'Эталон платформы';
+    if (algorithmId === null) {
+      return `${defaultName} (по умолчанию)`;
+    }
+    const algo = this.store.backgroundAlgorithms().find((item) => item.id === algorithmId);
+    return algo ? `${algo.name} · v${algo.latestVersion} · ${algo.author}` : algorithmId;
+  };
 
   protected readonly minCapital = MIN_INITIAL_CAPITAL_RUB;
   protected readonly maxCapital = MAX_INITIAL_CAPITAL_RUB;

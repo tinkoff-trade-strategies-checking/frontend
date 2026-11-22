@@ -190,6 +190,7 @@ export class StubLaunchApi implements LaunchApi {
       paperCount: papersCount,
       customStartDate: blind ? null : (command.customStartDate ?? null),
       netReturnPct: null,
+      backgroundAlgorithmId: command.backgroundAlgorithmId,
     });
     return { accepted: true, sessionId };
   }

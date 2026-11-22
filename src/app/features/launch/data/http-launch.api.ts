@@ -79,6 +79,7 @@ export class HttpLaunchApi implements LaunchApi {
         body: {
           ...command,
           paperIds: command.paperIds === null ? null : [...command.paperIds],
+          backgroundAlgorithmId: command.backgroundAlgorithmId,
         },
       });
       return { accepted: true, sessionId: created.sessionId };

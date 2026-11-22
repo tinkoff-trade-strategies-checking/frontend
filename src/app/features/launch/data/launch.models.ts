@@ -61,6 +61,7 @@ export interface StartSessionCommand {
   readonly paperIds: readonly string[] | null;
   /** Money из контракта (INV-6): десятичная строка рублей, до 2 знаков. */
   readonly initialCapital: string;
+  readonly backgroundAlgorithmId: string | null;
 }
 
 export type LaunchCommandResult =

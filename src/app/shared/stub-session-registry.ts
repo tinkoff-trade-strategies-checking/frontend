@@ -20,6 +20,7 @@ export interface StubSessionRecord {
   readonly paperCount: number;
   readonly customStartDate: string | null;
   readonly netReturnPct: number | null;
+  readonly backgroundAlgorithmId?: string | null;
 }
 
 export function formatMoscowDate(iso: string): string {
