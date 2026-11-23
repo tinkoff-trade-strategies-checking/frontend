@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiIcon, TuiInput, TuiNotification } from '@taiga-ui/core';
+import { TuiPassword } from '@taiga-ui/kit';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
 import { AuthService } from '../../core/auth/auth.service';
@@ -13,7 +14,7 @@ export function safeReturnUrl(value: string | null): string {
 
 @Component({
   selector: 'app-login-page',
-  imports: [FormsModule, TuiButton, TuiNotification, TuiTextfield],
+  imports: [FormsModule, TuiButton, TuiIcon, TuiInput, TuiNotification, TuiPassword],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="login-page">
@@ -26,29 +27,30 @@ export function safeReturnUrl(value: string | null): string {
           <label tuiLabel for="login-email">Почта</label>
           <input
             id="login-email"
-            tuiTextfield
+            tuiInput
             type="email"
             name="email"
             autocomplete="username"
             maxlength="254"
             required
             [ngModel]="email()"
-            (ngModelChange)="email.set($event)"
+            (ngModelChange)="email.set($event ?? '')"
           />
         </tui-textfield>
         <tui-textfield>
           <label tuiLabel for="login-password">Пароль</label>
           <input
             id="login-password"
-            tuiTextfield
+            tuiInput
             type="password"
             name="password"
             autocomplete="current-password"
             required
             [ngModel]="password()"
-            (ngModelChange)="password.set($event)"
+            (ngModelChange)="password.set($event ?? '')"
             (keydown.enter)="onEnter($event)"
           />
+          <tui-icon tuiPassword />
         </tui-textfield>
         <button tuiButton type="submit" appearance="primary" [disabled]="submitting()">
           Войти
@@ -60,9 +62,16 @@ export function safeReturnUrl(value: string | null): string {
     .login-page {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 1.25rem;
       max-width: 24rem;
-      margin: 2rem auto;
+      margin: 4rem auto;
+      padding: 2rem;
+      border-radius: var(--tui-radius-l);
+      background: var(--tui-background-elevation-1);
+      border: 1px solid var(--tui-border-normal);
+    }
+    .login-page h1 {
+      margin: 0;
     }
     .login-form {
       display: flex;

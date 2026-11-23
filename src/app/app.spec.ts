@@ -142,6 +142,26 @@ describe('App', () => {
     });
   });
 
+  it('настоящий режим без входа: навигация скрыта, чтобы не показывать нерабочие пункты на /login', async () => {
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [App],
+      providers: [
+        provideRouter([]),
+        provideTaiga(),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: STUB_MODE, useValue: false },
+      ],
+    }).compileComponents();
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('nav')).toBeNull();
+    expect(root.querySelector('.user')).toBeNull();
+  });
+
   it('настоящий режим: без арены и отчёта в навигации, с почтой и кнопкой выхода', async () => {
     TestBed.resetTestingModule();
     await TestBed.configureTestingModule({

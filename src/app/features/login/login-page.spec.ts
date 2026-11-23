@@ -53,8 +53,11 @@ describe('LoginPage', () => {
     await fixture.whenStable();
 
     const root = fixture.nativeElement as HTMLElement;
-    const email = root.querySelector<HTMLInputElement>('#login-email')!;
-    const password = root.querySelector<HTMLInputElement>('#login-password')!;
+    const email = root.querySelector<HTMLInputElement>('#login-email[tuiInput]')!;
+    const password = root.querySelector<HTMLInputElement>('#login-password[tuiInput]')!;
+    expect(email).not.toBeNull();
+    expect(password).not.toBeNull();
+    expect(root.querySelector('tui-icon[tuiPassword]')).not.toBeNull();
     email.value = 'a@b.c';
     email.dispatchEvent(new Event('input'));
     password.value = 'wrong';
@@ -83,8 +86,11 @@ describe('LoginPage', () => {
     controller.expectOne('/api/v1/me').flush({}, { status: 401, statusText: 'Unauthorized' });
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
-    const email = root.querySelector<HTMLInputElement>('#login-email')!;
-    const password = root.querySelector<HTMLInputElement>('#login-password')!;
+    const email = root.querySelector<HTMLInputElement>('#login-email[tuiInput]')!;
+    const password = root.querySelector<HTMLInputElement>('#login-password[tuiInput]')!;
+    expect(email).not.toBeNull();
+    expect(password).not.toBeNull();
+    expect(root.querySelector('tui-icon[tuiPassword]')).not.toBeNull();
 
     password.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     controller.expectNone('/api/v1/auth/login');
