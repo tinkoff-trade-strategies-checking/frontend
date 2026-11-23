@@ -251,7 +251,7 @@
                   formatComparisonBadge(
                     cmp.netReturn.winner,
                     cmp.netReturn.diffLabel,
-                    cmp.netReturn.humanPct - cmp.netReturn.algoPct
+                    cmp.netReturn.diffPctPoints
                   )
                 }}
               </span>
@@ -262,11 +262,18 @@
               <div class="cmp-values">
                 <div>
                   <span class="tui-text_body-xs muted">Вы</span>
-                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.humanPct) }}</div>
+                  <div
+                    class="tui-text_h5 num"
+                    [class.neg]="pctSign(cmp.maxDrawdown.humanPct) !== 0"
+                  >
+                    {{ formatDrawdown(cmp.maxDrawdown.humanPct) }}
+                  </div>
                 </div>
                 <div>
                   <span class="tui-text_body-xs muted">Алгоритм</span>
-                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.algoPct) }}</div>
+                  <div class="tui-text_h5 num" [class.neg]="pctSign(cmp.maxDrawdown.algoPct) !== 0">
+                    {{ formatDrawdown(cmp.maxDrawdown.algoPct) }}
+                  </div>
                 </div>
               </div>
               <span tuiBadge size="s" appearance="neutral">
@@ -274,7 +281,7 @@
                   formatComparisonBadge(
                     cmp.maxDrawdown.winner,
                     cmp.maxDrawdown.diffLabel,
-                    cmp.maxDrawdown.humanPct - cmp.maxDrawdown.algoPct
+                    cmp.maxDrawdown.diffPctPoints
                   )
                 }}
               </span>
@@ -373,9 +380,13 @@
                   </tr>
                   <tr>
                     <td>Макс. просадка</td>
-                    <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
+                    <td class="num" [class.neg]="pctSign(hm.maxDrawdownPct) !== 0">
+                      {{ formatDrawdown(hm.maxDrawdownPct) }}
+                    </td>
                     @if (am) {
-                      <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
+                      <td class="num" [class.neg]="pctSign(am.maxDrawdownPct) !== 0">
+                        {{ formatDrawdown(am.maxDrawdownPct) }}
+                      </td>
                     }
                   </tr>
                   <tr>
@@ -555,14 +566,14 @@
               @if (summary) {
                 <div tuiNotification appearance="info" size="s">
                   <div>
-                    @if (summary.totalErrorCostRub > 0) {
+                    @if (summary.totalErrorCostRub >= 0.005) {
                       Расхождения обошлись вам в
                       <strong class="num neg">{{
                         formatRubExact(summary.totalErrorCostRub)
                       }}</strong>
                       (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
                       >)
-                    } @else {
+                    } @else if (summary.totalErrorCostRub <= -0.005) {
                       Расхождения сложились в вашу пользу (сэкономлено
                       <strong class="num pos">{{
                         formatRubExact(Math.abs(summary.totalErrorCostRub))
@@ -570,6 +581,11 @@
                       <strong class="num pos">{{
                         formatPct(Math.abs(summary.totalErrorCostPct))
                       }}</strong>)
+                    } @else {
+                      Расхождения не повлияли на итог (<strong class="num">{{
+                        formatRubExact(0)
+                      }}</strong
+                      >)
                     }
                     @if (
                       summary.worstType &&

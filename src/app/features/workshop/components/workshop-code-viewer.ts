@@ -293,11 +293,11 @@ export class WorkshopCodeViewer {
 
   protected async copyCode(): Promise<void> {
     const src = this.activeSource();
-    if (!src) {
+    if (!src || !navigator.clipboard) {
       return;
     }
     try {
-      await navigator.clipboard?.writeText(src);
+      await navigator.clipboard.writeText(src);
       this.copied.set(true);
       if (this.copyTimer !== null) {
         clearTimeout(this.copyTimer);

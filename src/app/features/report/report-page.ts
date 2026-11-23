@@ -21,6 +21,7 @@ import {
   DIVERGENCE_TYPE_LABELS,
   formatComparisonBadge,
   formatDeltaBars,
+  formatDrawdown,
   formatDrawdownDuration,
   formatPct,
   formatRatio,
@@ -94,6 +95,7 @@ export class ReportPage implements OnInit {
   protected readonly formatDrawdownDuration = formatDrawdownDuration;
   protected readonly formatPct = formatPct;
   protected readonly formatRatio = formatRatio;
+  protected readonly formatDrawdown = formatDrawdown;
   protected readonly formatComparisonBadge = formatComparisonBadge;
   protected readonly Math = Math;
 

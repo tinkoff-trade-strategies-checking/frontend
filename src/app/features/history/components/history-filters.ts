@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiTextfield } from '@taiga-ui/core';
 import { TuiChevron, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
@@ -136,13 +136,8 @@ export class HistoryFilters {
   readonly regimeChange = output<HistoryRegimeFilter>();
   readonly blindToggle = output<void>();
 
-  protected statusIds(): readonly HistoryStatusFilter[] {
-    return this.statusFilters().map((f) => f.id);
-  }
-
-  protected regimeIds(): readonly HistoryRegimeFilter[] {
-    return this.regimeFilters().map((f) => f.id);
-  }
+  protected readonly statusIds = computed(() => this.statusFilters().map((f) => f.id));
+  protected readonly regimeIds = computed(() => this.regimeFilters().map((f) => f.id));
 
   protected readonly statusStringify = (id: HistoryStatusFilter): string =>
     this.statusFilters().find((f) => f.id === id)?.label ?? id;

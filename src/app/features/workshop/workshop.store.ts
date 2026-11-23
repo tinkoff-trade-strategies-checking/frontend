@@ -154,6 +154,7 @@ export class WorkshopStore implements OnDestroy {
     this.detailLoading.set(true);
     this.detailError.set(null);
     this.actionError.set(null);
+    this.deleteConfirmId.set(null);
     if (this.runFormOpen()) {
       this.runFormOpen.set(false);
     }
@@ -678,18 +679,23 @@ export class WorkshopStore implements OnDestroy {
     if (!detail || detail.id !== id || !detail.isMine || detail.isSystem || this.deleting()) {
       return false;
     }
+    const seq = this.detailSeq;
     this.deleting.set(true);
     this.actionError.set(null);
 
     try {
       await this.api.deleteAlgorithm(id);
-      this.deleteConfirmId.set(null);
       this.removeFromCompare(id);
-      this.closeDetail();
+      if (seq === this.detailSeq && this.selectedId() === id) {
+        this.deleteConfirmId.set(null);
+        this.closeDetail();
+      }
       await this.load();
       return true;
     } catch (error) {
-      this.actionError.set(errorMessage(error, 'Не удалось удалить алгоритм.'));
+      if (seq === this.detailSeq && this.selectedId() === id) {
+        this.actionError.set(errorMessage(error, 'Не удалось удалить алгоритм.'));
+      }
       return false;
     } finally {
       this.deleting.set(false);

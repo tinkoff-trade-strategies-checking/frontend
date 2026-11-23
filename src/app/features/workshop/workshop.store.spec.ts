@@ -899,4 +899,143 @@ describe('WorkshopStore', () => {
 
     expect(store.compareList().map((x) => x.id)).toEqual(['A-FAST']);
   });
+
+  it('confirmDelete удаляет свой алгоритм, очищает compareList/selectedDetail и сбрасывает deleteConfirmId', async () => {
+    const deleteCalls: string[] = [];
+    const mine = { ...makeAlgo('A-MINE', 'My Algo'), isMine: true };
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage(deleteCalls.length > 0 ? [] : [mine]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: { ...mine, id } };
+        },
+      }),
+      async deleteAlgorithm(id: string): Promise<void> {
+        deleteCalls.push(id);
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    store.toggleCompare({ id: 'A-MINE', name: 'My Algo', latestVersion: 1 });
+    await store.selectAlgorithm('A-MINE');
+    store.requestDelete('A-MINE');
+    expect(store.deleteConfirmId()).toBe('A-MINE');
+
+    const ok = await store.confirmDelete('A-MINE');
+    expect(ok).toBe(true);
+    expect(deleteCalls).toEqual(['A-MINE']);
+    expect(store.compareList()).toEqual([]);
+    expect(store.selectedId()).toBeNull();
+    expect(store.selectedDetail()).toBeNull();
+    expect(store.deleteConfirmId()).toBeNull();
+    expect(store.items()).toEqual([]);
+  });
+
+  it('confirmDelete при ошибке API выставляет actionError и не закрывает карточку', async () => {
+    const mine = { ...makeAlgo('A-MINE', 'My Algo'), isMine: true };
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([mine]);
+        },
+        async getById(): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: mine };
+        },
+      }),
+      async deleteAlgorithm(): Promise<void> {
+        throw new Error('delete failed');
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.selectAlgorithm('A-MINE');
+    store.requestDelete('A-MINE');
+    const ok = await store.confirmDelete('A-MINE');
+
+    expect(ok).toBe(false);
+    expect(store.selectedId()).toBe('A-MINE');
+    expect(store.actionError()).toBe('Не удалось удалить алгоритм.');
+  });
+
+  it('confirmDelete запрещён для системного и чужого алгоритмов', async () => {
+    let deleteCount = 0;
+    const sysAlgo = { ...makeAlgo('A-SYS', 'System'), isMine: true, isSystem: true };
+    const alienAlgo = { ...makeAlgo('A-ALIEN', 'Alien'), isMine: false, isSystem: false };
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([sysAlgo, alienAlgo]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: id === 'A-SYS' ? sysAlgo : alienAlgo };
+        },
+      }),
+      async deleteAlgorithm(): Promise<void> {
+        deleteCount++;
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.selectAlgorithm('A-SYS');
+    expect(await store.confirmDelete('A-SYS')).toBe(false);
+    await store.selectAlgorithm('A-ALIEN');
+    expect(await store.confirmDelete('A-ALIEN')).toBe(false);
+    expect(deleteCount).toBe(0);
+  });
+
+  it('confirmDelete защищён от гонки: переключение на другой алгоритм во время удаления не закрывает новую карточку', async () => {
+    let resolveDelete!: () => void;
+    const mine = { ...makeAlgo('A-MINE', 'My Algo'), isMine: true };
+    const other = makeAlgo('A-OTHER', 'Other Algo');
+
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([other]);
+        },
+        async getById(id: string): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: id === 'A-MINE' ? mine : other };
+        },
+      }),
+      deleteAlgorithm(): Promise<void> {
+        return new Promise<void>((resolve) => {
+          resolveDelete = resolve;
+        });
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    await store.selectAlgorithm('A-MINE');
+    store.requestDelete('A-MINE');
+    const pendingDelete = store.confirmDelete('A-MINE');
+
+    await store.selectAlgorithm('A-OTHER');
+    expect(store.deleteConfirmId()).toBeNull();
+
+    resolveDelete();
+    await pendingDelete;
+
+    expect(store.selectedId()).toBe('A-OTHER');
+    expect(store.selectedDetail()?.id).toBe('A-OTHER');
+  });
 });

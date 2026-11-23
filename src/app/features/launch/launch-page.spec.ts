@@ -84,7 +84,7 @@ describe('LaunchPage', () => {
     const customText = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(customText).toContain('03.06.2024');
     expect(customText).toContain('Доступный архив: 03.01.2020 — 31.12.2025');
-    expect(customText).not.toContain('Тип периода');
+    expect(customText).toContain('Должен совпадать с категорией выбранного отрезка');
 
     // Пустая дата блокирует кнопку запуска и показывает подсказку.
     store.setCustomStartDate('');

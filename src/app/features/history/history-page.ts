@@ -83,50 +83,12 @@ export class HistoryPage implements OnInit {
   protected readonly periodOf = historyPeriod;
   protected readonly netReturnOf = historyNetReturn;
 
-  protected readonly statusFilterIds = STATUS_FILTERS.map((f) => f.id);
-  protected readonly regimeFilterIds = REGIME_FILTERS.map((f) => f.id);
-  protected readonly statusStringify = (id: HistoryStatusFilter): string =>
-    STATUS_FILTERS.find((f) => f.id === id)?.label ?? id;
-  protected readonly regimeStringify = (id: HistoryRegimeFilter): string =>
-    REGIME_FILTERS.find((f) => f.id === id)?.label ?? id;
-
   protected shortEntryId(id: string): string {
     return id.length <= 12 ? id : `#${id.slice(0, 8)}`;
   }
 
   ngOnInit(): void {
     void this.store.load();
-  }
-
-  protected filterIndex<T extends string>(
-    options: readonly { readonly id: T }[],
-    current: T,
-  ): number {
-    return Math.max(
-      0,
-      options.findIndex((item) => item.id === current),
-    );
-  }
-
-  protected onKindIndexChange(index: number): void {
-    const next = this.kindFilters[index];
-    if (next) {
-      this.store.setKind(next.id);
-    }
-  }
-
-  protected onStatusIndexChange(index: number): void {
-    const next = this.statusFilters[index];
-    if (next) {
-      this.store.setStatus(next.id);
-    }
-  }
-
-  protected onRegimeIndexChange(index: number): void {
-    const next = this.regimeFilters[index];
-    if (next) {
-      this.store.setRegime(next.id);
-    }
   }
 
   protected statusAppearance(

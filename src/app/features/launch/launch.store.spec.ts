@@ -10,7 +10,7 @@ import {
 } from '../workshop/data/workshop.models';
 import { LAUNCH_API } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
-import { LaunchStore } from './launch.store';
+import { LaunchStore, pickSafeArchiveDate } from './launch.store';
 
 function makeAlgorithm(
   overrides: Partial<WorkshopAlgorithmSummary> = {},
@@ -165,5 +165,17 @@ describe('LaunchStore: фоновый алгоритм', () => {
     await initPromise;
 
     expect(store.backgroundAlgorithms()).toEqual([]);
+  });
+
+  it('pickSafeArchiveDate учитывает запас до archiveTo и обходит выходные', () => {
+    // 2024-06-03 подходит, если до archiveTo >= 90 дней для defaultDuration = 60.
+    expect(pickSafeArchiveDate('2020-01-03', '2025-12-31', 60)).toBe('2024-06-03');
+
+    // Когда 2024-06-03 слишком близко к правому краю (меньше 90 дней до 2024-07-01), отступаем к archiveFrom.
+    // 2020-01-03 + 30d = 2020-02-02 (воскресенье) -> сдвигается на понедельник 2020-02-03.
+    expect(pickSafeArchiveDate('2020-01-03', '2024-07-01', 60)).toBe('2020-02-03');
+
+    // Суббота на archiveFrom при коротком окне сдвигается на понедельник.
+    expect(pickSafeArchiveDate('2024-02-03', '2024-03-15', 60)).toBe('2024-02-05');
   });
 });

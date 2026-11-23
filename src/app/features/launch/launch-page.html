@@ -117,25 +117,28 @@
           </div>
         </section>
 
-        @if (store.isBlind()) {
-          <section class="panel">
-            <div class="panel-header">
-              <h2 class="tui-text_h6">Тип периода</h2>
-            </div>
-            <div class="panel-body">
-              <tui-segmented
-                size="s"
-                [activeItemIndex]="regimeIndex(opts.regimes, store.regime())"
-                (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
-              >
-                @for (item of opts.regimes; track item) {
-                  <button type="button">{{ regimeLabels[item] }}</button>
-                }
-              </tui-segmented>
-              <p class="tui-text_body-s muted hint">{{ regimeHints[store.regime()] }}</p>
-            </div>
-          </section>
-        }
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="tui-text_h6">Тип периода</h2>
+          </div>
+          <div class="panel-body">
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="regimeIndex(opts.regimes, store.regime())"
+              (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
+            >
+              @for (item of opts.regimes; track item) {
+                <button type="button">{{ regimeLabels[item] }}</button>
+              }
+            </tui-segmented>
+            <p class="tui-text_body-s muted hint">
+              {{ regimeHints[store.regime()] }}
+              @if (!store.isBlind()) {
+                · Должен совпадать с категорией выбранного отрезка.
+              }
+            </p>
+          </div>
+        </section>
 
         <section class="panel">
           <div class="panel-header">
@@ -331,12 +334,10 @@
               <span class="muted">Шаг свечей</span>
               <span>{{ timeframeLabels[store.timeframe()] }}</span>
             </div>
-            @if (store.isBlind()) {
-              <div class="kv">
-                <span class="muted">Тип периода</span>
-                <span>{{ regimeLabels[store.regime()] }}</span>
-              </div>
-            }
+            <div class="kv">
+              <span class="muted">Тип периода</span>
+              <span>{{ regimeLabels[store.regime()] }}</span>
+            </div>
             <div class="kv">
               <span class="muted">Начало</span>
               <span>

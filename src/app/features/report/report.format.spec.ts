@@ -1,4 +1,10 @@
-import { formatPct, formatRatio, formatRub } from './report.format';
+import {
+  formatComparisonBadge,
+  formatDrawdown,
+  formatPct,
+  formatRatio,
+  formatRub,
+} from './report.format';
 
 describe('report.format', () => {
   const norm = (text: string): string => text.replace(/[\u00a0\u202f]/g, ' ');
@@ -19,5 +25,32 @@ describe('report.format', () => {
     for (const text of [formatRatio(-1), formatPct(-1), formatRub(-1)]) {
       expect(text).not.toContain('-');
     }
+  });
+
+  it('нормализует околонулевые значения (|x| < 0.005) к 0 без знака минуса', () => {
+    expect(formatPct(-0.001)).toBe('0,00 %');
+    expect(formatPct(-0.001, true)).toBe('0,00 %');
+    expect(formatPct(-0)).toBe('0,00 %');
+    expect(norm(formatRub(-0.004, true))).toBe('0,00 ₽');
+    expect(formatRatio(-0.004)).toBe('0,00');
+    expect(formatDrawdown(0)).toBe('0,00 %');
+    expect(formatDrawdown(-0.002)).toBe('0,00 %');
+    expect(formatDrawdown(4.5)).toBe('−4,50 %');
+  });
+
+  it('formatComparisonBadge форматирует сравнение и не перебивает порог округления 0.005', () => {
+    expect(formatComparisonBadge('tie', 'Доходность равна', 0)).toBe('На уровне алгоритма');
+    expect(formatComparisonBadge('human', 'Вы лучше на 0,00 п.п.', 0.004)).toBe(
+      'На уровне алгоритма',
+    );
+    expect(formatComparisonBadge('human', 'Вы лучше на 0,01 п.п.', 0.006)).toBe(
+      'Вы впереди на +0,01 п.п.',
+    );
+    expect(formatComparisonBadge('algo', 'Алгоритм лучше на 2,75 п.п.', -2.75)).toBe(
+      'Алгоритм впереди на +2,75 п.п.',
+    );
+    expect(formatComparisonBadge('human', 'Сентинел: вы лучше на 999 888 ₽', 134_567)).toBe(
+      'Сентинел: вы лучше на 999 888 ₽',
+    );
   });
 });

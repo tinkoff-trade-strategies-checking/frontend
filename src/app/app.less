@@ -64,10 +64,17 @@
   color: var(--tui-text-secondary);
 }
 
-.nav-link.active {
+.nav-link.active,
+.header .nav a.nav-link.active:active {
   background: var(--ttsc-accent);
   color: var(--ttsc-on-accent);
   font-weight: 600;
+}
+
+.header .nav a.nav-link.active:hover,
+.header .nav a.nav-link.active:focus-visible {
+  background: var(--ttsc-accent-hover);
+  color: var(--ttsc-on-accent);
 }
 
 .header-actions {
