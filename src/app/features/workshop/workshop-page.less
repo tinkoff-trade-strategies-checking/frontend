@@ -101,22 +101,7 @@
 }
 
 .workshop-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1rem;
-  align-items: start;
-
-  &.with-detail {
-    grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr);
-
-    .col-secondary {
-      display: none;
-    }
-
-    .desc-preview {
-      max-width: 40ch;
-    }
-  }
+  display: block;
 }
 
 .catalog-tabs {
@@ -163,9 +148,57 @@
   color: var(--ttsc-accent-text, var(--tui-text-primary));
 }
 
-@media (max-width: 1100px) {
-  .workshop-layout.with-detail {
-    grid-template-columns: minmax(0, 1fr);
+.detail-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--ttsc-backdrop);
+  backdrop-filter: blur(2px);
+  animation: workshop-fade-in 0.16s ease-out;
+}
+
+.detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  width: min(640px, 94vw);
+  max-width: 100%;
+  margin: 0;
+  border-radius: var(--tui-radius-l) 0 0 var(--tui-radius-l);
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: var(--tui-background-elevation-1);
+  box-shadow: var(--ttsc-drawer-shadow);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: workshop-drawer-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes workshop-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes workshop-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-backdrop,
+  .detail-panel {
+    animation: none;
   }
 }
 
@@ -322,13 +355,20 @@
 }
 
 .detail-body {
-  padding: 1rem;
+  padding: 0 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
 }
 
 .detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -1.25rem;
+  padding: 1rem 1.25rem 0.75rem;
+  background: var(--tui-background-elevation-1);
+  border-bottom: 1px solid var(--tui-border-normal);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

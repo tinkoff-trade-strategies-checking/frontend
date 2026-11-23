@@ -31,10 +31,19 @@ test('фильтры, карточка алгоритма, неизменяем�
   const rowBreakout = page.locator('tr[data-algo-id="A-0003"]');
   await expect(rowBreakout).toBeVisible();
 
+  const table = page.locator('.workshop-table');
+  const widthBefore = (await table.boundingBox())?.width ?? 0;
+
   await rowBreakout.getByRole('button', { name: 'Открыть' }).click();
 
   const detail = page.getByRole('complementary', { name: 'Карточка алгоритма' });
   await expect(detail).toBeVisible();
+  // Выезжающая панель идёт оверлеем поверх страницы и не сужает таблицу.
+  const widthAfter = (await table.boundingBox())?.width ?? 0;
+  expect(widthAfter).toBe(widthBefore);
+  await expect(table.locator('th', { hasText: 'Автор' })).toBeVisible();
+  await expect(table.locator('th', { hasText: 'Версия' })).toBeVisible();
+  await expect(table.locator('th', { hasText: 'Публикация' })).toBeVisible();
   await expect(detail).toContainText('Breakout ATR');
   await expect(detail).toContainText('L001');
   await expect(detail).toContainText('W-LA01');
@@ -121,6 +130,8 @@ test('сравнение выбранных алгоритмов (UC-22): пер
     await page.locator(`tr[data-algo-id="${id}"]`).getByRole('button', { name: 'Открыть' }).click();
     const detail = page.getByRole('complementary', { name: 'Карточка алгоритма' });
     await detail.getByRole('button', { name: 'Добавить в сравнение' }).click();
+    await detail.getByRole('button', { name: 'Закрыть' }).click();
+    await expect(detail).toHaveCount(0);
   };
 
   // При 1 алгоритме кнопка «Сравнить (1)» отключена и видна подсказка.

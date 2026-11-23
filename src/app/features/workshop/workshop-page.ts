@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -55,11 +56,15 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
     WorkshopStore,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(document:keydown.escape)': 'onEscapeKey($event)',
+  },
   templateUrl: './workshop-page.html',
   styleUrl: './workshop-page.less',
 })
 export class WorkshopPage implements OnInit {
   protected readonly store = inject(WorkshopStore);
+  private readonly document = inject(DOCUMENT);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -123,5 +128,35 @@ export class WorkshopPage implements OnInit {
     if (next) {
       this.store.setSort(next.id);
     }
+  }
+
+  protected onBackdropClick(): void {
+    this.dismissSidePanel();
+  }
+
+  protected onEscapeKey(event: Event): void {
+    if (event.defaultPrevented || this.document.querySelector('tui-dropdown')) {
+      return;
+    }
+    this.dismissSidePanel();
+  }
+
+  private dismissSidePanel(): void {
+    if (!this.showSidePanel()) {
+      return;
+    }
+    const mode = this.store.editorMode();
+    if (mode !== 'closed') {
+      const pristineCreate =
+        mode === 'create' &&
+        !this.store.draftName().trim() &&
+        !this.store.draftDescription().trim() &&
+        !this.store.draftSource().trim();
+      if (pristineCreate) {
+        this.store.closeEditor();
+      }
+      return;
+    }
+    this.store.closeDetail();
   }
 }

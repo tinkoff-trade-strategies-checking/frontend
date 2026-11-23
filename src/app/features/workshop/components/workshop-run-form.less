@@ -1,11 +1,18 @@
 .run-form-body {
-  padding: 1rem;
+  padding: 0 1.25rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
 }
 
 .run-form-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 -1.25rem;
+  padding: 1rem 1.25rem 0.75rem;
+  background: var(--tui-background-elevation-1);
+  border-bottom: 1px solid var(--tui-border-normal);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
