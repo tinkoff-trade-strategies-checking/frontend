@@ -37,6 +37,13 @@
   --ttsc-nav-active-bg-hover: rgba(59, 130, 246, 0.24);
   --ttsc-nav-active-color: #93c5fd;
   --ttsc-nav-active-color-hover: #bfdbfe;
+  --ttsc-accent-soft: rgba(59, 130, 246, 0.16);
+  --ttsc-accent-text: #93c5fd;
+  --ttsc-code-number: #a5b4fc;
+  --ttsc-buy-bg: #059669;
+  --ttsc-buy-bg-hover: #047857;
+  --ttsc-sell-bg: #dc2626;
+  --ttsc-sell-bg-hover: #b91c1c;
 
   --ttsc-btn-text: #cbd5e1;
   --ttsc-btn-text-hover: #f1f5f9;
@@ -101,6 +108,13 @@
   --ttsc-nav-active-bg-hover: rgba(37, 99, 235, 0.16);
   --ttsc-nav-active-color: #1d4ed8;
   --ttsc-nav-active-color-hover: #1e40af;
+  --ttsc-accent-soft: rgba(37, 99, 235, 0.1);
+  --ttsc-accent-text: #1d4ed8;
+  --ttsc-code-number: #4338ca;
+  --ttsc-buy-bg: #059669;
+  --ttsc-buy-bg-hover: #047857;
+  --ttsc-sell-bg: #dc2626;
+  --ttsc-sell-bg-hover: #b91c1c;
 
   --ttsc-btn-text: #334155;
   --ttsc-btn-text-hover: #0f172a;
@@ -215,7 +229,11 @@ tui-segmented {
     .submit-sell,
     [data-appearance='primary-destructive'],
     [appearance='primary-destructive'],
-    .active
+    .active,
+    .indicator-active,
+    .btn-active,
+    .version-active,
+    .paper-selected
   ) {
   color: var(--ttsc-btn-text);
 
@@ -266,9 +284,28 @@ tui-segmented {
     .submit-buy,
     .submit-sell,
     [data-appearance='primary-destructive'],
-    [appearance='primary-destructive']
+    [appearance='primary-destructive'],
+    .indicator-active,
+    .btn-active,
+    .version-active,
+    .paper-selected
   ) {
   --t-bs: var(--ttsc-btn-border);
   background: var(--ttsc-btn-secondary-bg);
   box-shadow: inset 0 0 0 1px var(--t-bs);
+}
+
+:root body [tuiButton]:where(.indicator-active, .btn-active, .version-active, .paper-selected) {
+  --t-bs: var(--ttsc-accent);
+  background: var(--ttsc-accent-soft);
+  color: var(--ttsc-accent-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--t-bs);
+
+  &:hover:not(:disabled, [data-state='disabled']),
+  &[data-state='hover']:not(:disabled, [data-state='disabled']) {
+    --t-bs: var(--ttsc-accent);
+    background: var(--ttsc-nav-active-bg-hover);
+    color: var(--ttsc-accent-text);
+  }
 }

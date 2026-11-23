@@ -215,8 +215,9 @@ export function tokenizeDslSource(source: string): readonly DslCodeLine[] {
     }
 
     .version-active {
-      border-color: var(--ttsc-accent, var(--tui-border-hover));
-      color: var(--tui-text-primary);
+      --t-bs: var(--ttsc-accent, var(--tui-border-hover));
+      background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
+      color: var(--ttsc-accent-text, var(--tui-text-primary));
     }
 
     .tok-keyword {
@@ -234,11 +235,7 @@ export function tokenizeDslSource(source: string): readonly DslCodeLine[] {
     }
 
     .tok-number {
-      color: #4338ca;
-    }
-
-    :host-context([tuiTheme='dark']) .tok-number {
-      color: #a5b4fc;
+      color: var(--ttsc-code-number, var(--tui-text-secondary));
     }
 
     .muted {

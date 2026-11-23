@@ -386,17 +386,17 @@ function round2(value: number): number {
     }
 
     .submit-buy {
-      --tui-background-accent-1: var(--tui-text-positive);
-      --tui-background-accent-1-hover: var(--tui-text-positive-hover);
-      --tui-background-accent-1-pressed: var(--tui-text-positive);
+      --tui-background-accent-1: var(--ttsc-buy-bg, #059669);
+      --tui-background-accent-1-hover: var(--ttsc-buy-bg-hover, #047857);
+      --tui-background-accent-1-pressed: var(--ttsc-buy-bg-hover, #047857);
       --tui-text-primary-on-accent-1: #ffffff;
       color: #ffffff;
     }
 
     .submit-sell {
-      --tui-background-accent-1: var(--tui-text-negative);
-      --tui-background-accent-1-hover: var(--tui-text-negative-hover);
-      --tui-background-accent-1-pressed: var(--tui-text-negative);
+      --tui-background-accent-1: var(--ttsc-sell-bg, #dc2626);
+      --tui-background-accent-1-hover: var(--ttsc-sell-bg-hover, #b91c1c);
+      --tui-background-accent-1-pressed: var(--ttsc-sell-bg-hover, #b91c1c);
       --tui-text-primary-on-accent-1: #ffffff;
       color: #ffffff;
     }
