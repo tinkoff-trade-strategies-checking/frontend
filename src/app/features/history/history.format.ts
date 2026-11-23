@@ -50,6 +50,13 @@ export function formatMoscowDateTime(iso: string): string {
   return MOSCOW_DATETIME_FORMATTER.format(new Date(iso)).replace(',', '');
 }
 
+export function signedPctSign(value: number | null): -1 | 0 | 1 {
+  if (value === null || Math.abs(value) < 0.005) {
+    return 0;
+  }
+  return value > 0 ? 1 : -1;
+}
+
 export function formatSignedPct(value: number | null): string {
   if (value === null) {
     return '—';

@@ -36,6 +36,19 @@
     }
   </header>
 
+  @if (!readOnly() && !store.finished() && !guideDismissed()) {
+    <div tuiNotification appearance="info" size="s" class="guide-banner">
+      <span class="tui-text_body-s">
+        Как торговать: листайте свечи кнопкой «Следующая свеча» или «Пуск», выставляйте заявку
+        справа — она исполнится на открытии следующей свечи. Для разбора с алгоритмом нажмите
+        «Завершить сессию».
+      </span>
+      <button tuiButton type="button" size="xs" appearance="outline" (click)="dismissGuide()">
+        Понятно
+      </button>
+    </div>
+  }
+
   @if (store.finished() && !readOnly() && store.sessionId()) {
     <div tuiNotification appearance="positive" size="m" class="finish-banner">
       <div class="finish-banner-text">
@@ -115,7 +128,9 @@
             tuiButton
             type="button"
             size="xs"
-            [appearance]="showSma20() ? 'accent' : 'outline'"
+            [appearance]="showSma20() ? 'secondary' : 'outline'"
+            [class.indicator-active]="showSma20()"
+            [attr.aria-pressed]="showSma20()"
             (click)="showSma20.set(!showSma20())"
           >
             SMA 20
@@ -124,7 +139,9 @@
             tuiButton
             type="button"
             size="xs"
-            [appearance]="showSma50() ? 'accent' : 'outline'"
+            [appearance]="showSma50() ? 'secondary' : 'outline'"
+            [class.indicator-active]="showSma50()"
+            [attr.aria-pressed]="showSma50()"
             (click)="showSma50.set(!showSma50())"
           >
             SMA 50

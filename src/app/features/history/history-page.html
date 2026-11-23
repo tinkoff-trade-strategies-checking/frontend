@@ -103,12 +103,13 @@
                   </div>
                 </td>
                 <td>{{ regimeLabels[item.regime] }}</td>
+                @let netReturn = netReturnOf(item);
                 <td
                   class="num"
-                  [class.pos]="(netReturnOf(item) ?? 0) > 0"
-                  [class.neg]="(netReturnOf(item) ?? 0) < 0"
+                  [class.pos]="signedPctSign(netReturn) > 0"
+                  [class.neg]="signedPctSign(netReturn) < 0"
                 >
-                  {{ formatSignedPct(netReturnOf(item)) }}
+                  {{ formatSignedPct(netReturn) }}
                 </td>
                 <td class="actions-col">
                   <div class="row-actions">

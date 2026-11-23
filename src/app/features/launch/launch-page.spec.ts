@@ -50,14 +50,26 @@ describe('LaunchPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
     expect(text).toContain('Новая сессия');
-    expect(text).toContain('Торгую сам');
-    expect(text).toContain('мастерской');
+    expect(text).not.toContain('Кто торгует');
+    expect(text).not.toContain('Торгую сам');
+    expect(text).toContain('Мастерскую');
     expect(text).not.toContain('Запуск алгоритмов из мастерской пока недоступен');
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector('a[href="/workshop"]'),
-    ).not.toBeNull();
+    expect(root.querySelector('a[href="/workshop"]')).not.toBeNull();
+    expect(text).toContain('Выберите сценарий');
+    expect(text).toContain('Торгуйте на Арене');
+    expect(text).toContain('Разберите ошибки с алгоритмом');
+    expect(text).toContain('Быстрый старт');
+    expect(text).toContain('Быстрая тренировка');
+    expect(text).toContain('Полноценный квартал');
+    expect(text).toContain('Стресс-тест рынка');
+    expect(text).toContain('В слепом режиме названия бумаг и даты скрыты до конца сессии');
+    expect(root.querySelector('#launch-advanced-toggle')?.getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+    expect(root.querySelector('#launch-advanced-panels')).toBeNull();
     expect(text).toContain('60 дн.');
     expect(text).toContain('1 д');
     expect(text).toContain('Эталон платформы');
@@ -67,6 +79,93 @@ describe('LaunchPage', () => {
     expect(text).not.toContain('SBER');
     expect(text).not.toContain('GAZP');
     expect(text).not.toContain('Сбербанк');
+  });
+
+  it('пресеты «Быстрый старт» в 1 клик применяют параметры и подсвечивают активную карточку', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    const card = (id: string): HTMLButtonElement => {
+      const btn = root.querySelector<HTMLButtonElement>(`button[data-preset="${id}"]`);
+      if (!btn) {
+        throw new Error(`Нет карточки пресета ${id}`);
+      }
+      return btn;
+    };
+
+    // По умолчанию активен «Полноценный квартал» (60 дн., 1д, средний, 3 бумаги, 1 000 000 ₽).
+    expect(card('quarter').classList.contains('active')).toBe(true);
+    expect(card('quarter').getAttribute('aria-pressed')).toBe('true');
+
+    // Клик по «Быстрая тренировка».
+    card('quick').click();
+    fixture.detectChanges();
+    expect(store.durationDays()).toBe(20);
+    expect(store.timeframe()).toBe('1d');
+    expect(store.regime()).toBe('medium');
+    expect(store.paperCount()).toBe(3);
+    expect(store.initialCapitalRub()).toBe(1_000_000);
+    expect(store.isBlind()).toBe(true);
+    expect(card('quick').classList.contains('active')).toBe(true);
+    expect(card('quarter').classList.contains('active')).toBe(false);
+    expect(root.querySelector('aside.summary-col')?.textContent ?? '').toContain('20 дн.');
+
+    // Клик по «Стресс-тест рынка».
+    card('stress').click();
+    fixture.detectChanges();
+    expect(store.durationDays()).toBe(60);
+    expect(store.timeframe()).toBe('1d');
+    expect(store.regime()).toBe('stress');
+    expect(store.paperCount()).toBe(3);
+    expect(store.initialCapitalRub()).toBe(1_000_000);
+    expect(store.isBlind()).toBe(true);
+    expect(card('stress').classList.contains('active')).toBe(true);
+    expect(root.querySelector('aside.summary-col')?.textContent ?? '').toContain('Стрессовый');
+
+    // Возврат к «Полноценному кварталу» из неслепого режима сбрасывает custom-бумаги.
+    await store.setStartMode('custom');
+    fixture.detectChanges();
+    expect(store.activePresetId()).toBeNull();
+    card('quarter').click();
+    fixture.detectChanges();
+    expect(store.isBlind()).toBe(true);
+    expect(store.selectedPaperIds()).toEqual([]);
+    expect(card('quarter').classList.contains('active')).toBe(true);
+  });
+
+  it('Progressive Disclosure: «Настроить вручную» раскрывается/сворачивается и авто-раскрывается при ошибке или custom', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    const toggle = root.querySelector<HTMLButtonElement>('#launch-advanced-toggle');
+    expect(toggle).not.toBeNull();
+    expect(toggle?.textContent ?? '').toContain('Настроить вручную');
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('#launch-advanced-panels')).toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('#launch-advanced-panels')).not.toBeNull();
+
+    toggle!.click();
+    fixture.detectChanges();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('#launch-advanced-panels')).toBeNull();
+
+    // Ошибка капитала автоматически раскрывает ручные настройки.
+    store.setInitialCapital(5_000);
+    fixture.detectChanges();
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('#launch-capital')).not.toBeNull();
   });
 
   it('переключение «своя дата → случайная» сбрасывает выбранные бумаги и блокирует пустую дату', async () => {
@@ -144,9 +243,15 @@ describe('LaunchPage', () => {
     fixture.detectChanges();
     const store = fixture.debugElement.injector.get(LaunchStore);
     const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    fixture.detectChanges();
 
     const input = root.querySelector<HTMLInputElement>('#launch-capital');
     expect(input).not.toBeNull();
+    const capitalLabel = root.querySelector('label[for="launch-capital"]');
+    expect(capitalLabel).not.toBeNull();
+    expect(capitalLabel?.closest('tui-textfield')).toBeNull();
+    expect(capitalLabel?.querySelector('tui-textfield')).not.toBeNull();
 
     const launchButton = (): HTMLButtonElement | undefined =>
       Array.from(root.querySelectorAll('button')).find((b) => b.textContent?.includes('Запустить'));
@@ -204,6 +309,8 @@ describe('LaunchPage', () => {
     fixture.detectChanges();
     const store = fixture.debugElement.injector.get(LaunchStore);
     const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    fixture.detectChanges();
 
     const button = (label: string): HTMLButtonElement => {
       const btn = Array.from(root.querySelectorAll('button')).find(
@@ -237,20 +344,24 @@ describe('LaunchPage', () => {
     expect(button('250 дн.').disabled).toBe(true);
     expect(launchBtn().disabled).toBe(false);
 
-    // Своя дата: лимит консервативен, ничего не выключаем — решает 422 TOO_MANY_BARS.
+    // Своя дата: лимит 5 000 свечей действует для всех ручных сессий (и RANDOM, и CUSTOM).
     await store.setStartMode('custom');
     fixture.detectChanges();
-    expect(button('60 дн.').disabled).toBe(false);
-    expect(button('1 мин').disabled).toBe(false);
+    expect(button('60 дн.').disabled).toBe(true);
+    expect(button('1 мин').disabled).toBe(true);
 
-    // Выбрана недопустимая пара при своей дате, затем возврат к случайной: запуск заблокирован.
+    // Недопустимая пара (программно): запуск заблокирован и в custom, и при возврате в random.
     store.setDuration(250);
     store.setTimeframe('1m');
-    await store.setStartMode('random');
     fixture.detectChanges();
     expect(store.pairExceedsLimit()).toBe(true);
     expect(launchBtn().disabled).toBe(true);
     expect(root.textContent ?? '').toContain('Выбранная пара шаг × длительность');
+
+    await store.setStartMode('random');
+    fixture.detectChanges();
+    expect(store.pairExceedsLimit()).toBe(true);
+    expect(launchBtn().disabled).toBe(true);
   });
 
   it('показывает кнопку «Повторить» при ошибке загрузки параметров', async () => {
@@ -270,6 +381,9 @@ describe('LaunchPage', () => {
 
     retryBtn!.click();
     await fixture.whenStable();
+    fixture.detectChanges();
+    expect(root.textContent ?? '').toContain('Быстрый старт');
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
     fixture.detectChanges();
     expect(root.textContent ?? '').toContain('Длительность в торговых днях');
   });
@@ -305,6 +419,9 @@ describe('LaunchPage', () => {
     expect(textAfterReject).toContain('Слишком много свечей');
     expect(textAfterReject).toContain('6 480');
     expect(navSpy).not.toHaveBeenCalled();
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('#launch-advanced-panels'),
+    ).not.toBeNull();
 
     vi.spyOn(stubApi, 'startSession').mockResolvedValueOnce({
       accepted: true,
@@ -384,6 +501,8 @@ describe('LaunchPage', () => {
     const store = fixture.debugElement.injector.get(LaunchStore);
     expect(root.textContent ?? '').not.toContain('Выбор алгоритма из каталога пока недоступен');
 
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    fixture.detectChanges();
     const select = root.querySelector<HTMLSelectElement>('#launch-background-algorithm');
     expect(select).not.toBeNull();
     expect(store.backgroundAlgorithmId()).toBeNull();
@@ -415,6 +534,8 @@ describe('LaunchPage', () => {
     const store = fixture.debugElement.injector.get(LaunchStore);
     expect(store.error()).toBeNull();
     expect(store.backgroundAlgorithmsError()).toBe(true);
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    fixture.detectChanges();
     expect(root.textContent ?? '').toContain(
       'Не удалось загрузить каталог алгоритмов — доступен эталон платформы по умолчанию.',
     );

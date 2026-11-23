@@ -65,6 +65,19 @@
   white-space: nowrap;
 }
 
+.tabular {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.id-badge {
+  padding: 0.0625rem 0.4rem;
+  border-radius: var(--tui-radius-s);
+  background: var(--tui-background-neutral-1);
+  border: 1px solid var(--tui-border-normal);
+  font-variant-numeric: tabular-nums;
+}
+
 .panel {
   background: var(--tui-background-base);
   border: 1px solid var(--tui-border-normal);
@@ -209,6 +222,54 @@
   .metrics-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.verdict-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+}
+
+.verdict-main {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+
+.verdict-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.verdict-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.verdict-sentence {
+  margin: 0;
+  font-weight: 600;
+}
+
+.verdict-note {
+  margin: 0;
+}
+
+.verdict-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .export-error {

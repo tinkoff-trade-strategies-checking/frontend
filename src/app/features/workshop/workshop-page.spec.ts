@@ -680,6 +680,136 @@ describe('WorkshopPage', () => {
 
     expect(el.querySelector('tr[data-algo-id="A-0002"]')).toBeNull();
   });
+
+  it('на вкладке «Мои алгоритмы» скрывает сортировку «По автору», а для черновика (latestVersion === 0) скрывает сравнение и «Скрыть»', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(WorkshopStore);
+
+    // В «Каталог сообщества» есть сортировка «По автору».
+    const sortButtonsCatalog = Array.from(el.querySelectorAll('tui-segmented button')).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(sortButtonsCatalog).toContain('По автору');
+
+    // Открываем чужой алгоритм и включаем «По автору», затем переключаемся на «Мои алгоритмы».
+    store.setSort('author_asc');
+    findRowButton(el, 'A-0003', 'Открыть')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('.detail-panel')).not.toBeNull();
+
+    const mineTab = Array.from(el.querySelectorAll('button[role="tab"]')).find(
+      (b) => b.textContent?.trim() === 'Мои алгоритмы',
+    ) as HTMLButtonElement | undefined;
+    mineTab?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const sortButtonsMine = Array.from(el.querySelectorAll('tui-segmented button')).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(sortButtonsMine).not.toContain('По автору');
+    expect(store.sort()).toBe('published_desc');
+    expect(el.querySelector('.detail-panel')).toBeNull();
+
+    // Создаём черновик (latestVersion === 0) и проверяем таблицу и карточку.
+    store.openCreateDraft();
+    fixture.detectChanges();
+    store.setDraftName('Новый черновик UI');
+    store.setDraftSource('rule x when close > open buy 10% market because "тест";');
+    await store.createDraft();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const draftId = store.draft()!.strategyId;
+    expect(findRowButton(el, draftId, '+ Сравнить')).toBeUndefined();
+
+    await store.selectAlgorithm(draftId);
+    fixture.detectChanges();
+    const detailBtns = Array.from(el.querySelectorAll('.detail-panel button')).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(detailBtns).not.toContain('Добавить в сравнение');
+    expect(detailBtns).not.toContain('Скрыть');
+    expect(detailBtns).not.toContain('Вернуть в каталог');
+  });
+
+  it('при пустой вкладке «Мои алгоритмы» показывает дружелюбный empty-state с кнопками создания и перехода в каталог', async () => {
+    const emptyMineApi = stubApi({
+      async list(query): Promise<WorkshopPageData> {
+        return {
+          items: query?.mineOnly
+            ? []
+            : [
+                {
+                  id: 'A-PUB',
+                  name: 'Public Algo',
+                  description: 'Desc',
+                  authorId: 'other',
+                  author: 'Автор',
+                  isMine: false,
+                  isSystem: false,
+                  visibility: 'public',
+                  latestVersion: 1,
+                  publishedAt: '2026-11-18T12:00:00+03:00',
+                  license: 'MIT',
+                  linterWarnings: [],
+                },
+              ],
+          authors: [{ id: 'other', name: 'Автор' }],
+          total: query?.mineOnly ? 0 : 1,
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+        };
+      },
+      async getById(): Promise<WorkshopDetailResult> {
+        return { status: 'NOT_FOUND' };
+      },
+    });
+
+    TestBed.overrideProvider(WORKSHOP_API, { useValue: emptyMineApi });
+
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(WorkshopStore);
+
+    store.setMineOnly(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const empty = el.querySelector('.empty-state-mine');
+    expect(empty?.textContent).toContain(
+      'Здесь хранятся все ваши черновики, копии и опубликованные алгоритмы',
+    );
+
+    const catalogBtn = Array.from(empty?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Открыть каталог сообщества',
+    ) as HTMLButtonElement | undefined;
+    catalogBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(store.mineOnly()).toBe(false);
+
+    store.setMineOnly(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const createBtn = Array.from(el.querySelectorAll('.empty-state-mine button')).find(
+      (b) => b.textContent?.trim() === 'Создать алгоритм',
+    ) as HTMLButtonElement | undefined;
+    createBtn?.click();
+    fixture.detectChanges();
+    expect(store.editorMode()).toBe('create');
+  });
 });
 
 describe('WorkshopStore race protection', () => {

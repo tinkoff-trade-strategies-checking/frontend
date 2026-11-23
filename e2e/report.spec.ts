@@ -8,7 +8,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(page.locator('.report-header').getByText('S-0103', { exact: true })).toBeVisible();
 
   // Открываем вкладку «Расхождения».
-  await page.getByRole('button', { name: 'Расхождения' }).click();
+  await page.getByRole('button', { name: 'Расхождения', exact: true }).click();
   await expect(page.locator('main')).toContainText('Расхождения обошлись вам в');
 
   const mainText = ((await page.locator('main').textContent()) ?? '').replace(/\u00a0/g, ' ');
@@ -32,7 +32,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(page.getByRole('button', { name: 'Написать правило' })).toBeEnabled();
 
   // Возвращаемся на «Расхождения» и переходим в воспроизведение на шаг расхождения (шаг 18 -> День 19).
-  await page.getByRole('button', { name: 'Расхождения' }).click();
+  await page.getByRole('button', { name: 'Расхождения', exact: true }).click();
   await page.getByRole('button', { name: /Лишнее действие/ }).click();
   await page.getByRole('link', { name: 'Посмотреть в воспроизведении' }).click();
 
@@ -60,7 +60,7 @@ test('report/S-NO-ALGO: поля null не роняют страницу', async
   ).toBeVisible();
   await expect(page.getByText('Сравнение с алгоритмом недоступно')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Расхождения' }).click();
+  await page.getByRole('button', { name: 'Расхождения', exact: true }).click();
   await expect(page.getByText('Разбор расхождений недоступен')).toBeVisible();
 
   await page.getByRole('button', { name: 'Обратная проверка' }).click();

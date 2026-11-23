@@ -1038,4 +1038,67 @@ describe('WorkshopStore', () => {
     expect(store.selectedId()).toBe('A-OTHER');
     expect(store.selectedDetail()?.id).toBe('A-OTHER');
   });
+
+  it('setMineOnly(true) сбрасывает sort author_asc на published_desc и закрывает открытую карточку чужого алгоритма', async () => {
+    const mine = { ...makeAlgo('A-MINE', 'My Algo'), isMine: true };
+    const alien = { ...makeAlgo('A-ALIEN', 'Alien Algo'), isMine: false };
+    const api = stubApi({
+      async list(): Promise<WorkshopPageData> {
+        return makePage([mine, alien]);
+      },
+      async getById(id: string): Promise<WorkshopDetailResult> {
+        return { status: 'READY', algorithm: id === 'A-MINE' ? mine : alien };
+      },
+    });
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    store.setSort('author_asc');
+    await store.selectAlgorithm('A-ALIEN');
+    expect(store.selectedId()).toBe('A-ALIEN');
+
+    store.setMineOnly(true);
+    expect(store.sort()).toBe('published_desc');
+    expect(store.selectedId()).toBeNull();
+    expect(store.selectedDetail()).toBeNull();
+
+    // Своя карточка при переходе в «Мои алгоритмы» остаётся открытой.
+    await store.setMineOnly(false);
+    await store.selectAlgorithm('A-MINE');
+    store.setMineOnly(true);
+    expect(store.selectedId()).toBe('A-MINE');
+  });
+
+  it('не добавляет неопубликованный черновик (latestVersion === 0) в сравнение и не меняет его видимость', async () => {
+    let visibilityCalls = 0;
+    const draft = { ...makeAlgo('A-DRAFT', 'Draft'), isMine: true, latestVersion: 0, versions: [] };
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([draft]);
+        },
+        async getById(): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: draft };
+        },
+      }),
+      async setVisibility() {
+        visibilityCalls++;
+        return draft;
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+
+    store.toggleCompare({ id: 'A-DRAFT', name: 'Draft', latestVersion: 0 });
+    expect(store.compareCount()).toBe(0);
+
+    await store.toggleVisibility(draft);
+    expect(visibilityCalls).toBe(0);
+  });
 });

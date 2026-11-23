@@ -14,6 +14,58 @@ export type MarketRegime = 'calm' | 'medium' | 'stress';
 
 export type StartMode = 'random' | 'custom';
 
+export type LaunchPresetId = 'quick' | 'quarter' | 'stress';
+
+export interface LaunchPreset {
+  readonly id: LaunchPresetId;
+  readonly title: string;
+  readonly badge?: string;
+  readonly specs: string;
+  readonly description: string;
+  readonly durationDays: SessionDurationDays;
+  readonly timeframe: CandleTimeframe;
+  readonly regime: MarketRegime;
+  readonly paperCount: number;
+  readonly initialCapitalRub: number;
+}
+
+export const LAUNCH_PRESETS: readonly LaunchPreset[] = [
+  {
+    id: 'quick',
+    title: 'Быстрая тренировка',
+    badge: 'Рекомендуем',
+    specs: '20 дн. · 1д · 3 случайные бумаги · средний рынок',
+    description: 'Короткий слепой заход, чтобы быстро освоить арену и увидеть разбор ошибок',
+    durationDays: 20,
+    timeframe: '1d',
+    regime: 'medium',
+    paperCount: 3,
+    initialCapitalRub: 1_000_000,
+  },
+  {
+    id: 'quarter',
+    title: 'Полноценный квартал',
+    specs: '60 дн. · 1д · 3 случайные бумаги · средний рынок',
+    description: 'Основной учебный горизонт: проверка дисциплины на разных фазах рынка',
+    durationDays: 60,
+    timeframe: '1d',
+    regime: 'medium',
+    paperCount: 3,
+    initialCapitalRub: 1_000_000,
+  },
+  {
+    id: 'stress',
+    title: 'Стресс-тест рынка',
+    specs: '60 дн. · 1д · 3 случайные бумаги · стрессовый период',
+    description: 'Период повышенной волатильности: испытание на просадку и стопы',
+    durationDays: 60,
+    timeframe: '1d',
+    regime: 'stress',
+    paperCount: 3,
+    initialCapitalRub: 1_000_000,
+  },
+];
+
 export type LaunchRejectReason =
   'NO_MATCHING_PERIOD' | 'TOO_MANY_BARS' | 'INVALID_PARAMS' | 'CORPORATE_ACTION_ON_PERIOD';
 

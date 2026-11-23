@@ -194,6 +194,23 @@ describe('ArenaStore', () => {
     expect(store.canStep()).toBe(false);
   });
 
+  it('при завершении сессии с длинным UUID не выводит полный 36-символьный UUID в уведомлении', async () => {
+    const stub = new StubArenaApi();
+    const { store } = setup(stub);
+    await store.init();
+    const uuid = '12345678-90ab-cdef-1234-567890abcdef';
+    vi.spyOn(stub, 'finishSession').mockResolvedValueOnce({
+      sessionId: uuid,
+      finishedAtDay: 12,
+      finishedAtStep: 12,
+      portfolio: store.portfolio(),
+    });
+
+    await store.finishSession();
+    expect(store.notice()).toContain('#12345678');
+    expect(store.notice()).not.toContain(uuid);
+  });
+
   it('INV-2: фиксирует seenStep синхронно в момент клика, даже если шаг уже в очереди', async () => {
     const stub = new StubArenaApi();
     const { store } = setup(stub);

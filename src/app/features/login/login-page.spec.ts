@@ -117,7 +117,7 @@ describe('LoginPage', () => {
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/new'));
   });
 
-  it('отображает бренд-шапку с заголовком и тремя преимуществами', async () => {
+  it('отображает бренд-шапку «Честная проверка стратегий» без сторонних названий и с тремя преимуществами', async () => {
     await setup(false);
     const fixture = TestBed.createComponent(LoginPage);
     fixture.detectChanges();
@@ -125,7 +125,12 @@ describe('LoginPage', () => {
     await fixture.whenStable();
 
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('h1')?.textContent).toContain('Тренажёр и лаборатория стратегий');
+    expect(root.querySelector('h1')?.textContent).toContain('Честная проверка стратегий');
+    expect(root.querySelector('.login-subtitle')?.textContent).toContain(
+      'Тренажёр ручной торговли и лаборатория алгоритмов на данных MOEX',
+    );
+    expect(root.querySelector('.login-logo rect')?.getAttribute('fill')).toBe('#2563EB');
+    expect(root.textContent).not.toMatch(/т-инвестиц|янтарн/i);
     const chips = Array.from(root.querySelectorAll('.login-chips li')).map((li) =>
       li.textContent?.trim(),
     );

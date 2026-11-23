@@ -19,39 +19,45 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
           <div class="metric-item">
             <span class="tui-text_body-xs muted">Стоимость портфеля</span>
             @let equityRub = portfolio().equityRub;
-            @if (equityRub !== undefined && equityRub !== null) {
-              <span class="tui-text_h5 num">{{ formatRub(equityRub) }}</span>
-              <span class="tui-text_body-xs muted num">{{ formatPct(portfolio().equityPct) }}</span>
-            } @else {
-              <span class="tui-text_h5 num">{{ formatPct(portfolio().equityPct) }}</span>
-            }
+            <div class="metric-values">
+              @if (equityRub !== undefined && equityRub !== null) {
+                <span class="tui-text_h5 num">{{ formatRub(equityRub) }}</span>
+                <span class="tui-text_body-xs muted num">{{
+                  formatPct(portfolio().equityPct)
+                }}</span>
+              } @else {
+                <span class="tui-text_h5 num">{{ formatPct(portfolio().equityPct) }}</span>
+              }
+            </div>
           </div>
           <div class="metric-item">
             <span class="tui-text_body-xs muted">P&amp;L</span>
-            @if (portfolio().pnlRub !== undefined) {
-              <span
-                class="tui-text_h5 num"
-                [class.pos]="portfolio().pnlPct > 0"
-                [class.neg]="portfolio().pnlPct < 0"
-              >
-                {{ formatRub(portfolio().pnlRub!, true) }}
-              </span>
-              <span
-                class="tui-text_body-xs num"
-                [class.pos]="portfolio().pnlPct > 0"
-                [class.neg]="portfolio().pnlPct < 0"
-              >
-                {{ formatPct(portfolio().pnlPct, true) }}
-              </span>
-            } @else {
-              <span
-                class="tui-text_h5 num"
-                [class.pos]="portfolio().pnlPct > 0"
-                [class.neg]="portfolio().pnlPct < 0"
-              >
-                {{ formatPct(portfolio().pnlPct, true) }}
-              </span>
-            }
+            <div class="metric-values">
+              @if (portfolio().pnlRub !== undefined) {
+                <span
+                  class="tui-text_h5 num"
+                  [class.pos]="portfolio().pnlPct > 0"
+                  [class.neg]="portfolio().pnlPct < 0"
+                >
+                  {{ formatRub(portfolio().pnlRub!, true) }}
+                </span>
+                <span
+                  class="tui-text_body-xs num"
+                  [class.pos]="portfolio().pnlPct > 0"
+                  [class.neg]="portfolio().pnlPct < 0"
+                >
+                  {{ formatPct(portfolio().pnlPct, true) }}
+                </span>
+              } @else {
+                <span
+                  class="tui-text_h5 num"
+                  [class.pos]="portfolio().pnlPct > 0"
+                  [class.neg]="portfolio().pnlPct < 0"
+                >
+                  {{ formatPct(portfolio().pnlPct, true) }}
+                </span>
+              }
+            </div>
           </div>
         </div>
 
@@ -155,11 +161,18 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
     .metric-item {
       display: flex;
       flex-direction: column;
-      gap: 0.15rem;
+      justify-content: space-between;
+      gap: 0.35rem;
       padding: 0.55rem 0.65rem;
       background: var(--tui-background-neutral-1);
       border-radius: var(--tui-radius-m);
       min-width: 0;
+    }
+
+    .metric-values {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
     }
 
     .kv {

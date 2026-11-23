@@ -64,17 +64,17 @@
   color: var(--tui-text-secondary);
 }
 
-.nav-link.active,
-.header .nav a.nav-link.active:active {
-  background: var(--ttsc-accent);
-  color: var(--ttsc-on-accent);
+.nav-link.active[tuiButton],
+.header .nav a.nav-link.active[tuiButton]:active {
+  background: var(--ttsc-nav-active-bg);
+  color: var(--ttsc-nav-active-color);
   font-weight: 600;
 }
 
-.header .nav a.nav-link.active:hover,
-.header .nav a.nav-link.active:focus-visible {
-  background: var(--ttsc-accent-hover);
-  color: var(--ttsc-on-accent);
+.header .nav a.nav-link.active[tuiButton]:hover,
+.header .nav a.nav-link.active[tuiButton]:focus-visible {
+  background: var(--ttsc-nav-active-bg-hover);
+  color: var(--ttsc-nav-active-color-hover);
 }
 
 .header-actions {

@@ -8,7 +8,10 @@ import { HISTORY_API } from '../history/data/history.models';
 import { StubHistoryApi } from '../history/data/stub-history.api';
 import { RUNS_API } from '../runs/data/runs.models';
 import { StubRunsApi } from '../runs/data/stub-runs.api';
-import { WorkshopCompareChart } from './components/workshop-compare-chart';
+import {
+  computeCompareLogicalRange,
+  WorkshopCompareChart,
+} from './components/workshop-compare-chart';
 import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API } from './data/workshop.models';
 import { WorkshopComparePage } from './workshop-compare-page';
@@ -213,5 +216,15 @@ describe('WorkshopCompareChart', () => {
     fixture.detectChanges();
     expect(legendBtns[0].getAttribute('aria-pressed')).toBe('false');
     expect(legendBtns[0].classList.contains('legend-hidden')).toBe(true);
+  });
+
+  it('оставляет достаточный левый логический отступ под метку «Шаг 0» для короткой и длинной серии (maxIndex ~ 300)', () => {
+    const shortRange = computeCompareLogicalRange(-0.5, 60.5);
+    expect(shortRange.from).toBeLessThanOrEqual(-12);
+    expect(shortRange.to).toBeGreaterThan(60.5);
+
+    const longRange = computeCompareLogicalRange(-0.5, 300.5);
+    expect(longRange.from).toBeLessThanOrEqual(-18);
+    expect(longRange.to).toBeGreaterThan(300.5);
   });
 });

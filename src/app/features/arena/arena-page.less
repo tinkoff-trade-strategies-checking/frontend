@@ -35,6 +35,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.guide-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .finish-banner {
   display: flex;
   align-items: center;
@@ -98,8 +106,13 @@
 
   &.active {
     background: var(--tui-background-neutral-1);
-    box-shadow: inset 0 -2px 0 var(--tui-text-action);
+    box-shadow: inset 0 -2px 0 var(--ttsc-accent, var(--tui-text-action));
   }
+}
+
+.indicator-active {
+  border-color: var(--ttsc-accent, var(--tui-border-hover));
+  color: var(--tui-text-primary);
 }
 
 .paper-top,

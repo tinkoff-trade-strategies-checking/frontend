@@ -110,7 +110,7 @@
             [activeItemIndex]="sortIndex(store.sort())"
             (activeItemIndexChange)="onSortIndexChange($event)"
           >
-            @for (opt of sortOptions; track opt.id) {
+            @for (opt of sortOptions(); track opt.id) {
               <button type="button">{{ opt.label }}</button>
             }
           </tui-segmented>
@@ -157,7 +157,8 @@
             tuiButton
             type="button"
             size="s"
-            [appearance]="store.cleanOnly() ? 'primary' : 'outline'"
+            [appearance]="store.cleanOnly() ? 'secondary' : 'outline'"
+            [class.btn-active]="store.cleanOnly()"
             [attr.aria-pressed]="store.cleanOnly()"
             (click)="store.toggleCleanOnly()"
           >
@@ -177,18 +178,47 @@
           </button>
         </div>
       } @else if (store.items().length === 0) {
-        <div class="empty-state">
-          <span class="tui-text_body-m muted">Алгоритмы под выбранные фильтры не найдены.</span>
-          <button
-            tuiButton
-            type="button"
-            size="s"
-            appearance="outline"
-            (click)="store.resetFilters()"
-          >
-            Сбросить фильтры
-          </button>
-        </div>
+        @if (store.mineOnly() && !store.search() && !store.cleanOnly()) {
+          <div class="empty-state empty-state-mine">
+            <strong class="tui-text_body-l">В разделе «Мои алгоритмы» пока пусто</strong>
+            <span class="tui-text_body-m muted">
+              Здесь хранятся все ваши черновики, копии и опубликованные алгоритмы
+            </span>
+            <div class="empty-actions">
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="primary"
+                (click)="store.openCreateDraft()"
+              >
+                Создать алгоритм
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                (click)="store.setMineOnly(false)"
+              >
+                Открыть каталог сообщества
+              </button>
+            </div>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span class="tui-text_body-m muted">Алгоритмы под выбранные фильтры не найдены.</span>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.resetFilters()"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        }
       } @else {
         <div class="table-scroll">
           <table class="workshop-table">
@@ -241,33 +271,37 @@
                   </td>
                   <td class="actions-col">
                     <div class="row-actions">
+                      @if (item.latestVersion > 0) {
+                        <button
+                          tuiButton
+                          type="button"
+                          size="xs"
+                          [appearance]="store.isInCompare(item.id) ? 'secondary' : 'outline'"
+                          [class.btn-active]="store.isInCompare(item.id)"
+                          [disabled]="!store.canAddToCompare(item.id)"
+                          [attr.aria-pressed]="store.isInCompare(item.id)"
+                          [title]="
+                            !store.canAddToCompare(item.id)
+                              ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
+                              : ''
+                          "
+                          (click)="
+                            store.toggleCompare({
+                              id: item.id,
+                              name: item.name,
+                              latestVersion: item.latestVersion,
+                            })
+                          "
+                        >
+                          {{ store.isInCompare(item.id) ? '✓ В сравнении' : '+ Сравнить' }}
+                        </button>
+                      }
                       <button
                         tuiButton
                         type="button"
                         size="xs"
-                        [appearance]="store.isInCompare(item.id) ? 'primary' : 'outline'"
-                        [disabled]="!store.canAddToCompare(item.id)"
-                        [attr.aria-pressed]="store.isInCompare(item.id)"
-                        [title]="
-                          !store.canAddToCompare(item.id)
-                            ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
-                            : ''
-                        "
-                        (click)="
-                          store.toggleCompare({
-                            id: item.id,
-                            name: item.name,
-                            latestVersion: item.latestVersion,
-                          })
-                        "
-                      >
-                        {{ store.isInCompare(item.id) ? '✓ В сравнении' : '+ Сравнить' }}
-                      </button>
-                      <button
-                        tuiButton
-                        type="button"
-                        size="xs"
-                        [appearance]="store.selectedId() === item.id ? 'primary' : 'outline'"
+                        [appearance]="store.selectedId() === item.id ? 'secondary' : 'outline'"
+                        [class.btn-active]="store.selectedId() === item.id"
                         (click)="store.selectAlgorithm(item.id)"
                       >
                         Открыть
@@ -374,27 +408,30 @@
             }
 
             <div class="detail-actions">
-              <button
-                tuiButton
-                type="button"
-                size="s"
-                [appearance]="store.isInCompare(algo.id) ? 'primary' : 'outline'"
-                [disabled]="!store.canAddToCompare(algo.id)"
-                [title]="
-                  !store.canAddToCompare(algo.id)
-                    ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
-                    : ''
-                "
-                (click)="
-                  store.toggleCompare({
-                    id: algo.id,
-                    name: algo.name,
-                    latestVersion: algo.latestVersion,
-                  })
-                "
-              >
-                {{ store.isInCompare(algo.id) ? 'Убрать из сравнения' : 'Добавить в сравнение' }}
-              </button>
+              @if (algo.latestVersion > 0) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  [appearance]="store.isInCompare(algo.id) ? 'secondary' : 'outline'"
+                  [class.btn-active]="store.isInCompare(algo.id)"
+                  [disabled]="!store.canAddToCompare(algo.id)"
+                  [title]="
+                    !store.canAddToCompare(algo.id)
+                      ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
+                      : ''
+                  "
+                  (click)="
+                    store.toggleCompare({
+                      id: algo.id,
+                      name: algo.name,
+                      latestVersion: algo.latestVersion,
+                    })
+                  "
+                >
+                  {{ store.isInCompare(algo.id) ? 'Убрать из сравнения' : 'Добавить в сравнение' }}
+                </button>
+              }
 
               <button
                 tuiButton
@@ -421,16 +458,18 @@
                   Редактировать черновик
                 </button>
 
-                <button
-                  tuiButton
-                  type="button"
-                  size="s"
-                  appearance="outline"
-                  [disabled]="store.visibilityPending()"
-                  (click)="store.toggleVisibility(algo)"
-                >
-                  {{ algo.visibility === 'public' ? 'Скрыть' : 'Вернуть в каталог' }}
-                </button>
+                @if (algo.latestVersion > 0) {
+                  <button
+                    tuiButton
+                    type="button"
+                    size="s"
+                    appearance="outline"
+                    [disabled]="store.visibilityPending()"
+                    (click)="store.toggleVisibility(algo)"
+                  >
+                    {{ algo.visibility === 'public' ? 'Скрыть' : 'Вернуть в каталог' }}
+                  </button>
+                }
 
                 <button
                   tuiButton

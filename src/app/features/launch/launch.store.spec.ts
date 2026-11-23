@@ -8,7 +8,7 @@ import {
   WorkshopApi,
   WorkshopPage,
 } from '../workshop/data/workshop.models';
-import { LAUNCH_API } from './data/launch.models';
+import { LAUNCH_API, LAUNCH_PRESETS } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
 import { LaunchStore, pickSafeArchiveDate } from './launch.store';
 
@@ -177,5 +177,54 @@ describe('LaunchStore: фоновый алгоритм', () => {
 
     // Суббота на archiveFrom при коротком окне сдвигается на понедельник.
     expect(pickSafeArchiveDate('2024-02-03', '2024-03-15', 60)).toBe('2024-02-05');
+  });
+
+  it('ограничение maxDurationDaysByTimeframe действует для всех ручных сессий (и random, и custom)', async () => {
+    const { store } = setup(() => Promise.resolve(makeWorkshopPage([])));
+    await store.init();
+
+    expect(store.isBlind()).toBe(true);
+    expect(store.isPairDisabled(60, '1m')).toBe(true);
+    expect(store.isPairDisabled(60, '5m')).toBe(true);
+    expect(store.isPairDisabled(60, '1d')).toBe(false);
+
+    await store.setStartMode('custom');
+    expect(store.isBlind()).toBe(false);
+    expect(store.isPairDisabled(60, '1m')).toBe(true);
+    expect(store.isPairDisabled(60, '5m')).toBe(true);
+    expect(store.isPairDisabled(60, '1d')).toBe(false);
+
+    store.setTimeframe('1m');
+    expect(store.pairExceedsLimit()).toBe(true);
+    expect(store.canSubmit()).toBe(false);
+    expect(store.submitError()).toContain('больше 5');
+  });
+
+  it('applyPreset устанавливает все параметры сценария, включает слепой режим и сбрасывает custom-бумаги', async () => {
+    const { store } = setup(() => Promise.resolve(makeWorkshopPage([])));
+    await store.init();
+
+    expect(store.activePresetId()).toBe('quarter');
+
+    await store.setStartMode('custom');
+    store.setInitialCapital(500_000);
+    expect(store.isBlind()).toBe(false);
+    expect(store.selectedPaperIds().length).toBeGreaterThan(0);
+    expect(store.activePresetId()).toBeNull();
+
+    store.applyPreset(LAUNCH_PRESETS[0]);
+    expect(store.activePresetId()).toBe('quick');
+    expect(store.isBlind()).toBe(true);
+    expect(store.durationDays()).toBe(20);
+    expect(store.timeframe()).toBe('1d');
+    expect(store.regime()).toBe('medium');
+    expect(store.paperCount()).toBe(3);
+    expect(store.initialCapitalRub()).toBe(1_000_000);
+    expect(store.selectedPaperIds()).toEqual([]);
+    expect(store.customPapers()).toEqual([]);
+
+    store.applyPreset(LAUNCH_PRESETS[2]);
+    expect(store.activePresetId()).toBe('stress');
+    expect(store.regime()).toBe('stress');
   });
 });

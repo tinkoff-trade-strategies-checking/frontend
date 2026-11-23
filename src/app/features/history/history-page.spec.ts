@@ -13,6 +13,7 @@ import {
 } from './data/history.models';
 import { StubHistoryApi } from './data/stub-history.api';
 import { HistoryPage } from './history-page';
+import { formatSignedPct, signedPctSign } from './history.format';
 import { HistoryStore } from './history.store';
 
 describe('HistoryPage', () => {
@@ -479,5 +480,98 @@ describe('HistoryPage: ошибка и утечки', () => {
     fixture.detectChanges();
 
     expect(el.textContent).toContain('Не удалось повторить прогон.');
+  });
+
+  it('для значений около нуля (|v| < 0.005) отображает 0,00 % нейтральным цветом без .pos и .neg', async () => {
+    expect(signedPctSign(null)).toBe(0);
+    expect(signedPctSign(0.003)).toBe(0);
+    expect(signedPctSign(-0.001)).toBe(0);
+    expect(signedPctSign(0.005)).toBe(1);
+    expect(signedPctSign(-0.005)).toBe(-1);
+    expect(formatSignedPct(0.003)).toBe('0,00 %');
+    expect(formatSignedPct(-0.001)).toBe('0,00 %');
+
+    const items: HistoryEntry[] = [
+      {
+        id: 'S-POS-TINY',
+        kind: 'session',
+        owner: 'USER',
+        blind: false,
+        status: 'completed',
+        createdAt: '2026-11-18T12:00:00+03:00',
+        regime: 'calm',
+        title: 'SBER · 01.02.2024 — 01.03.2024',
+        papers: ['SBER'],
+        periodLabel: '01.02.2024 — 01.03.2024',
+        netReturnPct: 0.003,
+        playedDays: 20,
+        totalDays: 20,
+        algoName: null,
+      },
+      {
+        id: 'S-NEG-TINY',
+        kind: 'session',
+        owner: 'USER',
+        blind: false,
+        status: 'completed',
+        createdAt: '2026-11-18T11:00:00+03:00',
+        regime: 'calm',
+        title: 'GAZP · 01.02.2024 — 01.03.2024',
+        papers: ['GAZP'],
+        periodLabel: '01.02.2024 — 01.03.2024',
+        netReturnPct: -0.001,
+        playedDays: 20,
+        totalDays: 20,
+        algoName: null,
+      },
+      {
+        id: 'S-POS-REAL',
+        kind: 'session',
+        owner: 'USER',
+        blind: false,
+        status: 'completed',
+        createdAt: '2026-11-18T10:00:00+03:00',
+        regime: 'calm',
+        title: 'YDEX · 01.02.2024 — 01.03.2024',
+        papers: ['YDEX'],
+        periodLabel: '01.02.2024 — 01.03.2024',
+        netReturnPct: 0.01,
+        playedDays: 20,
+        totalDays: 20,
+        algoName: null,
+      },
+    ];
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          {
+            provide: HISTORY_API,
+            useValue: { list: async () => ({ ...emptyPage(), items, total: items.length }) },
+          },
+          { provide: RUNS_API, useValue: new StubRunsApi() },
+          HistoryStore,
+        ],
+      },
+    });
+
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const posTinyCell = el.querySelector('tr[data-session-id="S-POS-TINY"] td:nth-child(6)');
+    const negTinyCell = el.querySelector('tr[data-session-id="S-NEG-TINY"] td:nth-child(6)');
+    const posRealCell = el.querySelector('tr[data-session-id="S-POS-REAL"] td:nth-child(6)');
+
+    expect(posTinyCell?.textContent?.trim()).toBe('0,00 %');
+    expect(posTinyCell?.classList.contains('pos')).toBe(false);
+    expect(posTinyCell?.classList.contains('neg')).toBe(false);
+
+    expect(negTinyCell?.textContent?.trim()).toBe('0,00 %');
+    expect(negTinyCell?.classList.contains('pos')).toBe(false);
+    expect(negTinyCell?.classList.contains('neg')).toBe(false);
+
+    expect(posRealCell?.classList.contains('pos')).toBe(true);
   });
 });

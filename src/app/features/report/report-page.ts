@@ -2,9 +2,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   inject,
   OnInit,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -76,6 +78,7 @@ export class ReportPage implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly exportService = inject(ReportExportService);
+  private readonly detailsTabsSection = viewChild<ElementRef<HTMLElement>>('detailsTabsSection');
 
   protected readonly stubMode = inject(STUB_MODE);
   protected readonly exporting = signal(false);
@@ -128,6 +131,11 @@ export class ReportPage implements OnInit {
     }
   }
 
+  /** Короткий бейдж идентификатора сессии, как на Арене и в Истории. */
+  protected shortSessionId(id: string): string {
+    return id.length <= 12 ? id : `#${id.slice(0, 8)}`;
+  }
+
   /** Заголовок как в истории: «бумаги · период»; идентификатор показывается рядом мелко. */
   protected reportTitle(rep: SessionReport): string {
     const tickers = rep.papers.map((p) => p.ticker).join(', ');
@@ -165,5 +173,30 @@ export class ReportPage implements OnInit {
 
   protected openWorkshop(): void {
     void this.router.navigate(['/workshop'], { queryParams: { create: '1' } });
+  }
+
+  protected verdictText(rep: SessionReport): string {
+    const cmp = rep.comparison;
+    if (!cmp) {
+      return 'Сравнение с фоновым алгоритмом недоступно — изучите метрики и сделки ниже.';
+    }
+    const algoName = rep.backgroundAlgorithmName ? ` «${rep.backgroundAlgorithmName}»` : '';
+    const net = cmp.netReturn;
+    if (net.winner === 'tie' || Math.abs(net.diffPctPoints) < 0.005) {
+      return `Ваш результат на уровне алгоритма${algoName}.`;
+    }
+    const diffPp = `${formatRatio(Math.abs(net.diffPctPoints))} п.п.`;
+    if (net.winner === 'human') {
+      return `Вы обогнали алгоритм${algoName} на ${diffPp}.`;
+    }
+    return `Алгоритм${algoName} оказался впереди на ${diffPp}.`;
+  }
+
+  protected goToDivergences(): void {
+    this.store.setTab('divergences');
+    this.detailsTabsSection()?.nativeElement.scrollIntoView?.({
+      behavior: 'smooth',
+      block: 'start',
+    });
   }
 }

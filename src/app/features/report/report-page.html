@@ -9,7 +9,9 @@
     @if (res.status === 'BUILDING') {
       <header class="report-header">
         <h1 class="tui-text_h3">Отчёт сессии</h1>
-        <span class="tui-text_body-xs muted">{{ res.sessionId }}</span>
+        <span class="id-badge tui-text_body-xs muted" [title]="res.sessionId">
+          {{ shortSessionId(res.sessionId) }}
+        </span>
       </header>
       <div tuiNotification appearance="info" size="s">
         <strong>Отчёт строится</strong>
@@ -80,7 +82,9 @@
         <div class="title-group">
           <h1 class="tui-text_h3">{{ reportTitle(rep) }}</h1>
           <div class="title-badges">
-            <span class="tui-text_body-xs muted" [title]="rep.sessionId">{{ rep.sessionId }}</span>
+            <span class="id-badge tui-text_body-xs muted" [title]="rep.sessionId">
+              {{ shortSessionId(rep.sessionId) }}
+            </span>
             <span tuiBadge size="s" [appearance]="rep.blind ? 'info' : 'neutral'">
               {{ rep.blind ? 'Слепая (раскрыта)' : 'Неслепая' }}
             </span>
@@ -154,6 +158,35 @@
           — исполнение пессимистичное: сначала стоп, сделка помечена.
         </div>
       }
+
+      <section class="panel verdict-hero" aria-label="Итог сессии">
+        <div class="verdict-main">
+          <div class="verdict-metric">
+            <span class="tui-text_body-xs muted">Ваш итог после издержек</span>
+            <strong
+              class="tui-text_h2 num"
+              [class.pos]="pctSign(rep.humanMetrics.netReturnPct) > 0"
+              [class.neg]="pctSign(rep.humanMetrics.netReturnPct) < 0"
+            >
+              {{ formatPct(rep.humanMetrics.netReturnPct, true) }}
+            </strong>
+          </div>
+          <div class="verdict-copy">
+            <p class="tui-text_body-l verdict-sentence">{{ verdictText(rep) }}</p>
+            @if (rep.playedDays <= 5) {
+              <p class="tui-text_body-xs muted verdict-note">
+                Короткий отрезок — для надёжной оценки пройдите больше дней.
+              </p>
+            }
+          </div>
+        </div>
+        <div class="verdict-actions">
+          <button tuiButton type="button" size="s" appearance="primary" (click)="goToDivergences()">
+            Разобрать расхождения
+          </button>
+          <a tuiButton size="s" appearance="outline" routerLink="/new">Новая сессия</a>
+        </div>
+      </section>
 
       <section class="panel">
         <div class="panel-header">
@@ -320,7 +353,7 @@
         </section>
       </div>
 
-      <section class="panel">
+      <section #detailsTabsSection class="panel">
         <div class="panel-header">
           <tui-segmented
             size="s"
@@ -567,25 +600,34 @@
                 <div tuiNotification appearance="info" size="s">
                   <div>
                     @if (summary.totalErrorCostRub >= 0.005) {
-                      Расхождения обошлись вам в
-                      <strong class="num neg">{{
-                        formatRubExact(summary.totalErrorCostRub)
-                      }}</strong>
-                      (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
-                      >)
+                      <span
+                        >Расхождения обошлись вам в
+                        <strong class="num neg">{{
+                          formatRubExact(summary.totalErrorCostRub)
+                        }}</strong>
+                        (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
+                        >)</span
+                      ><!--
+                    -->
                     } @else if (summary.totalErrorCostRub <= -0.005) {
-                      Расхождения сложились в вашу пользу (сэкономлено
-                      <strong class="num pos">{{
-                        formatRubExact(Math.abs(summary.totalErrorCostRub))
-                      }}</strong>,
-                      <strong class="num pos">{{
-                        formatPct(Math.abs(summary.totalErrorCostPct))
-                      }}</strong>)
+                      <span
+                        >Расхождения сложились в вашу пользу (сэкономлено
+                        <strong class="num pos">{{
+                          formatRubExact(Math.abs(summary.totalErrorCostRub))
+                        }}</strong>,
+                        <strong class="num pos">{{
+                          formatPct(Math.abs(summary.totalErrorCostPct))
+                        }}</strong>)</span
+                      ><!--
+                    -->
                     } @else {
-                      Расхождения не повлияли на итог (<strong class="num">{{
-                        formatRubExact(0)
-                      }}</strong
-                      >)
+                      <span
+                        >Расхождения не повлияли на итог (<strong class="num">{{
+                          formatRubExact(0)
+                        }}</strong
+                        >)</span
+                      ><!--
+                    -->
                     }
                     @if (
                       summary.worstType &&
@@ -593,20 +635,23 @@
                       summary.worstErrorCostRub !== null &&
                       summary.worstErrorCostRub > 0
                     ) {
-                      , самое дорогое —
-                      {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на дне
-                      {{ summary.worstDay }} (<strong class="num">{{
-                        formatRubExact(summary.worstErrorCostRub, true)
-                      }}</strong
-                      >)
+                      <span
+                        >, самое дорогое —
+                        {{ divergenceTypeLabel(summary.worstType).toLowerCase() }} на дне
+                        {{ summary.worstDay }} (<strong class="num">{{
+                          formatRubExact(summary.worstErrorCostRub, true)
+                        }}</strong
+                        >)</span
+                      >
                     }
-                    .
+                    <!--
+                    -->.
                   </div>
                   <div class="tui-text_body-xs muted">
-                    Цена ошибки = V_алгоритма − V_человека до следующего решения (горизонт e): &gt;
-                    0 — выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты,
-                    как правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные
-                    заявки и отмены в сравнении не участвуют.
+                    Цена ошибки = V_алгоритма − V_человека (до следующего решения): &gt; 0 —
+                    выгоднее было поступить как алгоритм, ≤ 0 — вы поступили не хуже. Горизонты, как
+                    правило, не пересекаются; сумма — ориентир, а не точный итог. Защитные заявки и
+                    отмены в сравнении не участвуют.
                   </div>
                 </div>
               }
@@ -665,7 +710,7 @@
                     <tbody>
                       @for (item of store.filteredDivergences(); track item.id) {
                         <tr>
-                          <td class="num">
+                          <td class="tabular">
                             <div>День {{ item.day }} ({{ item.dateLabel }})</div>
                             <div class="tui-text_body-xs muted">шаг {{ item.step }}</div>
                           </td>
