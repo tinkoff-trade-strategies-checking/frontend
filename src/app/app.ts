@@ -22,6 +22,7 @@ export class App {
 
   protected readonly user = this.auth.user;
   protected readonly stubMode = inject(STUB_MODE);
+  protected readonly showNav = computed(() => this.stubMode || this.user() !== null);
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(

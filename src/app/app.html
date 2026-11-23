@@ -1,20 +1,22 @@
 <tui-root>
   <header class="header">
     <span class="tui-text_body-l">Т-Инвестиции: тренажёр и лаборатория стратегий</span>
-    <nav class="nav">
-      @for (section of sections(); track section.title) {
-        <a
-          tuiButton
-          size="s"
-          appearance="flat"
-          [class.active]="isSectionActive(section.activePrefix)"
-          [attr.aria-current]="isSectionActive(section.activePrefix) ? 'page' : null"
-          [routerLink]="section.path"
-        >
-          {{ section.title }}
-        </a>
-      }
-    </nav>
+    @if (showNav()) {
+      <nav class="nav">
+        @for (section of sections(); track section.title) {
+          <a
+            tuiButton
+            size="s"
+            appearance="flat"
+            [class.active]="isSectionActive(section.activePrefix)"
+            [attr.aria-current]="isSectionActive(section.activePrefix) ? 'page' : null"
+            [routerLink]="section.path"
+          >
+            {{ section.title }}
+          </a>
+        }
+      </nav>
+    }
     @if (user(); as currentUser) {
       <div class="user">
         <span class="tui-text_body-s">{{ currentUser.email }}</span>
