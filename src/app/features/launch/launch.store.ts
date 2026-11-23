@@ -18,6 +18,87 @@ import { errorMessage } from '../../core/api-problem';
 import { isFeatureOpen } from '../../core/real-features';
 import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 
+const DEFAULT_CUSTOM_START_DATE = '2024-06-03';
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86_400_000;
+
+function toWeekdayMs(ms: number, minMs: number, maxMs: number): number {
+  const day = new Date(ms).getUTCDay();
+  let forwardShift: number;
+  let backwardShift: number;
+  if (day === 6) {
+    forwardShift = 2 * DAY_MS;
+    backwardShift = -1 * DAY_MS;
+  } else if (day === 0) {
+    forwardShift = 1 * DAY_MS;
+    backwardShift = -2 * DAY_MS;
+  } else {
+    return ms;
+  }
+  if (ms + forwardShift <= maxMs) {
+    return ms + forwardShift;
+  }
+  if (ms + backwardShift >= minMs) {
+    return ms + backwardShift;
+  }
+  return ms;
+}
+
+export function pickSafeArchiveDate(
+  archiveFrom?: string | null,
+  archiveTo?: string | null,
+  durationDays = 60,
+): string {
+  const from = archiveFrom && ISO_DATE_RE.test(archiveFrom) ? archiveFrom : null;
+  const to = archiveTo && ISO_DATE_RE.test(archiveTo) ? archiveTo : null;
+  const requiredReserveMs = Math.ceil(durationDays * 1.5) * DAY_MS;
+
+  if (from && to && from <= to) {
+    const fromMs = Date.parse(`${from}T00:00:00Z`);
+    const toMs = Date.parse(`${to}T00:00:00Z`);
+    const defaultMs = Date.parse(`${DEFAULT_CUSTOM_START_DATE}T00:00:00Z`);
+    if (
+      Number.isFinite(fromMs) &&
+      Number.isFinite(toMs) &&
+      Number.isFinite(defaultMs) &&
+      defaultMs >= fromMs &&
+      toMs - defaultMs >= requiredReserveMs
+    ) {
+      return DEFAULT_CUSTOM_START_DATE;
+    }
+    if (Number.isFinite(fromMs) && Number.isFinite(toMs)) {
+      const shiftedMs = fromMs + 30 * DAY_MS;
+      const candidateMs = toMs - shiftedMs >= requiredReserveMs ? shiftedMs : fromMs;
+      return new Date(toWeekdayMs(candidateMs, fromMs, toMs)).toISOString().slice(0, 10);
+    }
+    return from;
+  }
+  if (from) {
+    const fromMs = Date.parse(`${from}T00:00:00Z`);
+    if (DEFAULT_CUSTOM_START_DATE >= from) {
+      return DEFAULT_CUSTOM_START_DATE;
+    }
+    return Number.isFinite(fromMs)
+      ? new Date(toWeekdayMs(fromMs, fromMs, Number.POSITIVE_INFINITY)).toISOString().slice(0, 10)
+      : from;
+  }
+  if (to) {
+    const toMs = Date.parse(`${to}T00:00:00Z`);
+    const defaultMs = Date.parse(`${DEFAULT_CUSTOM_START_DATE}T00:00:00Z`);
+    if (Number.isFinite(toMs) && Number.isFinite(defaultMs)) {
+      if (toMs - defaultMs >= requiredReserveMs) {
+        return DEFAULT_CUSTOM_START_DATE;
+      }
+      const fallbackMs = toMs - requiredReserveMs;
+      return new Date(toWeekdayMs(fallbackMs, Number.NEGATIVE_INFINITY, toMs))
+        .toISOString()
+        .slice(0, 10);
+    }
+    return DEFAULT_CUSTOM_START_DATE <= to ? DEFAULT_CUSTOM_START_DATE : to;
+  }
+  return DEFAULT_CUSTOM_START_DATE;
+}
+
 @Injectable()
 export class LaunchStore {
   private readonly api = inject(LAUNCH_API);
@@ -27,6 +108,7 @@ export class LaunchStore {
   private readonly destroyRef = inject(DestroyRef);
   private customPapersLoadSeq = 0;
   private backgroundAlgorithmsLoadSeq = 0;
+  private customStartDateTouched = false;
   private destroyed = false;
 
   readonly loading = signal(false);
@@ -45,7 +127,7 @@ export class LaunchStore {
   readonly timeframe = signal<CandleTimeframe>('1d');
   readonly regime = signal<MarketRegime>('medium');
   readonly startMode = signal<StartMode>('random');
-  readonly customStartDate = signal('2020-02-26');
+  readonly customStartDate = signal(DEFAULT_CUSTOM_START_DATE);
   readonly paperCount = signal(3);
   readonly selectedPaperIds = signal<readonly string[]>([]);
   readonly initialCapitalRub = signal<number | null>(1_000_000);
@@ -177,6 +259,11 @@ export class LaunchStore {
       this.regime.set(opts.defaultRegime);
       this.initialCapitalRub.set(opts.defaultCapitalRub);
       this.paperCount.set(opts.defaultPaperCount);
+      if (!this.customStartDateTouched) {
+        this.customStartDate.set(
+          pickSafeArchiveDate(opts.archiveFrom, opts.archiveTo, opts.defaultDuration),
+        );
+      }
     } catch (error) {
       if (!this.destroyed) {
         this.error.set(errorMessage(error, 'Не удалось загрузить параметры запуска.'));
@@ -284,6 +371,7 @@ export class LaunchStore {
   }
 
   setCustomStartDate(date: string): void {
+    this.customStartDateTouched = true;
     this.customStartDate.set(date);
     this.rejection.set(null);
   }

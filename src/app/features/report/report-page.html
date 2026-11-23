@@ -79,20 +79,22 @@
       <header class="report-header">
         <div class="title-group">
           <h1 class="tui-text_h3">{{ reportTitle(rep) }}</h1>
-          <span class="tui-text_body-xs muted">{{ rep.sessionId }}</span>
-          <span tuiBadge size="s" [appearance]="rep.blind ? 'info' : 'neutral'">
-            {{ rep.blind ? 'Слепая (раскрыта)' : 'Неслепая' }}
-          </span>
-          <span tuiBadge size="s" appearance="neutral">{{ regimeLabels[rep.regime] }}</span>
-          <span tuiBadge size="s" appearance="neutral">{{ timeframeLabels[rep.timeframe] }}</span>
-          @if (rep.finishedEarly) {
-            <span tuiBadge size="s" appearance="warning">
-              Завершена досрочно: {{ rep.playedDays }} из {{ rep.totalDays }} дн.
+          <div class="title-badges">
+            <span class="tui-text_body-xs muted" [title]="rep.sessionId">{{ rep.sessionId }}</span>
+            <span tuiBadge size="s" [appearance]="rep.blind ? 'info' : 'neutral'">
+              {{ rep.blind ? 'Слепая (раскрыта)' : 'Неслепая' }}
             </span>
-          }
-          @if (rep.humanMetrics.bankrupt) {
-            <span tuiBadge size="s" appearance="negative">Банкротство</span>
-          }
+            <span tuiBadge size="s" appearance="neutral">{{ regimeLabels[rep.regime] }}</span>
+            <span tuiBadge size="s" appearance="neutral">{{ timeframeLabels[rep.timeframe] }}</span>
+            @if (rep.finishedEarly) {
+              <span tuiBadge size="s" appearance="warning">
+                Завершена досрочно: {{ rep.playedDays }} из {{ rep.totalDays }} дн.
+              </span>
+            }
+            @if (rep.humanMetrics.bankrupt) {
+              <span tuiBadge size="s" appearance="negative">Банкротство</span>
+            }
+          </div>
         </div>
 
         <div class="export-group">
@@ -210,8 +212,13 @@
                 </div>
               </div>
               <span tuiBadge size="s" appearance="neutral">
-                {{ winnerLabels[cmp.finalCapital.winner] }} ·
-                {{ cmp.finalCapital.diffLabel }}
+                {{
+                  formatComparisonBadge(
+                    cmp.finalCapital.winner,
+                    cmp.finalCapital.diffLabel,
+                    cmp.finalCapital.diffRub
+                  )
+                }}
               </span>
             </div>
 
@@ -222,8 +229,8 @@
                   <span class="tui-text_body-xs muted">Вы</span>
                   <div
                     class="tui-text_h5 num"
-                    [class.pos]="cmp.netReturn.humanPct > 0"
-                    [class.neg]="cmp.netReturn.humanPct < 0"
+                    [class.pos]="pctSign(cmp.netReturn.humanPct) > 0"
+                    [class.neg]="pctSign(cmp.netReturn.humanPct) < 0"
                   >
                     {{ formatPct(cmp.netReturn.humanPct, true) }}
                   </div>
@@ -232,16 +239,21 @@
                   <span class="tui-text_body-xs muted">Алгоритм</span>
                   <div
                     class="tui-text_h5 num"
-                    [class.pos]="cmp.netReturn.algoPct > 0"
-                    [class.neg]="cmp.netReturn.algoPct < 0"
+                    [class.pos]="pctSign(cmp.netReturn.algoPct) > 0"
+                    [class.neg]="pctSign(cmp.netReturn.algoPct) < 0"
                   >
                     {{ formatPct(cmp.netReturn.algoPct, true) }}
                   </div>
                 </div>
               </div>
               <span tuiBadge size="s" appearance="neutral">
-                {{ winnerLabels[cmp.netReturn.winner] }} ·
-                {{ cmp.netReturn.diffLabel }}
+                {{
+                  formatComparisonBadge(
+                    cmp.netReturn.winner,
+                    cmp.netReturn.diffLabel,
+                    cmp.netReturn.diffPctPoints
+                  )
+                }}
               </span>
             </div>
 
@@ -250,16 +262,28 @@
               <div class="cmp-values">
                 <div>
                   <span class="tui-text_body-xs muted">Вы</span>
-                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.humanPct) }}</div>
+                  <div
+                    class="tui-text_h5 num"
+                    [class.neg]="pctSign(cmp.maxDrawdown.humanPct) !== 0"
+                  >
+                    {{ formatDrawdown(cmp.maxDrawdown.humanPct) }}
+                  </div>
                 </div>
                 <div>
                   <span class="tui-text_body-xs muted">Алгоритм</span>
-                  <div class="tui-text_h5 num neg">−{{ formatPct(cmp.maxDrawdown.algoPct) }}</div>
+                  <div class="tui-text_h5 num" [class.neg]="pctSign(cmp.maxDrawdown.algoPct) !== 0">
+                    {{ formatDrawdown(cmp.maxDrawdown.algoPct) }}
+                  </div>
                 </div>
               </div>
               <span tuiBadge size="s" appearance="neutral">
-                {{ winnerLabels[cmp.maxDrawdown.winner] }} ·
-                {{ cmp.maxDrawdown.diffLabel }}
+                {{
+                  formatComparisonBadge(
+                    cmp.maxDrawdown.winner,
+                    cmp.maxDrawdown.diffLabel,
+                    cmp.maxDrawdown.diffPctPoints
+                  )
+                }}
               </span>
             </div>
           </div>
@@ -356,9 +380,13 @@
                   </tr>
                   <tr>
                     <td>Макс. просадка</td>
-                    <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
+                    <td class="num" [class.neg]="pctSign(hm.maxDrawdownPct) !== 0">
+                      {{ formatDrawdown(hm.maxDrawdownPct) }}
+                    </td>
                     @if (am) {
-                      <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
+                      <td class="num" [class.neg]="pctSign(am.maxDrawdownPct) !== 0">
+                        {{ formatDrawdown(am.maxDrawdownPct) }}
+                      </td>
                     }
                   </tr>
                   <tr>
@@ -390,27 +418,35 @@
                     }
                   </tr>
                   <tr>
-                    <td>Sharpe (rf = RUONIA)</td>
+                    <td>
+                      Sharpe (rf = RUONIA)
+                      @if (rep.playedDays < 10) {
+                        <span class="tui-text_body-xs muted">(малая выборка)</span>
+                      }
+                    </td>
                     <td class="num">{{ formatRatio(hm.sharpe) }}</td>
                     @if (am) {
                       <td class="num">{{ formatRatio(am.sharpe) }}</td>
                     }
                   </tr>
                   <tr>
-                    <td>Sortino (rf = RUONIA)</td>
+                    <td>
+                      Sortino (rf = RUONIA)
+                      @if (rep.playedDays < 10) {
+                        <span class="tui-text_body-xs muted">(малая выборка)</span>
+                      }
+                    </td>
                     <td class="num">{{ formatRatio(hm.sortino) }}</td>
                     @if (am) {
                       <td class="num">{{ formatRatio(am.sortino) }}</td>
                     }
                   </tr>
-                  <tr>
-                    <td>Бенчмарк IMOEX</td>
-                    <td class="num" [attr.colspan]="am ? 2 : 1">
-                      {{ formatPct(hm.benchmarkImoexPct, true) }}
-                    </td>
-                  </tr>
                 </tbody>
               </table>
+              <div class="benchmark-note tui-text_body-s">
+                <span>Бенчмарк IMOEX за период</span>
+                <strong class="num">{{ formatPct(hm.benchmarkImoexPct, true) }}</strong>
+              </div>
             </div>
 
             <div class="metrics-col">
@@ -530,19 +566,25 @@
               @if (summary) {
                 <div tuiNotification appearance="info" size="s">
                   <div>
-                    @if (summary.totalErrorCostRub > 0) {
+                    @if (summary.totalErrorCostRub >= 0.005) {
                       Расхождения обошлись вам в
                       <strong class="num neg">{{
                         formatRubExact(summary.totalErrorCostRub)
                       }}</strong>
                       (<strong class="num">{{ formatPct(summary.totalErrorCostPct) }}</strong
                       >)
-                    } @else {
-                      Расхождения сложились в вашу пользу на
+                    } @else if (summary.totalErrorCostRub <= -0.005) {
+                      Расхождения сложились в вашу пользу (сэкономлено
                       <strong class="num pos">{{
-                        formatRubExact(summary.totalErrorCostRub, true)
-                      }}</strong>
-                      (<strong class="num">{{ formatPct(summary.totalErrorCostPct, true) }}</strong
+                        formatRubExact(Math.abs(summary.totalErrorCostRub))
+                      }}</strong>,
+                      <strong class="num pos">{{
+                        formatPct(Math.abs(summary.totalErrorCostPct))
+                      }}</strong>)
+                    } @else {
+                      Расхождения не повлияли на итог (<strong class="num">{{
+                        formatRubExact(0)
+                      }}</strong
                       >)
                     }
                     @if (
@@ -615,8 +657,8 @@
                         <th>Вы</th>
                         <th>Алгоритм</th>
                         <th class="num">Цена ошибки</th>
-                        <th class="num col-horizon">Горизонт e</th>
-                        <th>Причина (because)</th>
+                        <th class="num col-horizon">Горизонт оценки</th>
+                        <th>Причина (правило алгоритма)</th>
                         <th></th>
                       </tr>
                     </thead>

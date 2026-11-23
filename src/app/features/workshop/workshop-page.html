@@ -79,6 +79,29 @@
 
   <div class="workshop-layout" [class.with-detail]="showSidePanel()">
     <section class="panel catalog-panel">
+      <div class="catalog-tabs" role="tablist" aria-label="Раздел мастерской">
+        <button
+          type="button"
+          role="tab"
+          class="catalog-tab"
+          [class.active]="!store.mineOnly()"
+          [attr.aria-selected]="!store.mineOnly()"
+          (click)="store.setMineOnly(false)"
+        >
+          Каталог сообщества
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="catalog-tab"
+          [class.active]="store.mineOnly()"
+          [attr.aria-selected]="store.mineOnly()"
+          (click)="store.setMineOnly(true)"
+        >
+          Мои алгоритмы
+        </button>
+      </div>
+
       <div class="filters-bar">
         <div class="filter-group">
           <span class="tui-text_body-xs muted">Сортировка</span>
@@ -93,24 +116,27 @@
           </tui-segmented>
         </div>
 
-        <div class="filter-group author-group">
-          <label tuiLabel for="workshop-author-filter">
-            Автор
-            <tui-textfield
-              tuiTextfieldSize="s"
-              [tuiTextfieldCleaner]="false"
-              [stringify]="authorStringify"
-            >
-              <select
-                id="workshop-author-filter"
-                tuiSelect
-                [items]="authorOptions()"
-                [ngModel]="store.authorId()"
-                (ngModelChange)="store.setAuthor($event ?? null)"
-              ></select>
-            </tui-textfield>
-          </label>
-        </div>
+        @if (!store.mineOnly()) {
+          <div class="filter-group author-group">
+            <label tuiLabel for="workshop-author-filter">
+              Автор
+              <tui-textfield
+                tuiChevron
+                tuiTextfieldSize="s"
+                [tuiTextfieldCleaner]="false"
+                [stringify]="authorStringify"
+              >
+                <select
+                  id="workshop-author-filter"
+                  tuiSelect
+                  [items]="authorOptions()"
+                  [ngModel]="store.authorId() ?? ''"
+                  (ngModelChange)="store.setAuthor($event ? $event : null)"
+                ></select>
+              </tui-textfield>
+            </label>
+          </div>
+        }
 
         <div class="filter-group search-group">
           <tui-textfield tuiTextfieldSize="s" [tuiTextfieldCleaner]="true" class="search-field">
@@ -127,16 +153,6 @@
         </div>
 
         <div class="filter-actions">
-          <button
-            tuiButton
-            type="button"
-            size="s"
-            [appearance]="store.mineOnly() ? 'primary' : 'outline'"
-            [attr.aria-pressed]="store.mineOnly()"
-            (click)="store.toggleMineOnly()"
-          >
-            Мои
-          </button>
           <button
             tuiButton
             type="button"
@@ -224,15 +240,39 @@
                     }
                   </td>
                   <td class="actions-col">
-                    <button
-                      tuiButton
-                      type="button"
-                      size="xs"
-                      [appearance]="store.selectedId() === item.id ? 'primary' : 'outline'"
-                      (click)="store.selectAlgorithm(item.id)"
-                    >
-                      Открыть
-                    </button>
+                    <div class="row-actions">
+                      <button
+                        tuiButton
+                        type="button"
+                        size="xs"
+                        [appearance]="store.isInCompare(item.id) ? 'primary' : 'outline'"
+                        [disabled]="!store.canAddToCompare(item.id)"
+                        [attr.aria-pressed]="store.isInCompare(item.id)"
+                        [title]="
+                          !store.canAddToCompare(item.id)
+                            ? 'Максимум ' + compareLimit + ' алгоритмов в сравнении'
+                            : ''
+                        "
+                        (click)="
+                          store.toggleCompare({
+                            id: item.id,
+                            name: item.name,
+                            latestVersion: item.latestVersion,
+                          })
+                        "
+                      >
+                        {{ store.isInCompare(item.id) ? '✓ В сравнении' : '+ Сравнить' }}
+                      </button>
+                      <button
+                        tuiButton
+                        type="button"
+                        size="xs"
+                        [appearance]="store.selectedId() === item.id ? 'primary' : 'outline'"
+                        (click)="store.selectAlgorithm(item.id)"
+                      >
+                        Открыть
+                      </button>
+                    </div>
                   </td>
                 </tr>
               }
@@ -391,6 +431,17 @@
                 >
                   {{ algo.visibility === 'public' ? 'Скрыть' : 'Вернуть в каталог' }}
                 </button>
+
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline-destructive"
+                  [disabled]="store.deleting()"
+                  (click)="store.requestDelete(algo.id)"
+                >
+                  Удалить
+                </button>
               }
 
               <button
@@ -410,12 +461,52 @@
               </button>
             </div>
 
+            @if (store.deleteConfirmId() === algo.id) {
+              <div
+                class="delete-confirm-box"
+                role="alertdialog"
+                aria-label="Подтверждение удаления"
+              >
+                <p class="tui-text_body-s">
+                  Удалить алгоритм из Мастерской? Прошлые прогоны и ссылки на опубликованные версии
+                  останутся доступными.
+                </p>
+                <div class="delete-confirm-actions">
+                  <button
+                    tuiButton
+                    type="button"
+                    size="xs"
+                    appearance="primary-destructive"
+                    [disabled]="store.deleting()"
+                    (click)="store.confirmDelete(algo.id)"
+                  >
+                    Удалить алгоритм
+                  </button>
+                  <button
+                    tuiButton
+                    type="button"
+                    size="xs"
+                    appearance="outline"
+                    [disabled]="store.deleting()"
+                    (click)="store.cancelDelete()"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            }
+
             @if (algo.latestVersion === 0) {
               <p class="tui-text_body-xs muted">
                 Черновик без опубликованной версии — для запуска прогона или форка сначала
                 опубликуйте версию.
               </p>
             }
+
+            <app-workshop-code-viewer
+              [versions]="algo.versions"
+              [latestVersion]="algo.latestVersion"
+            />
 
             <section class="detail-section">
               <div class="section-head">

@@ -239,6 +239,8 @@ import {
       border-bottom: 0;
     }
 
+    .arena-table th.num,
+    .arena-table td.num,
     .num {
       text-align: right;
       font-variant-numeric: tabular-nums;

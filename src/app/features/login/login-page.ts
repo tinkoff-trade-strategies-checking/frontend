@@ -17,66 +17,195 @@ export function safeReturnUrl(value: string | null): string {
   imports: [FormsModule, TuiButton, TuiIcon, TuiInput, TuiNotification, TuiPassword],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <section class="login-page">
-      <h1>Вход</h1>
-      @if (error(); as message) {
-        <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
-      }
-      <form (ngSubmit)="submit()" class="login-form">
-        <tui-textfield>
-          <label tuiLabel for="login-email">Почта</label>
-          <input
-            id="login-email"
-            tuiInput
-            type="email"
-            name="email"
-            autocomplete="username"
-            maxlength="254"
-            required
-            [ngModel]="email()"
-            (ngModelChange)="email.set($event ?? '')"
+    <section class="login-shell">
+      <div class="login-hero">
+        <svg
+          class="login-logo"
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 64 64"
+          fill="none"
+          aria-hidden="true"
+        >
+          <rect
+            x="4"
+            y="4"
+            width="56"
+            height="56"
+            rx="16"
+            fill="#1A1D24"
+            stroke="#2E3442"
+            stroke-width="2"
           />
-        </tui-textfield>
-        <tui-textfield>
-          <label tuiLabel for="login-password">Пароль</label>
-          <input
-            id="login-password"
-            tuiInput
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            required
-            [ngModel]="password()"
-            (ngModelChange)="password.set($event ?? '')"
-            (keydown.enter)="onEnter($event)"
+          <path d="M18 17H46" stroke="#FFDD2D" stroke-width="4" stroke-linecap="round" />
+          <path d="M32 17V48" stroke="#FFDD2D" stroke-width="3" stroke-linecap="round" />
+          <rect x="17" y="29" width="6" height="14" rx="2" fill="#E6ECF5" />
+          <path d="M20 24V29M20 43V47" stroke="#E6ECF5" stroke-width="2" stroke-linecap="round" />
+          <rect
+            x="41"
+            y="26"
+            width="6"
+            height="15"
+            rx="2"
+            stroke="#FFDD2D"
+            stroke-width="2"
+            stroke-dasharray="3 2.5"
+            opacity="0.55"
           />
-          <tui-icon tuiPassword />
-        </tui-textfield>
-        <button tuiButton type="submit" appearance="primary" [disabled]="submitting()">
-          Войти
-        </button>
-      </form>
+          <circle cx="32" cy="17" r="3.5" fill="#FFDD2D" />
+        </svg>
+        <span class="login-eyebrow">Т-Инвестиции · Янтарный Тик</span>
+        <h1>Тренажёр и лаборатория стратегий</h1>
+        <ul class="login-chips" aria-label="Преимущества тренажёра">
+          <li>Без заглядывания в будущее</li>
+          <li>Реальные комиссии и ликвидность MOEX</li>
+          <li>Разбор ошибок по шагам</li>
+        </ul>
+      </div>
+
+      <div class="login-card panel">
+        <div class="login-card-header">
+          <h2>Вход</h2>
+          <p>Введите почту и пароль, чтобы продолжить работу с сессиями и алгоритмами.</p>
+        </div>
+        @if (error(); as message) {
+          <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+        }
+        <form (ngSubmit)="submit()" class="login-form">
+          <tui-textfield>
+            <label tuiLabel for="login-email">Почта</label>
+            <input
+              id="login-email"
+              tuiInput
+              type="email"
+              name="email"
+              autocomplete="username"
+              maxlength="254"
+              required
+              [ngModel]="email()"
+              (ngModelChange)="email.set($event ?? '')"
+            />
+          </tui-textfield>
+          <tui-textfield>
+            <label tuiLabel for="login-password">Пароль</label>
+            <input
+              id="login-password"
+              tuiInput
+              type="password"
+              name="password"
+              autocomplete="current-password"
+              required
+              [ngModel]="password()"
+              (ngModelChange)="password.set($event ?? '')"
+              (keydown.enter)="onEnter($event)"
+            />
+            <tui-icon tuiPassword />
+          </tui-textfield>
+          <button
+            tuiButton
+            type="submit"
+            appearance="primary"
+            class="login-submit"
+            [disabled]="submitting()"
+          >
+            Войти
+          </button>
+        </form>
+      </div>
     </section>
   `,
   styles: `
-    .login-page {
+    .login-shell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.75rem;
+      max-width: 34rem;
+      margin: 2.5rem auto;
+      padding: 0 1rem;
+    }
+
+    .login-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0.75rem;
+    }
+
+    .login-logo {
+      width: 3.5rem;
+      height: 3.5rem;
+      display: block;
+    }
+
+    .login-eyebrow {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--tui-text-action);
+    }
+
+    .login-hero h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      line-height: 1.2;
+      font-weight: 700;
+      color: var(--tui-text-primary);
+    }
+
+    .login-chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      list-style: none;
+      margin: 0.25rem 0 0;
+      padding: 0;
+    }
+
+    .login-chips li {
+      padding: 0.375rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: var(--ttsc-surface-alt);
+      border: 1px solid var(--ttsc-border);
+      color: var(--tui-text-secondary);
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 25rem;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
-      max-width: 24rem;
-      margin: 4rem auto;
-      padding: 2rem;
-      border-radius: var(--tui-radius-l);
-      background: var(--tui-background-elevation-1);
-      border: 1px solid var(--tui-border-normal);
+      padding: 1.75rem;
     }
-    .login-page h1 {
+
+    .login-card-header h2 {
       margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--tui-text-primary);
     }
+
+    .login-card-header p {
+      margin: 0.375rem 0 0;
+      font-size: 0.875rem;
+      color: var(--tui-text-secondary);
+    }
+
     .login-form {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+
+    .login-submit {
+      width: 100%;
+      font-weight: 600;
     }
   `,
 })

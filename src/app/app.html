@@ -1,13 +1,54 @@
-<tui-root>
+<tui-root [attr.tuiTheme]="theme()">
   <header class="header">
-    <span class="tui-text_body-l">Т-Инвестиции: тренажёр и лаборатория стратегий</span>
+    <div class="brand">
+      <svg
+        class="brand-logo"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 64 64"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect
+          x="4"
+          y="4"
+          width="56"
+          height="56"
+          rx="16"
+          fill="#1A1D24"
+          stroke="#2E3442"
+          stroke-width="2"
+        />
+        <path d="M18 17H46" stroke="#FFDD2D" stroke-width="4" stroke-linecap="round" />
+        <path d="M32 17V48" stroke="#FFDD2D" stroke-width="3" stroke-linecap="round" />
+        <rect x="17" y="29" width="6" height="14" rx="2" fill="#E6ECF5" />
+        <path d="M20 24V29M20 43V47" stroke="#E6ECF5" stroke-width="2" stroke-linecap="round" />
+        <rect
+          x="41"
+          y="26"
+          width="6"
+          height="15"
+          rx="2"
+          stroke="#FFDD2D"
+          stroke-width="2"
+          stroke-dasharray="3 2.5"
+          opacity="0.55"
+        />
+        <circle cx="32" cy="17" r="3.5" fill="#FFDD2D" />
+      </svg>
+      <div class="brand-text">
+        <span class="brand-title">Т-Инвестиции</span>
+        <span class="brand-badge">Честная проверка</span>
+      </div>
+    </div>
+
     @if (showNav()) {
-      <nav class="nav">
+      <nav class="nav" aria-label="Основная навигация">
         @for (section of sections(); track section.title) {
           <a
             tuiButton
             size="s"
             appearance="flat"
+            class="nav-link"
             [class.active]="isSectionActive(section.activePrefix)"
             [attr.aria-current]="isSectionActive(section.activePrefix) ? 'page' : null"
             [routerLink]="section.path"
@@ -17,15 +58,35 @@
         }
       </nav>
     }
-    @if (user(); as currentUser) {
-      <div class="user">
-        <span class="tui-text_body-s">{{ currentUser.email }}</span>
-        <button tuiButton type="button" size="s" appearance="outline" (click)="logout()">
-          Выйти
-        </button>
-      </div>
-    }
+
+    <div class="header-actions">
+      <button
+        id="theme-toggle"
+        tuiButton
+        type="button"
+        size="s"
+        appearance="outline"
+        class="theme-toggle"
+        [attr.aria-label]="
+          theme() === 'dark' ? 'Переключить на светлую тему' : 'Переключить на тёмную тему'
+        "
+        (click)="toggleTheme()"
+      >
+        <tui-icon [icon]="theme() === 'dark' ? '@tui.sun' : '@tui.moon'" />
+        <span>{{ theme() === 'dark' ? 'Светлая' : 'Тёмная' }}</span>
+      </button>
+
+      @if (user(); as currentUser) {
+        <div class="user">
+          <span class="user-email tui-text_body-s">{{ currentUser.email }}</span>
+          <button tuiButton type="button" size="s" appearance="outline" (click)="logout()">
+            Выйти
+          </button>
+        </div>
+      }
+    </div>
   </header>
+
   <main class="content">
     <router-outlet />
   </main>

@@ -1176,6 +1176,18 @@ export class StubWorkshopApi implements WorkshopApi {
     return toSummary(updated);
   }
 
+  async deleteAlgorithm(id: string): Promise<void> {
+    const algo = this.requireOwned(id);
+    if (algo.isSystem) {
+      throw problemError(403, 'FORBIDDEN', 'Системный алгоритм нельзя удалить.');
+    }
+    const idx = this.algorithms.findIndex((item) => item.id === id);
+    if (idx !== -1) {
+      this.algorithms.splice(idx, 1);
+    }
+    this.drafts.delete(id);
+  }
+
   private requireOwned(id: string): WorkshopAlgorithmDetail {
     const algo = this.algorithms.find((item) => item.id === id);
     if (!algo || !isVisibleToViewer(algo)) {

@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import { TuiChevron, TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { formatPct, formatPrice, formatRejectReason } from '../arena.format';
 import { OrderDraft } from '../arena.store';
 import {
@@ -51,6 +51,7 @@ function round2(value: number): number {
     TuiButton,
     TuiNotification,
     TuiTextfield,
+    TuiChevron,
     TuiSelect,
     TuiInputNumber,
     TuiSegmented,
@@ -67,7 +68,12 @@ function round2(value: number): number {
       <div class="ticket-body">
         <label tuiLabel for="arena-paper">
           Бумага
-          <tui-textfield tuiTextfieldSize="s" [stringify]="paperStringify">
+          <tui-textfield
+            tuiChevron
+            tuiTextfieldSize="s"
+            [tuiTextfieldCleaner]="false"
+            [stringify]="paperStringify"
+          >
             <select
               id="arena-paper"
               tuiSelect
@@ -81,17 +87,25 @@ function round2(value: number): number {
 
         <tui-segmented
           size="s"
+          class="side-segmented"
           [activeItemIndex]="side() === 'buy' ? 0 : 1"
           [disabled]="Boolean(editingOrder())"
           (activeItemIndexChange)="onSideIndexChange($event)"
         >
-          <button type="button" [disabled]="isSellOnly()">Купить</button>
-          <button type="button">Продать</button>
+          <button type="button" class="side-btn side-btn-buy" [disabled]="isSellOnly()">
+            Купить
+          </button>
+          <button type="button" class="side-btn side-btn-sell">Продать</button>
         </tui-segmented>
 
         <label tuiLabel for="arena-order-type">
           Тип заявки
-          <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
+          <tui-textfield
+            tuiChevron
+            tuiTextfieldSize="s"
+            [tuiTextfieldCleaner]="false"
+            [stringify]="orderTypeStringify"
+          >
             <select
               id="arena-order-type"
               tuiSelect
@@ -287,6 +301,8 @@ function round2(value: number): number {
             size="m"
             appearance="primary"
             class="submit-btn"
+            [class.submit-buy]="side() === 'buy'"
+            [class.submit-sell]="side() === 'sell'"
             [disabled]="finished() || Boolean(validationError())"
             (click)="onSubmit()"
           >
@@ -354,6 +370,28 @@ function round2(value: number): number {
 
     .submit-btn {
       flex: 1;
+    }
+
+    .submit-buy {
+      --tui-background-accent-1: var(--tui-text-positive);
+      --tui-background-accent-1-hover: var(--tui-text-positive);
+      --tui-background-accent-1-pressed: var(--tui-text-positive);
+    }
+
+    .submit-sell {
+      --tui-background-accent-1: var(--tui-text-negative);
+      --tui-background-accent-1-hover: var(--tui-text-negative);
+      --tui-background-accent-1-pressed: var(--tui-text-negative);
+    }
+
+    .side-btn-buy {
+      color: var(--tui-text-positive);
+      font-weight: 600;
+    }
+
+    .side-btn-sell {
+      color: var(--tui-text-negative);
+      font-weight: 600;
     }
   `,
 })

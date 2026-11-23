@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
-import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { TuiBadge } from '@taiga-ui/kit';
+import { HistoryFilters } from './components/history-filters';
 import { errorMessage } from '../../core/api-problem';
 import {
   HISTORY_API,
@@ -50,7 +51,7 @@ const REGIME_FILTERS: readonly { readonly id: HistoryRegimeFilter; readonly labe
 
 @Component({
   selector: 'app-history-page',
-  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiSegmented],
+  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, HistoryFilters],
   providers: [
     { provide: HISTORY_API, useClass: HISTORY_API_IMPL },
     { provide: RUNS_API, useClass: RUNS_API_IMPL },
@@ -82,39 +83,12 @@ export class HistoryPage implements OnInit {
   protected readonly periodOf = historyPeriod;
   protected readonly netReturnOf = historyNetReturn;
 
+  protected shortEntryId(id: string): string {
+    return id.length <= 12 ? id : `#${id.slice(0, 8)}`;
+  }
+
   ngOnInit(): void {
     void this.store.load();
-  }
-
-  protected filterIndex<T extends string>(
-    options: readonly { readonly id: T }[],
-    current: T,
-  ): number {
-    return Math.max(
-      0,
-      options.findIndex((item) => item.id === current),
-    );
-  }
-
-  protected onKindIndexChange(index: number): void {
-    const next = this.kindFilters[index];
-    if (next) {
-      this.store.setKind(next.id);
-    }
-  }
-
-  protected onStatusIndexChange(index: number): void {
-    const next = this.statusFilters[index];
-    if (next) {
-      this.store.setStatus(next.id);
-    }
-  }
-
-  protected onRegimeIndexChange(index: number): void {
-    const next = this.regimeFilters[index];
-    if (next) {
-      this.store.setRegime(next.id);
-    }
   }
 
   protected statusAppearance(

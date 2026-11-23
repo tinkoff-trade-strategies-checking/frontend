@@ -57,6 +57,13 @@ export class ArenaPage implements OnInit {
   protected readonly formatPct = formatPct;
   protected readonly formatPrice = formatPrice;
 
+  protected shortSessionId(id: string | null): string {
+    if (!id) {
+      return '';
+    }
+    return id.length <= 12 ? id : `#${id.slice(0, 8)}`;
+  }
+
   protected readonly selectedPaperOrders = computed(() => {
     const id = this.store.selectedPaperId();
     return this.store.activeOrders().filter((o) => o.paperId === id);

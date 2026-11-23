@@ -184,4 +184,22 @@ describe('App', () => {
     expect(root.querySelector('.user')?.textContent).toContain('a@b.c');
     expect(root.querySelector('.user button')?.textContent).toContain('Выйти');
   });
+
+  it('переключает тему через кнопку #theme-toggle и обновляет атрибут tuiTheme', () => {
+    localStorage.clear();
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const tuiRoot = root.querySelector('tui-root');
+    const toggleBtn = root.querySelector<HTMLButtonElement>('#theme-toggle');
+
+    expect(tuiRoot?.getAttribute('tuiTheme')).toBe('dark');
+    expect(toggleBtn?.textContent).toContain('Светлая');
+
+    toggleBtn?.click();
+    fixture.detectChanges();
+
+    expect(tuiRoot?.getAttribute('tuiTheme')).toBe('light');
+    expect(toggleBtn?.textContent).toContain('Тёмная');
+  });
 });

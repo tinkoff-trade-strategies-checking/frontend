@@ -2,17 +2,90 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
   padding: 0.75rem 1.5rem;
-  border-bottom: 1px solid var(--tui-border-normal);
+  background: var(--ttsc-surface);
+  border-bottom: 1px solid var(--ttsc-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  display: block;
+}
+
+.brand-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.brand-title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--tui-text-primary);
+}
+
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--ttsc-surface-alt);
+  border: 1px solid var(--ttsc-border);
+  color: var(--tui-text-secondary);
 }
 
 .nav {
   display: flex;
-  gap: 0.5rem;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--ttsc-surface-alt);
+  border: 1px solid var(--ttsc-border);
 }
 
-.active {
-  background: var(--tui-background-neutral-1);
+.nav-link {
+  border-radius: 999px;
+  color: var(--tui-text-secondary);
+}
+
+.nav-link.active,
+.header .nav a.nav-link.active:active {
+  background: var(--ttsc-accent);
+  color: var(--ttsc-on-accent);
+  font-weight: 600;
+}
+
+.header .nav a.nav-link.active:hover,
+.header .nav a.nav-link.active:focus-visible {
+  background: var(--ttsc-accent-hover);
+  color: var(--ttsc-on-accent);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.theme-toggle {
+  gap: 0.375rem;
 }
 
 .content {
@@ -23,4 +96,8 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+.user-email {
+  color: var(--tui-text-secondary);
 }

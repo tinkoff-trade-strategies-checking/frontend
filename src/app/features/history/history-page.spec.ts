@@ -152,6 +152,53 @@ describe('HistoryPage', () => {
     await vi.waitFor(() => expect(navSpy).toHaveBeenCalled());
     expect(navSpy).toHaveBeenCalledWith(['/runs', expect.stringMatching(/^R-\d{4}$/)]);
   });
+
+  it('переключает фильтры «Статус» и «Период» (и обратно в «Все») через HistoryFilters', async () => {
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const statusSelect = el.querySelector(
+      'select[aria-label="Статус"]',
+    ) as HTMLSelectElement | null;
+    const regimeSelect = el.querySelector(
+      'select[aria-label="Период"]',
+    ) as HTMLSelectElement | null;
+    expect(statusSelect).not.toBeNull();
+    expect(regimeSelect).not.toBeNull();
+
+    const selectByText = (select: HTMLSelectElement, label: string): void => {
+      const idx = Array.from(select.options).findIndex((o) => o.textContent?.trim() === label);
+      expect(idx).toBeGreaterThanOrEqual(0);
+      select.selectedIndex = idx;
+      select.dispatchEvent(new Event('change'));
+    };
+
+    selectByText(statusSelect!, 'Идёт');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('tr[data-session-id="S-0104"]')).not.toBeNull();
+    expect(el.querySelector('tr[data-session-id="S-0103"]')).toBeNull();
+
+    selectByText(statusSelect!, 'Все');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('tr[data-session-id="S-0103"]')).not.toBeNull();
+
+    selectByText(regimeSelect!, 'Стрессовый');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const stressRows = Array.from(el.querySelectorAll('tbody tr'));
+    expect(stressRows.length).toBeGreaterThan(0);
+    expect(stressRows.every((r) => r.textContent?.includes('Стрессовый'))).toBe(true);
+
+    selectByText(regimeSelect!, 'Все периоды');
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('tbody tr').length).toBe(20);
+  });
 });
 
 describe('HistoryStore', () => {
@@ -299,11 +346,11 @@ describe('HistoryStore: фильтры, ошибки, пагинация', () =>
 });
 
 describe('HistoryPage: ошибка и утечки', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    TestBed.configureTestingModule({
       imports: [HistoryPage],
       providers: [provideRouter([]), provideTaiga()],
-    }).compileComponents();
+    });
   });
 
   it('INV-7: «утекающая» запись не попадает на страницу', async () => {
@@ -421,7 +468,7 @@ describe('HistoryPage: ошибка и утечки', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Невалидный');
+    expect(el.textContent).toContain('С ошибкой DSL');
     expect(el.textContent).toContain('Ошибка');
 
     const repeatBtn = Array.from(

@@ -131,7 +131,12 @@
                 <button type="button">{{ regimeLabels[item] }}</button>
               }
             </tui-segmented>
-            <p class="tui-text_body-s muted hint">{{ regimeHints[store.regime()] }}</p>
+            <p class="tui-text_body-s muted hint">
+              {{ regimeHints[store.regime()] }}
+              @if (!store.isBlind()) {
+                · Должен совпадать с категорией выбранного отрезка.
+              }
+            </p>
           </div>
         </section>
 
@@ -171,6 +176,12 @@
                   </tui-textfield>
                 </label>
               </div>
+              @if (opts.archiveFrom && opts.archiveTo) {
+                <p class="tui-text_body-xs muted hint">
+                  Доступный архив: {{ formatDisplayDate(opts.archiveFrom) }} —
+                  {{ formatDisplayDate(opts.archiveTo) }}
+                </p>
+              }
               <div tuiNotification appearance="info" size="s">
                 Неслепая сессия: период и тикеры бумаг видны сразу и на арене, и в отчёте.
               </div>
@@ -276,6 +287,7 @@
               <label tuiLabel for="launch-background-algorithm" class="field-label">
                 Фоновый алгоритм сравнения
                 <tui-textfield
+                  tuiChevron
                   tuiTextfieldSize="s"
                   [tuiTextfieldCleaner]="false"
                   [stringify]="backgroundAlgorithmStringify"
@@ -284,8 +296,8 @@
                     id="launch-background-algorithm"
                     tuiSelect
                     [items]="backgroundAlgorithmOptions()"
-                    [ngModel]="store.backgroundAlgorithmId()"
-                    (ngModelChange)="store.setBackgroundAlgorithm($event ?? null)"
+                    [ngModel]="store.backgroundAlgorithmId() ?? ''"
+                    (ngModelChange)="store.setBackgroundAlgorithm($event ? $event : null)"
                   ></select>
                 </tui-textfield>
               </label>

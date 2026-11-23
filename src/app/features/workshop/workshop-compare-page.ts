@@ -159,6 +159,39 @@ export class WorkshopComparePage implements OnInit {
     return item.report.papers.map((p) => p.ticker).join(', ') || '—';
   }
 
+  protected shortRunId(runId: string): string {
+    const clean = runId.trim();
+    if (!clean) {
+      return '';
+    }
+    if (/^[0-9a-f]{8}-/i.test(clean)) {
+      return clean.slice(0, 8);
+    }
+    return clean.length > 12 ? clean.slice(0, 8) : clean;
+  }
+
+  protected returnTone(
+    key: CompareMetricKey | 'tradesCount',
+    item: Extract<ComparedWorkshopItem, { status: 'ready' }>,
+  ): 'positive' | 'negative' | null {
+    const metrics = item.report.metrics;
+    if (!metrics) {
+      return null;
+    }
+    let val: number | null = null;
+    if (key === 'netReturnPct') {
+      val = metrics.netReturnPct;
+    } else if (key === 'grossReturnPct') {
+      val = metrics.grossReturnPct;
+    } else if (key === 'cagrPct') {
+      val = metrics.cagrPct;
+    }
+    if (val === null || !Number.isFinite(val) || Math.abs(val) < 1e-9) {
+      return null;
+    }
+    return val > 0 ? 'positive' : 'negative';
+  }
+
   protected statusAppearance(
     status: RunStatus,
   ): 'neutral' | 'info' | 'positive' | 'warning' | 'negative' {

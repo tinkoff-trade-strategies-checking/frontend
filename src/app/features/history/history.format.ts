@@ -16,7 +16,7 @@ export const HISTORY_STATUS_LABELS: Readonly<Record<HistoryItemStatus, string>> 
   completed: 'Завершена',
   finished_early: 'Досрочно',
   bankrupt: 'Банкротство',
-  invalid: 'Невалидный',
+  invalid: 'С ошибкой DSL',
   failed: 'Ошибка',
 };
 
@@ -54,14 +54,15 @@ export function formatSignedPct(value: number | null): string {
   if (value === null) {
     return '—';
   }
-  const formatted = Math.abs(value).toLocaleString('ru-RU', {
+  const normalized = Math.abs(value) < 0.005 ? 0 : value;
+  const formatted = Math.abs(normalized).toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  if (value > 0) {
+  if (normalized > 0) {
     return `+${formatted} %`;
   }
-  if (value < 0) {
+  if (normalized < 0) {
     return `−${formatted} %`;
   }
   return `${formatted} %`;

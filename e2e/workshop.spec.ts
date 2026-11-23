@@ -50,7 +50,7 @@ test('фильтры, карточка алгоритма, неизменяем�
   await expect(detail).toHaveCount(0);
 
   await page.getByLabel('Поиск по названию и описанию').fill('');
-  await page.getByRole('button', { name: 'Мои' }).click();
+  await page.getByRole('tab', { name: 'Мои алгоритмы' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(4);
 
   await page.getByRole('button', { name: 'Без предупреждений линтера' }).click();

@@ -473,4 +473,88 @@ describe('ReportPage', () => {
     expect(text).toContain('SBER');
     expect(text).toContain('+3 900,00 ₽');
   });
+
+  it('показывает (малая выборка) при playedDays < 10, нулевую просадку без «−» и корректные ветки totalErrorCostRub', async () => {
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY' || !base.report.divergenceSummary || !base.report.comparison) {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        playedDays: 5,
+        humanMetrics: { ...base.report.humanMetrics, maxDrawdownPct: 0 },
+        comparison: {
+          ...base.report.comparison,
+          maxDrawdown: {
+            humanPct: 0,
+            algoPct: 0,
+            winner: 'tie',
+            diffPctPoints: 0,
+            diffLabel: 'Просадки равны',
+          },
+        },
+        divergenceSummary: {
+          ...base.report.divergenceSummary,
+          totalErrorCostRub: -125.5,
+          totalErrorCostPct: -1.25,
+          worstType: null,
+          worstDay: null,
+          worstErrorCostRub: null,
+        },
+      },
+    });
+
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const metricsText = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(metricsText).toContain('(малая выборка)');
+    expect(metricsText).not.toContain('−0,00 %');
+    const ddCard = Array.from(root.querySelectorAll('.cmp-card')).find((c) =>
+      c.textContent?.includes('Максимальная просадка'),
+    );
+    expect(ddCard?.querySelector('.neg')).toBeNull();
+    expect(ddCard?.textContent).toContain('На уровне алгоритма');
+
+    store.setTab('divergences');
+    fixture.detectChanges();
+    const divText = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(divText).toContain('Расхождения сложились в вашу пользу (сэкономлено 125,50 ₽, 1,25 %)');
+
+    // Граничное значение |totalErrorCostRub| < 0.005 — нейтральная формулировка без «сэкономлено 0,00 ₽» и .neg.
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        divergenceSummary: {
+          ...base.report.divergenceSummary,
+          totalErrorCostRub: 0.002,
+          totalErrorCostPct: 0.001,
+          worstType: null,
+          worstDay: null,
+          worstErrorCostRub: null,
+        },
+      },
+    });
+    const zeroFixture = TestBed.createComponent(ReportPage);
+    const zeroStore = zeroFixture.debugElement.injector.get(ReportStore);
+    zeroFixture.detectChanges();
+    await zeroFixture.whenStable();
+    zeroStore.setTab('divergences');
+    zeroFixture.detectChanges();
+    const zeroText = ((zeroFixture.nativeElement as HTMLElement).textContent ?? '').replace(
+      /\u00a0/g,
+      ' ',
+    );
+    expect(zeroText).toContain('Расхождения не повлияли на итог (0,00 ₽)');
+    expect(zeroText).not.toContain('сэкономлено 0,00 ₽');
+    expect(zeroText).not.toContain('обошлись вам в 0,00 ₽');
+  });
 });

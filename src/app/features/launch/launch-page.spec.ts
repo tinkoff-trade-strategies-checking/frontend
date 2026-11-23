@@ -81,7 +81,10 @@ describe('LaunchPage', () => {
     fixture.detectChanges();
     expect(store.selectedPaperIds().length).toBe(3);
     expect(store.customPapers().length).toBe(5);
-    expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('26.02.2020');
+    const customText = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(customText).toContain('03.06.2024');
+    expect(customText).toContain('Доступный архив: 03.01.2020 — 31.12.2025');
+    expect(customText).toContain('Должен совпадать с категорией выбранного отрезка');
 
     // Пустая дата блокирует кнопку запуска и показывает подсказку.
     store.setCustomStartDate('');

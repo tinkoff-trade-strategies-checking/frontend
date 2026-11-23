@@ -26,60 +26,20 @@
   }
 
   <section class="panel">
-    <div class="filters-bar">
-      <div class="filter-group">
-        <span class="tui-text_body-xs muted">Тип</span>
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="filterIndex(kindFilters, store.kind())"
-          (activeItemIndexChange)="onKindIndexChange($event)"
-        >
-          @for (opt of kindFilters; track opt.id) {
-            <button type="button">{{ opt.label }}</button>
-          }
-        </tui-segmented>
-      </div>
-
-      <div class="filter-group">
-        <span class="tui-text_body-xs muted">Статус</span>
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="filterIndex(statusFilters, store.status())"
-          (activeItemIndexChange)="onStatusIndexChange($event)"
-        >
-          @for (opt of statusFilters; track opt.id) {
-            <button type="button">{{ opt.label }}</button>
-          }
-        </tui-segmented>
-      </div>
-
-      <div class="filter-group">
-        <span class="tui-text_body-xs muted">Период</span>
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="filterIndex(regimeFilters, store.regime())"
-          (activeItemIndexChange)="onRegimeIndexChange($event)"
-        >
-          @for (opt of regimeFilters; track opt.id) {
-            <button type="button">{{ opt.label }}</button>
-          }
-        </tui-segmented>
-      </div>
-
-      <div class="filter-actions">
-        <button
-          tuiButton
-          type="button"
-          size="s"
-          [appearance]="store.blindOnly() ? 'primary' : 'outline'"
-          [attr.aria-pressed]="store.blindOnly()"
-          (click)="store.toggleBlindOnly()"
-        >
-          Только слепые
-        </button>
-        <span class="tui-text_body-s muted count-label">Всего: {{ store.total() }}</span>
-      </div>
-    </div>
+    <app-history-filters
+      [kindFilters]="kindFilters"
+      [statusFilters]="statusFilters"
+      [regimeFilters]="regimeFilters"
+      [kind]="store.kind()"
+      [status]="store.status()"
+      [regime]="store.regime()"
+      [blindOnly]="store.blindOnly()"
+      [total]="store.total()"
+      (kindChange)="store.setKind($event)"
+      (statusChange)="store.setStatus($event)"
+      (regimeChange)="store.setRegime($event)"
+      (blindToggle)="store.toggleBlindOnly()"
+    />
 
     @if (store.loading() && store.items().length === 0) {
       <div class="empty-state tui-text_body-m muted">Загрузка истории…</div>
@@ -118,7 +78,9 @@
                   <div class="title-cell">
                     <div class="title-top">
                       <strong>{{ formatTitle(item) }}</strong>
-                      <span class="tui-text_body-xs muted">{{ item.id }}</span>
+                      <span class="id-badge tui-text_body-xs muted" [title]="item.id">
+                        {{ shortEntryId(item.id) }}
+                      </span>
                       @if (!item.blind) {
                         <span tuiBadge size="s" appearance="warning">Неслепая</span>
                       }
@@ -183,7 +145,7 @@
                         tuiButton
                         type="button"
                         size="xs"
-                        appearance="flat"
+                        appearance="outline"
                         [disabled]="repeatingId() !== null"
                         (click)="repeatRun(item.id)"
                       >
@@ -198,7 +160,12 @@
                       >
                         Открыть отчёт
                       </a>
-                      <a tuiButton size="xs" appearance="flat" [routerLink]="['/replay', item.id]">
+                      <a
+                        tuiButton
+                        size="xs"
+                        appearance="outline"
+                        [routerLink]="['/replay', item.id]"
+                      >
                         Воспроизвести
                       </a>
                     }
