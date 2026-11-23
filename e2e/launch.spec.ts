@@ -5,6 +5,7 @@ test('launch: своё значение начального капитала п
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await page.locator('#launch-advanced-toggle').click();
 
   const capital = page.getByLabel('Своё значение, ₽');
   await expect(capital).toBeVisible();
@@ -35,6 +36,7 @@ test('launch: выбор фонового алгоритма из каталог
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await page.locator('#launch-advanced-toggle').click();
 
   const summary = page.locator('aside.summary-col');
   await expect(summary).toContainText('Эталон платформы');

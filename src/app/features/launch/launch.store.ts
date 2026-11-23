@@ -3,8 +3,11 @@ import { Router } from '@angular/router';
 import {
   CandleTimeframe,
   LAUNCH_API,
+  LAUNCH_PRESETS,
   LaunchCustomPaper,
   LaunchOptions,
+  LaunchPreset,
+  LaunchPresetId,
   MarketRegime,
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
@@ -182,7 +185,7 @@ export class LaunchStore {
     return this.backgroundAlgorithms().find((item) => item.id === id) ?? null;
   });
 
-  /** Выбранная пара «шаг × длительность» всегда превышает лимит свечей (только для случайной даты). */
+  /** Выбранная пара «шаг × длительность» всегда превышает лимит свечей. */
   readonly pairExceedsLimit = computed(() =>
     this.isPairDisabled(this.durationDays(), this.timeframe()),
   );
@@ -211,6 +214,25 @@ export class LaunchStore {
     return null;
   });
 
+  readonly submitError = computed<string | null>(
+    () => this.rejection()?.title ?? this.submitBlockHint(),
+  );
+
+  readonly activePresetId = computed<LaunchPresetId | null>(() => {
+    if (!this.isBlind()) {
+      return null;
+    }
+    const match = LAUNCH_PRESETS.find(
+      (preset) =>
+        preset.durationDays === this.durationDays() &&
+        preset.timeframe === this.timeframe() &&
+        preset.regime === this.regime() &&
+        preset.paperCount === this.paperCount() &&
+        preset.initialCapitalRub === this.initialCapitalRub(),
+    );
+    return match?.id ?? null;
+  });
+
   readonly canSubmit = computed(() => {
     const opts = this.options();
     if (!opts) {
@@ -230,11 +252,11 @@ export class LaunchStore {
 
   /**
    * Пара «длительность × шаг» выключена, если длительность больше `maxDurationDaysByTimeframe` шага.
-   * Для своей даты не выключаем: лимит там консервативен, решает 422 TOO_MANY_BARS (backend#23).
+   * Лимит 5 000 свечей в LaunchPlanner действует для всех ручных сессий (и случайной, и своей даты).
    */
   isPairDisabled(days: SessionDurationDays, timeframe: CandleTimeframe): boolean {
     const opts = this.options();
-    if (!opts || !this.isBlind()) {
+    if (!opts) {
       return false;
     }
     const maxDays = opts.maxDurationDaysByTimeframe[timeframe];
@@ -319,6 +341,25 @@ export class LaunchStore {
     if (!this.isBlind() && this.customPapers().length === 0) {
       await this.setStartMode('custom');
     }
+  }
+
+  applyPreset(
+    preset: Pick<
+      LaunchPreset,
+      'durationDays' | 'timeframe' | 'regime' | 'paperCount' | 'initialCapitalRub'
+    >,
+  ): void {
+    this.customPapersLoadSeq++;
+    this.loadingCustomPapers.set(false);
+    this.startMode.set('random');
+    this.selectedPaperIds.set([]);
+    this.customPapers.set([]);
+    this.durationDays.set(preset.durationDays);
+    this.timeframe.set(preset.timeframe);
+    this.regime.set(preset.regime);
+    this.paperCount.set(preset.paperCount);
+    this.initialCapitalRub.set(preset.initialCapitalRub);
+    this.rejection.set(null);
   }
 
   setDuration(days: SessionDurationDays): void {

@@ -7,7 +7,7 @@
 @import '@fontsource/jetbrains-mono/600.css';
 @import '@fontsource/jetbrains-mono/700.css';
 
-/* Дизайн-система «Янтарный Тик» (60 / 30 / 10) */
+/* Дизайн-система «Честная проверка» — спокойный кобальт (60 / 30 / 10) */
 :root {
   --ttsc-font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
   --ttsc-font-mono: 'JetBrains Mono', monospace;
@@ -19,53 +19,71 @@
 [tuiTheme='dark'] {
   color-scheme: dark;
 
-  --ttsc-bg: #0f1115;
-  --ttsc-surface: #1a1d24;
-  --ttsc-surface-alt: #232732;
-  --ttsc-border: #2e3442;
-  --ttsc-accent: #ffdd2d;
-  --ttsc-accent-hover: #f5ce00;
-  --ttsc-on-accent: #111318;
-  --ttsc-text: #f1f5f9;
+  --ttsc-bg: #0e1117;
+  --ttsc-surface: #161b22;
+  --ttsc-surface-alt: #1e242e;
+  --ttsc-border: #2b3340;
+  --ttsc-accent: #3b82f6;
+  --ttsc-accent-hover: #2563eb;
+  --ttsc-on-accent: #ffffff;
+  --ttsc-text: #e2e8f0;
   --ttsc-text-muted: #94a3b8;
   --ttsc-text-subtle: #64748b;
   --ttsc-positive: #10b981;
-  --ttsc-negative: #f43f5e;
+  --ttsc-negative: #ef4444;
   --ttsc-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 
-  --tui-background-base: #0f1115;
-  --tui-background-base-alt: #161920;
-  --tui-background-elevation-1: #1a1d24;
-  --tui-background-elevation-2: #232732;
-  --tui-background-elevation-3: #2b303d;
-  --tui-background-neutral-1: rgba(255, 255, 255, 0.06);
-  --tui-background-neutral-1-hover: rgba(255, 255, 255, 0.12);
-  --tui-background-neutral-1-pressed: rgba(255, 255, 255, 0.18);
-  --tui-background-neutral-2: rgba(255, 255, 255, 0.12);
-  --tui-background-neutral-2-hover: rgba(255, 255, 255, 0.18);
-  --tui-background-neutral-2-pressed: rgba(255, 255, 255, 0.24);
-  --tui-border-normal: #2e3442;
-  --tui-border-hover: #475569;
-  --tui-border-focus: #ffdd2d;
+  --ttsc-nav-active-bg: rgba(59, 130, 246, 0.16);
+  --ttsc-nav-active-bg-hover: rgba(59, 130, 246, 0.24);
+  --ttsc-nav-active-color: #93c5fd;
+  --ttsc-nav-active-color-hover: #bfdbfe;
+  --ttsc-accent-soft: rgba(59, 130, 246, 0.16);
+  --ttsc-accent-text: #93c5fd;
+  --ttsc-code-number: #a5b4fc;
+  --ttsc-buy-bg: #059669;
+  --ttsc-buy-bg-hover: #047857;
+  --ttsc-sell-bg: #dc2626;
+  --ttsc-sell-bg-hover: #b91c1c;
 
-  --tui-text-primary: #f1f5f9;
+  --ttsc-btn-text: #cbd5e1;
+  --ttsc-btn-text-hover: #f1f5f9;
+  --ttsc-btn-border: #2b3340;
+  --ttsc-btn-secondary-bg: #1e242e;
+  --ttsc-btn-hover-bg: #262e3b;
+
+  --tui-background-base: #0e1117;
+  --tui-background-base-alt: #161b22;
+  --tui-background-elevation-1: #161b22;
+  --tui-background-elevation-2: #1e242e;
+  --tui-background-elevation-3: #262e3b;
+  --tui-background-neutral-1: rgba(226, 232, 240, 0.06);
+  --tui-background-neutral-1-hover: rgba(226, 232, 240, 0.11);
+  --tui-background-neutral-1-pressed: rgba(226, 232, 240, 0.16);
+  --tui-background-neutral-2: rgba(226, 232, 240, 0.11);
+  --tui-background-neutral-2-hover: rgba(226, 232, 240, 0.16);
+  --tui-background-neutral-2-pressed: rgba(226, 232, 240, 0.22);
+  --tui-border-normal: #2b3340;
+  --tui-border-hover: #475569;
+  --tui-border-focus: #3b82f6;
+
+  --tui-text-primary: #e2e8f0;
   --tui-text-secondary: #94a3b8;
   --tui-text-tertiary: #64748b;
-  --tui-background-accent-1: #ffdd2d;
-  --tui-background-accent-1-hover: #f5ce00;
-  --tui-background-accent-1-pressed: #e0ba00;
-  --tui-text-primary-on-accent-1: #111318;
-  --tui-text-action: #ffdd2d;
-  --tui-text-action-hover: #f5ce00;
+  --tui-background-accent-1: #3b82f6;
+  --tui-background-accent-1-hover: #2563eb;
+  --tui-background-accent-1-pressed: #1d4ed8;
+  --tui-text-primary-on-accent-1: #ffffff;
+  --tui-text-action: #3b82f6;
+  --tui-text-action-hover: #60a5fa;
 
   --tui-text-positive: #10b981;
   --tui-text-positive-hover: #34d399;
   --tui-status-positive: #10b981;
   --tui-status-positive-pale: rgba(16, 185, 129, 0.16);
-  --tui-text-negative: #f43f5e;
-  --tui-text-negative-hover: #fb7185;
-  --tui-status-negative: #f43f5e;
-  --tui-status-negative-pale: rgba(244, 63, 94, 0.16);
+  --tui-text-negative: #ef4444;
+  --tui-text-negative-hover: #f87171;
+  --tui-status-negative: #ef4444;
+  --tui-status-negative-pale: rgba(239, 68, 68, 0.16);
 }
 
 :root[data-theme='light'],
@@ -76,15 +94,33 @@
   --ttsc-surface: #ffffff;
   --ttsc-surface-alt: #eef2f7;
   --ttsc-border: #dce3ee;
-  --ttsc-accent: #ffdd2d;
-  --ttsc-accent-hover: #f5ce00;
-  --ttsc-on-accent: #111318;
+  --ttsc-accent: #2563eb;
+  --ttsc-accent-hover: #1d4ed8;
+  --ttsc-on-accent: #ffffff;
   --ttsc-text: #0f172a;
   --ttsc-text-muted: #475569;
   --ttsc-text-subtle: #64748b;
   --ttsc-positive: #059669;
-  --ttsc-negative: #e11d48;
+  --ttsc-negative: #dc2626;
   --ttsc-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+
+  --ttsc-nav-active-bg: rgba(37, 99, 235, 0.1);
+  --ttsc-nav-active-bg-hover: rgba(37, 99, 235, 0.16);
+  --ttsc-nav-active-color: #1d4ed8;
+  --ttsc-nav-active-color-hover: #1e40af;
+  --ttsc-accent-soft: rgba(37, 99, 235, 0.1);
+  --ttsc-accent-text: #1d4ed8;
+  --ttsc-code-number: #4338ca;
+  --ttsc-buy-bg: #059669;
+  --ttsc-buy-bg-hover: #047857;
+  --ttsc-sell-bg: #dc2626;
+  --ttsc-sell-bg-hover: #b91c1c;
+
+  --ttsc-btn-text: #334155;
+  --ttsc-btn-text-hover: #0f172a;
+  --ttsc-btn-border: #cbd5e1;
+  --ttsc-btn-secondary-bg: #ffffff;
+  --ttsc-btn-hover-bg: #f1f5f9;
 
   --tui-background-base: #f4f6fa;
   --tui-background-base-alt: #eef2f7;
@@ -99,26 +135,26 @@
   --tui-background-neutral-2-pressed: rgba(15, 23, 42, 0.18);
   --tui-border-normal: #dce3ee;
   --tui-border-hover: #94a3b8;
-  --tui-border-focus: #8a5b00;
+  --tui-border-focus: #2563eb;
 
   --tui-text-primary: #0f172a;
   --tui-text-secondary: #475569;
   --tui-text-tertiary: #64748b;
-  --tui-background-accent-1: #ffdd2d;
-  --tui-background-accent-1-hover: #f5ce00;
-  --tui-background-accent-1-pressed: #e0ba00;
-  --tui-text-primary-on-accent-1: #111318;
-  --tui-text-action: #8a5b00;
-  --tui-text-action-hover: #734b00;
+  --tui-background-accent-1: #2563eb;
+  --tui-background-accent-1-hover: #1d4ed8;
+  --tui-background-accent-1-pressed: #1e40af;
+  --tui-text-primary-on-accent-1: #ffffff;
+  --tui-text-action: #2563eb;
+  --tui-text-action-hover: #1d4ed8;
 
   --tui-text-positive: #059669;
   --tui-text-positive-hover: #047857;
   --tui-status-positive: #059669;
   --tui-status-positive-pale: rgba(5, 150, 105, 0.12);
-  --tui-text-negative: #e11d48;
-  --tui-text-negative-hover: #be123c;
-  --tui-status-negative: #e11d48;
-  --tui-status-negative-pale: rgba(225, 29, 72, 0.12);
+  --tui-text-negative: #dc2626;
+  --tui-text-negative-hover: #b91c1c;
+  --tui-status-negative: #dc2626;
+  --tui-status-negative-pale: rgba(220, 38, 38, 0.12);
 }
 
 html,
@@ -176,4 +212,100 @@ tui-segmented {
 :root [tuiBadge][data-size='m'] {
   --t-padding: 0.625rem;
   --t-size: 1.75rem;
+}
+
+/* Правило нейтральных secondary-кнопок: акцент остаётся только на primary, ссылках и фокусе */
+:root
+  body
+  [tuiButton]:where(
+    [data-appearance='outline'],
+    [appearance='outline'],
+    [data-appearance='flat'],
+    [appearance='flat'],
+    [data-appearance='secondary'],
+    [appearance='secondary']
+  ):not(
+    .submit-buy,
+    .submit-sell,
+    [data-appearance='primary-destructive'],
+    [appearance='primary-destructive'],
+    .active,
+    .indicator-active,
+    .btn-active,
+    .version-active,
+    .paper-selected
+  ) {
+  color: var(--ttsc-btn-text);
+
+  &:hover:not(:disabled, [data-state='disabled']),
+  &[data-state='hover']:not(:disabled, [data-state='disabled']),
+  &:active:not(:disabled, [data-state='disabled']),
+  &[data-state='active']:not(:disabled, [data-state='disabled']) {
+    background: var(--ttsc-btn-hover-bg);
+    color: var(--ttsc-btn-text-hover);
+  }
+}
+
+:root
+  body
+  [tuiButton]:where([data-appearance='outline'], [appearance='outline']):not(
+    .submit-buy,
+    .submit-sell,
+    [data-appearance='primary-destructive'],
+    [appearance='primary-destructive']
+  ) {
+  --t-bs: var(--ttsc-btn-border);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--t-bs);
+
+  &:hover:not(:disabled, [data-state='disabled']),
+  &[data-state='hover']:not(:disabled, [data-state='disabled']),
+  &:active:not(:disabled, [data-state='disabled']),
+  &[data-state='active']:not(:disabled, [data-state='disabled']) {
+    --t-bs: var(--ttsc-btn-border);
+  }
+}
+
+:root
+  body
+  [tuiButton]:where([data-appearance='flat'], [appearance='flat']):not(
+    .submit-buy,
+    .submit-sell,
+    [data-appearance='primary-destructive'],
+    [appearance='primary-destructive'],
+    .active
+  ) {
+  background: transparent;
+}
+
+:root
+  body
+  [tuiButton]:where([data-appearance='secondary'], [appearance='secondary']):not(
+    .submit-buy,
+    .submit-sell,
+    [data-appearance='primary-destructive'],
+    [appearance='primary-destructive'],
+    .indicator-active,
+    .btn-active,
+    .version-active,
+    .paper-selected
+  ) {
+  --t-bs: var(--ttsc-btn-border);
+  background: var(--ttsc-btn-secondary-bg);
+  box-shadow: inset 0 0 0 1px var(--t-bs);
+}
+
+:root body [tuiButton]:where(.indicator-active, .btn-active, .version-active, .paper-selected) {
+  --t-bs: var(--ttsc-accent);
+  background: var(--ttsc-accent-soft);
+  color: var(--ttsc-accent-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--t-bs);
+
+  &:hover:not(:disabled, [data-state='disabled']),
+  &[data-state='hover']:not(:disabled, [data-state='disabled']) {
+    --t-bs: var(--ttsc-accent);
+    background: var(--ttsc-nav-active-bg-hover);
+    color: var(--ttsc-accent-text);
+  }
 }

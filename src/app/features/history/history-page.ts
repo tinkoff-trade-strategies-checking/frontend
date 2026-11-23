@@ -23,6 +23,7 @@ import {
   HISTORY_KIND_LABELS,
   HISTORY_REGIME_LABELS,
   HISTORY_STATUS_LABELS,
+  signedPctSign,
 } from './history.format';
 import { HistoryStore } from './history.store';
 
@@ -78,6 +79,7 @@ export class HistoryPage implements OnInit {
 
   protected readonly formatDateTime = formatMoscowDateTime;
   protected readonly formatSignedPct = formatSignedPct;
+  protected readonly signedPctSign = signedPctSign;
   protected readonly formatTitle = formatHistoryTitle;
   protected readonly papersOf = historyPapers;
   protected readonly periodOf = historyPeriod;

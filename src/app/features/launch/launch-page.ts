@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiDay } from '@taiga-ui/cdk';
@@ -14,6 +22,8 @@ import {
 import {
   CandleTimeframe,
   LAUNCH_API,
+  LAUNCH_PRESETS,
+  LaunchPreset,
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
   REGIME_HINTS,
@@ -89,6 +99,9 @@ export class LaunchPage implements OnInit {
     return algo ? `${algo.name} · v${algo.latestVersion} · ${algo.author}` : algorithmId;
   };
 
+  protected readonly presets = LAUNCH_PRESETS;
+  protected readonly advancedOpen = signal(false);
+
   protected readonly minCapital = MIN_INITIAL_CAPITAL_RUB;
   protected readonly maxCapital = MAX_INITIAL_CAPITAL_RUB;
   protected readonly timeframeLabels = TIMEFRAME_LABELS;
@@ -98,6 +111,22 @@ export class LaunchPage implements OnInit {
   protected readonly formatExecutionPct = formatExecutionPct;
   protected readonly formatDecimalRu = formatDecimalRu;
   protected readonly formatDisplayDate = formatDisplayDate;
+
+  constructor() {
+    effect(() => {
+      if (this.store.submitError() || this.store.capitalError() || !this.store.isBlind()) {
+        this.advancedOpen.set(true);
+      }
+    });
+  }
+
+  protected selectPreset(preset: LaunchPreset): void {
+    this.store.applyPreset(preset);
+  }
+
+  protected toggleAdvanced(): void {
+    this.advancedOpen.update((open) => !open);
+  }
 
   protected disabledDurations(durations: readonly SessionDurationDays[]): SessionDurationDays[] {
     return durations.filter((d) => this.store.isPairDisabled(d, this.store.timeframe()));

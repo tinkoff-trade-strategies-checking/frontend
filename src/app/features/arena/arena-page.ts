@@ -22,6 +22,18 @@ import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaApi } from './data/arena.models';
 import { ARENA_API_IMPL } from '../../api-impls';
 
+const ARENA_GUIDE_STORAGE_KEY = 'ttsc.arenaGuideDismissed';
+
+function readGuideDismissed(): boolean {
+  try {
+    return (
+      typeof localStorage !== 'undefined' && localStorage.getItem(ARENA_GUIDE_STORAGE_KEY) === '1'
+    );
+  } catch {
+    return false;
+  }
+}
+
 @Component({
   selector: 'app-arena-page',
   imports: [
@@ -54,6 +66,7 @@ export class ArenaPage implements OnInit {
 
   protected readonly showSma20 = signal(false);
   protected readonly showSma50 = signal(false);
+  protected readonly guideDismissed = signal(readGuideDismissed());
   protected readonly formatPct = formatPct;
   protected readonly formatPrice = formatPrice;
 
@@ -85,6 +98,17 @@ export class ArenaPage implements OnInit {
       const id = params.get('id') ?? undefined;
       void this.store.init(undefined, id);
     });
+  }
+
+  protected dismissGuide(): void {
+    this.guideDismissed.set(true);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ARENA_GUIDE_STORAGE_KEY, '1');
+      }
+    } catch {
+      // Игнорируем ошибку доступа к localStorage (private mode / SSR).
+    }
   }
 
   protected confirmFinish(): void {

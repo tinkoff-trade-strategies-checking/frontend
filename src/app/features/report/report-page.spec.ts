@@ -557,4 +557,102 @@ describe('ReportPage', () => {
     expect(zeroText).not.toContain('сэкономлено 0,00 ₽');
     expect(zeroText).not.toContain('обошлись вам в 0,00 ₽');
   });
+
+  it('сокращает 36-символьный UUID в шапке, убирает «(горизонт e)» и лишние пробелы перед знаками препинания', async () => {
+    const uuid = 'abcdef12-3456-7890-abcd-ef1234567890';
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY' || !base.report.divergenceSummary) {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        sessionId: uuid,
+        divergenceSummary: {
+          ...base.report.divergenceSummary,
+          totalErrorCostRub: 0,
+          totalErrorCostPct: 0,
+          worstType: 'extra',
+          worstDay: 3,
+          worstErrorCostRub: 31.35,
+        },
+      },
+    });
+
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    store.setTab('divergences');
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const badge = root.querySelector('.report-header .id-badge');
+    expect(badge?.textContent?.trim()).toBe('#abcdef12');
+    expect(badge?.getAttribute('title')).toBe(uuid);
+    expect(root.querySelector('.report-header')?.textContent).not.toContain(uuid);
+
+    const divText = (root.textContent ?? '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
+    expect(divText).toContain('(до следующего решения):');
+    expect(divText).not.toContain('(горизонт e)');
+    expect(divText).toContain('(0,00 ₽), самое дорогое — лишнее действие на дне 3 (+31,35 ₽).');
+    expect(divText).not.toMatch(/\s[,.]/);
+
+    const stepHeader = root.querySelector('.data-table thead th:first-child');
+    const stepCell = root.querySelector('.data-table tbody td:first-child');
+    expect(stepHeader?.classList.contains('num')).toBe(false);
+    expect(stepCell?.classList.contains('num')).toBe(false);
+  });
+
+  it('показывает Hero-карточку вердикта с выводом, сноской короткого отрезка (<= 5 дн.) и действиями «Разобрать расхождения» / «Новая сессия»', async () => {
+    const base = await stubApi.getReport('S-0103');
+    if (base.status !== 'READY' || !base.report.comparison) {
+      throw new Error('Ожидался готовый отчёт S-0103');
+    }
+
+    vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce({
+      status: 'READY',
+      report: {
+        ...base.report,
+        playedDays: 5,
+        humanMetrics: { ...base.report.humanMetrics, netReturnPct: 4.5 },
+        comparison: {
+          ...base.report.comparison,
+          netReturn: {
+            humanPct: 4.5,
+            algoPct: 1.25,
+            winner: 'human',
+            diffPctPoints: 3.25,
+            diffLabel: 'Вы лучше на 3,25 п.п.',
+          },
+        },
+      },
+    });
+
+    const fixture = TestBed.createComponent(ReportPage);
+    const store = fixture.debugElement.injector.get(ReportStore);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const hero = root.querySelector('.verdict-hero');
+    expect(hero).not.toBeNull();
+    const heroText = (hero?.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(heroText).toContain('+4,50 %');
+    expect(heroText).toContain('Вы обогнали алгоритм');
+    expect(heroText).toContain('3,25 п.п.');
+    expect(heroText).toContain('Короткий отрезок — для надёжной оценки пройдите больше дней');
+    expect(hero?.querySelector('a[href="/new"]')?.textContent?.trim()).toBe('Новая сессия');
+
+    const divBtn = Array.from(hero?.querySelectorAll('button') ?? []).find((b) =>
+      b.textContent?.includes('Разобрать расхождения'),
+    ) as HTMLButtonElement | undefined;
+    expect(divBtn).toBeDefined();
+    divBtn?.click();
+    fixture.detectChanges();
+    expect(store.activeTab()).toBe('divergences');
+  });
 });

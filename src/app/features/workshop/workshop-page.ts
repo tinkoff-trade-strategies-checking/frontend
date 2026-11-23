@@ -63,7 +63,9 @@ export class WorkshopPage implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly sortOptions = SORT_OPTIONS;
+  protected readonly sortOptions = computed(() =>
+    this.store.mineOnly() ? SORT_OPTIONS.filter((opt) => opt.id !== 'author_asc') : SORT_OPTIONS,
+  );
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
   protected readonly showSidePanel = computed(
     () =>
@@ -112,12 +114,12 @@ export class WorkshopPage implements OnInit {
   protected sortIndex(current: WorkshopSortField): number {
     return Math.max(
       0,
-      this.sortOptions.findIndex((opt) => opt.id === current),
+      this.sortOptions().findIndex((opt) => opt.id === current),
     );
   }
 
   protected onSortIndexChange(index: number): void {
-    const next = this.sortOptions[index];
+    const next = this.sortOptions()[index];
     if (next) {
       this.store.setSort(next.id);
     }

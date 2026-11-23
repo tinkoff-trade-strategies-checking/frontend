@@ -26,35 +26,27 @@ export function safeReturnUrl(value: string | null): string {
           fill="none"
           aria-hidden="true"
         >
+          <rect x="4" y="4" width="56" height="56" rx="15" fill="#2563EB" />
+          <rect x="14" y="34" width="7" height="14" rx="2.5" fill="#FFFFFF" opacity="0.72" />
+          <rect x="24" y="25" width="7" height="23" rx="2.5" fill="#FFFFFF" opacity="0.9" />
+          <rect x="34" y="17" width="7" height="31" rx="2.5" fill="#FFFFFF" />
           <rect
-            x="4"
-            y="4"
-            width="56"
-            height="56"
-            rx="16"
-            fill="#1A1D24"
-            stroke="#2E3442"
-            stroke-width="2"
-          />
-          <path d="M18 17H46" stroke="#FFDD2D" stroke-width="4" stroke-linecap="round" />
-          <path d="M32 17V48" stroke="#FFDD2D" stroke-width="3" stroke-linecap="round" />
-          <rect x="17" y="29" width="6" height="14" rx="2" fill="#E6ECF5" />
-          <path d="M20 24V29M20 43V47" stroke="#E6ECF5" stroke-width="2" stroke-linecap="round" />
-          <rect
-            x="41"
-            y="26"
-            width="6"
-            height="15"
+            x="44"
+            y="22"
+            width="6.5"
+            height="26"
             rx="2"
-            stroke="#FFDD2D"
-            stroke-width="2"
+            stroke="#FFFFFF"
+            stroke-width="1.75"
             stroke-dasharray="3 2.5"
             opacity="0.55"
           />
-          <circle cx="32" cy="17" r="3.5" fill="#FFDD2D" />
+          <path d="M13 49H51" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />
         </svg>
-        <span class="login-eyebrow">Т-Инвестиции · Янтарный Тик</span>
-        <h1>Тренажёр и лаборатория стратегий</h1>
+        <h1>Честная проверка стратегий</h1>
+        <p class="login-subtitle">
+          Тренажёр ручной торговли и лаборатория алгоритмов на данных MOEX
+        </p>
         <ul class="login-chips" aria-label="Преимущества тренажёра">
           <li>Без заглядывания в будущее</li>
           <li>Реальные комиссии и ликвидность MOEX</li>
@@ -138,12 +130,12 @@ export function safeReturnUrl(value: string | null): string {
       display: block;
     }
 
-    .login-eyebrow {
-      font-size: 0.8125rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--tui-text-action);
+    .login-subtitle {
+      margin: 0;
+      font-size: 0.9375rem;
+      line-height: 1.45;
+      color: var(--tui-text-secondary);
+      max-width: 28rem;
     }
 
     .login-hero h1 {

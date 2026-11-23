@@ -3,10 +3,27 @@
     <div>
       <h1 class="tui-text_h3">Новая сессия</h1>
       <p class="tui-text_body-m muted">
-        Настройте параметры рынка и бумаги. Исполнение и сравнение с фоновым алгоритмом — по единым
-        правилам платформы.
+        Ручная торговля против алгоритма по реальным правилам рынка. Чтобы запустить готовый
+        алгоритм, откройте <a routerLink="/workshop">Мастерскую</a>.
       </p>
     </div>
+
+    <ol class="launch-steps" aria-label="Этапы сессии">
+      <li class="step active" aria-current="step">
+        <span class="step-num">1</span>
+        <span>Выберите сценарий</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step">
+        <span class="step-num">2</span>
+        <span>Торгуйте на Арене</span>
+      </li>
+      <li class="step-arrow" aria-hidden="true">→</li>
+      <li class="step">
+        <span class="step-num">3</span>
+        <span>Разберите ошибки с алгоритмом</span>
+      </li>
+    </ol>
   </header>
 
   @if (store.error()) {
@@ -32,288 +49,342 @@
       <div class="form-col">
         <section class="panel">
           <div class="panel-header">
-            <h2 class="tui-text_h6">Кто торгует</h2>
+            <h2 class="tui-text_h6">Быстрый старт</h2>
+            <span class="tui-text_body-xs muted">Слепой режим · капитал 1 000 000 ₽</span>
           </div>
           <div class="panel-body">
-            <tui-segmented size="s" [activeItemIndex]="0">
-              <button type="button">Торгую сам</button>
-            </tui-segmented>
-            <p class="tui-text_body-s muted hint">
-              Ручная сессия в плеере арены. Запустить алгоритм можно в
-              <a routerLink="/workshop">мастерской</a>.
-            </p>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Длительность и шаг свечей</h2>
-          </div>
-          <div class="panel-body">
-            <div class="field-group">
-              <span class="tui-text_body-s field-label">Длительность в торговых днях</span>
-              <tui-segmented
-                size="s"
-                [activeItemIndex]="durationIndex(opts.durations, store.durationDays())"
-                (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
-              >
-                @for (days of opts.durations; track days) {
-                  @let off = store.isPairDisabled(days, store.timeframe());
-                  <button
-                    type="button"
-                    [disabled]="off"
-                    [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
-                    [attr.aria-describedby]="off ? 'launch-duration-note' : null"
-                  >
-                    {{ days }} дн.
-                  </button>
-                }
-              </tui-segmented>
-              @if (disabledDurations(opts.durations); as off) {
-                @if (off.length > 0) {
-                  <p id="launch-duration-note" class="tui-text_body-xs muted hint">
-                    Выключено: {{ off.join(', ') }} дн. — при шаге
-                    {{ timeframeLabels[store.timeframe()] }}
-                    {{ limitHint(opts.executionRules.maxBars) }}.
-                  </p>
-                }
-              }
-            </div>
-
-            <div class="field-group">
-              <span class="tui-text_body-s field-label">Шаг свечей</span>
-              <tui-segmented
-                size="s"
-                [activeItemIndex]="timeframeIndex(opts.availableTimeframes, store.timeframe())"
-                (activeItemIndexChange)="onTimeframeIndexChange(opts.availableTimeframes, $event)"
-              >
-                @for (tf of opts.availableTimeframes; track tf) {
-                  @let off = store.isPairDisabled(store.durationDays(), tf);
-                  <button
-                    type="button"
-                    [disabled]="off"
-                    [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
-                    [attr.aria-describedby]="off ? 'launch-timeframe-note' : null"
-                  >
-                    {{ timeframeLabels[tf] }}
-                  </button>
-                }
-              </tui-segmented>
-              @if (disabledTimeframes(opts.availableTimeframes); as offTf) {
-                @if (offTf.length > 0) {
-                  <p id="launch-timeframe-note" class="tui-text_body-xs muted hint">
-                    Выключено: {{ labelsOf(offTf) }} — при {{ store.durationDays() }} дн.
-                    {{ limitHint(opts.executionRules.maxBars) }}.
-                  </p>
-                }
-              }
-            </div>
-
-            <p class="tui-text_body-s muted hint">
-              Доступные шаги зависят от архива. Для ручной сессии действует лимит
-              {{ opts.executionRules.maxBars.toLocaleString('ru-RU') }} свечей на бумагу: пары «шаг
-              × длительность», которые его всегда превышают, выключены.
-            </p>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Тип периода</h2>
-          </div>
-          <div class="panel-body">
-            <tui-segmented
-              size="s"
-              [activeItemIndex]="regimeIndex(opts.regimes, store.regime())"
-              (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
-            >
-              @for (item of opts.regimes; track item) {
-                <button type="button">{{ regimeLabels[item] }}</button>
-              }
-            </tui-segmented>
-            <p class="tui-text_body-s muted hint">
-              {{ regimeHints[store.regime()] }}
-              @if (!store.isBlind()) {
-                · Должен совпадать с категорией выбранного отрезка.
-              }
-            </p>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Начало периода</h2>
-            @if (!store.isBlind()) {
-              <span tuiBadge size="s" appearance="warning">Неслепая</span>
-            }
-          </div>
-          <div class="panel-body">
-            <tui-segmented
-              size="s"
-              [activeItemIndex]="store.isBlind() ? 0 : 1"
-              (activeItemIndexChange)="onStartModeIndexChange($event)"
-            >
-              <button type="button">Случайная закрытая дата</button>
-              <button type="button">Своя дата</button>
-            </tui-segmented>
-
-            @if (store.isBlind()) {
-              <p class="tui-text_body-s muted hint">
-                Слепой режим: реальные даты, названия и тикеры бумаг скрыты до завершения сессии.
-              </p>
-            } @else {
-              <div class="custom-date-row">
-                <label tuiLabel for="launch-custom-date" class="date-field">
-                  Дата начала
-                  <tui-textfield tuiTextfieldSize="s">
-                    <input
-                      id="launch-custom-date"
-                      tuiInputDate
-                      [ngModel]="customStartDay()"
-                      (ngModelChange)="onCustomStartDayChange($event)"
-                    />
-                    <tui-calendar *tuiDropdown />
-                  </tui-textfield>
-                </label>
-              </div>
-              @if (opts.archiveFrom && opts.archiveTo) {
-                <p class="tui-text_body-xs muted hint">
-                  Доступный архив: {{ formatDisplayDate(opts.archiveFrom) }} —
-                  {{ formatDisplayDate(opts.archiveTo) }}
-                </p>
-              }
-              <div tuiNotification appearance="info" size="s">
-                Неслепая сессия: период и тикеры бумаг видны сразу и на арене, и в отчёте.
-              </div>
-            }
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Бумаги</h2>
-            @if (store.isBlind()) {
-              <span class="tui-text_body-xs muted">
-                {{ store.paperCount() }} из {{ opts.maxPapers }}
-              </span>
-            } @else {
-              <span class="tui-text_body-xs muted">
-                выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
-              </span>
-            }
-          </div>
-          <div class="panel-body">
-            @if (store.isBlind()) {
-              <div class="field-group">
-                <span class="tui-text_body-s field-label">Количество бумаг в сессии</span>
-                <tui-segmented
-                  size="s"
-                  [activeItemIndex]="paperCountIndex(store.paperCountOptions(), store.paperCount())"
-                  (activeItemIndexChange)="
-                    onPaperCountIndexChange(store.paperCountOptions(), $event)
-                  "
+            <div class="presets-grid">
+              @for (preset of presets; track preset.id) {
+                @let active = store.activePresetId() === preset.id;
+                <button
+                  type="button"
+                  class="preset-card"
+                  [class.active]="active"
+                  [attr.data-preset]="preset.id"
+                  [attr.aria-pressed]="active"
+                  (click)="selectPreset(preset)"
                 >
-                  @for (count of store.paperCountOptions(); track count) {
-                    <button type="button">{{ count }}</button>
-                  }
-                </tui-segmented>
+                  <div class="preset-top">
+                    <span class="preset-title">{{ preset.title }}</span>
+                    @if (preset.badge) {
+                      <span class="preset-badge">{{ preset.badge }}</span>
+                    }
+                  </div>
+                  <div class="preset-specs">{{ preset.specs }}</div>
+                  <p class="preset-desc muted">{{ preset.description }}</p>
+                </button>
+              }
+            </div>
+          </div>
+        </section>
+
+        <button
+          id="launch-advanced-toggle"
+          type="button"
+          class="advanced-toggle"
+          [class.open]="advancedOpen()"
+          [attr.aria-expanded]="advancedOpen()"
+          aria-controls="launch-advanced-panels"
+          (click)="toggleAdvanced()"
+        >
+          <span class="advanced-toggle-text">
+            <span class="advanced-toggle-title">Настроить вручную</span>
+            <span class="advanced-toggle-hint muted">
+              длительность, шаг свечей, своя дата, выбор бумаг, капитал, фоновый алгоритм
+            </span>
+          </span>
+          <span class="advanced-toggle-chevron" aria-hidden="true">
+            {{ advancedOpen() ? '▴' : '▾' }}
+          </span>
+        </button>
+
+        @if (advancedOpen()) {
+          <div id="launch-advanced-panels" class="advanced-panels">
+            <section class="panel">
+              <div class="panel-header">
+                <h2 class="tui-text_h6">Длительность и шаг свечей</h2>
               </div>
-              <p class="tui-text_body-s muted hint">
-                В слепом режиме система случайно выбирает от {{ opts.minPapers }} до
-                {{ opts.maxPapers }} бумаг из пула IMOEX. Названия и тикеры не раскрываются до конца
-                сессии.
-              </p>
-            } @else {
-              @if (store.loadingCustomPapers()) {
-                <p class="tui-text_body-s muted hint">Загрузка списка бумаг…</p>
-              } @else {
-                <div class="papers-list">
-                  @for (paper of store.customPapers(); track paper.id) {
-                    @let selected = store.selectedPaperIds().includes(paper.id);
-                    <button
-                      tuiButton
-                      type="button"
-                      size="s"
-                      [appearance]="selected ? 'primary' : 'outline'"
-                      (click)="store.togglePaper(paper.id)"
-                    >
-                      {{ paper.ticker }} ({{ paper.name }}) · {{ paper.sector }}
-                    </button>
+              <div class="panel-body">
+                <div class="field-group">
+                  <span class="tui-text_body-s field-label">Длительность в торговых днях</span>
+                  <tui-segmented
+                    size="s"
+                    [activeItemIndex]="durationIndex(opts.durations, store.durationDays())"
+                    (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
+                  >
+                    @for (days of opts.durations; track days) {
+                      @let off = store.isPairDisabled(days, store.timeframe());
+                      <button
+                        type="button"
+                        [disabled]="off"
+                        [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
+                        [attr.aria-describedby]="off ? 'launch-duration-note' : null"
+                      >
+                        {{ days }} дн.
+                      </button>
+                    }
+                  </tui-segmented>
+                  @if (disabledDurations(opts.durations); as off) {
+                    @if (off.length > 0) {
+                      <p id="launch-duration-note" class="tui-text_body-xs muted hint">
+                        Выключено: {{ off.join(', ') }} дн. — при шаге
+                        {{ timeframeLabels[store.timeframe()] }}
+                        {{ limitHint(opts.executionRules.maxBars) }}.
+                      </p>
+                    }
                   }
                 </div>
-              }
-              <p class="tui-text_body-s muted hint">
-                Для своей даты выберите от {{ opts.minPapers }} до {{ opts.maxPapers }} бумаг.
-              </p>
-            }
-          </div>
-        </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Начальный капитал и фоновый алгоритм</h2>
-          </div>
-          <div class="panel-body">
-            <div class="field-group">
-              <span class="tui-text_body-s field-label">Начальный капитал</span>
-              <tui-segmented
-                size="s"
-                [activeItemIndex]="capitalIndex(opts.capitalPresetsRub, store.initialCapitalRub())"
-                (activeItemIndexChange)="onCapitalIndexChange(opts.capitalPresetsRub, $event)"
-              >
-                @for (preset of opts.capitalPresetsRub; track preset) {
-                  <button type="button">{{ formatRub(preset) }}</button>
-                }
-              </tui-segmented>
-              <tui-textfield tuiTextfieldSize="s">
-                <label tuiLabel for="launch-capital">Своё значение, ₽</label>
-                <input
-                  id="launch-capital"
-                  tuiInputNumber
-                  [min]="minCapital"
-                  [max]="maxCapital"
-                  [ngModel]="store.initialCapitalRub()"
-                  (ngModelChange)="store.setInitialCapital($event)"
-                />
-              </tui-textfield>
-              @if (store.capitalError(); as capitalError) {
-                <p class="tui-text_body-s capital-error" role="alert">{{ capitalError }}</p>
-              } @else {
-                <p class="tui-text_body-s muted hint">От 10 000 до 100 000 000 ₽, до 2 знаков.</p>
-              }
-            </div>
+                <div class="field-group">
+                  <span class="tui-text_body-s field-label">Шаг свечей</span>
+                  <tui-segmented
+                    size="s"
+                    [activeItemIndex]="timeframeIndex(opts.availableTimeframes, store.timeframe())"
+                    (activeItemIndexChange)="
+                      onTimeframeIndexChange(opts.availableTimeframes, $event)
+                    "
+                  >
+                    @for (tf of opts.availableTimeframes; track tf) {
+                      @let off = store.isPairDisabled(store.durationDays(), tf);
+                      <button
+                        type="button"
+                        [disabled]="off"
+                        [attr.title]="off ? limitHint(opts.executionRules.maxBars) : null"
+                        [attr.aria-describedby]="off ? 'launch-timeframe-note' : null"
+                      >
+                        {{ timeframeLabels[tf] }}
+                      </button>
+                    }
+                  </tui-segmented>
+                  @if (disabledTimeframes(opts.availableTimeframes); as offTf) {
+                    @if (offTf.length > 0) {
+                      <p id="launch-timeframe-note" class="tui-text_body-xs muted hint">
+                        Выключено: {{ labelsOf(offTf) }} — при {{ store.durationDays() }} дн.
+                        {{ limitHint(opts.executionRules.maxBars) }}.
+                      </p>
+                    }
+                  }
+                </div>
 
-            <div class="field-group">
-              <label tuiLabel for="launch-background-algorithm" class="field-label">
-                Фоновый алгоритм сравнения
-                <tui-textfield
-                  tuiChevron
-                  tuiTextfieldSize="s"
-                  [tuiTextfieldCleaner]="false"
-                  [stringify]="backgroundAlgorithmStringify"
-                >
-                  <select
-                    id="launch-background-algorithm"
-                    tuiSelect
-                    [items]="backgroundAlgorithmOptions()"
-                    [ngModel]="store.backgroundAlgorithmId() ?? ''"
-                    (ngModelChange)="store.setBackgroundAlgorithm($event ? $event : null)"
-                  ></select>
-                </tui-textfield>
-              </label>
-              @if (store.backgroundAlgorithmsError()) {
-                <p class="tui-text_body-xs muted hint">
-                  Не удалось загрузить каталог алгоритмов — доступен эталон платформы по умолчанию.
-                </p>
-              } @else {
                 <p class="tui-text_body-s muted hint">
-                  Фоновый алгоритм торгует на том же отрезке с тем же капиталом и правилами
-                  исполнения.
+                  Доступные шаги зависят от архива. Для ручной сессии действует лимит
+                  {{ opts.executionRules.maxBars.toLocaleString('ru-RU') }} свечей на бумагу: пары
+                  «шаг × длительность», которые его всегда превышают, выключены.
                 </p>
-              }
-            </div>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2 class="tui-text_h6">Тип периода</h2>
+              </div>
+              <div class="panel-body">
+                <tui-segmented
+                  size="s"
+                  [activeItemIndex]="regimeIndex(opts.regimes, store.regime())"
+                  (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
+                >
+                  @for (item of opts.regimes; track item) {
+                    <button type="button">{{ regimeLabels[item] }}</button>
+                  }
+                </tui-segmented>
+                <p class="tui-text_body-s muted hint">
+                  {{ regimeHints[store.regime()] }}
+                  @if (!store.isBlind()) {
+                    · Должен совпадать с категорией выбранного отрезка.
+                  }
+                </p>
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2 class="tui-text_h6">Начало периода</h2>
+                @if (!store.isBlind()) {
+                  <span tuiBadge size="s" appearance="warning">Неслепая</span>
+                }
+              </div>
+              <div class="panel-body">
+                <tui-segmented
+                  size="s"
+                  [activeItemIndex]="store.isBlind() ? 0 : 1"
+                  (activeItemIndexChange)="onStartModeIndexChange($event)"
+                >
+                  <button type="button">Случайная закрытая дата</button>
+                  <button type="button">Своя дата</button>
+                </tui-segmented>
+
+                @if (store.isBlind()) {
+                  <p class="tui-text_body-s muted hint">
+                    Слепой режим: реальные даты, названия и тикеры бумаг скрыты до завершения
+                    сессии.
+                  </p>
+                } @else {
+                  <div class="custom-date-row">
+                    <label tuiLabel for="launch-custom-date" class="date-field">
+                      Дата начала
+                      <tui-textfield tuiTextfieldSize="s">
+                        <input
+                          id="launch-custom-date"
+                          tuiInputDate
+                          [ngModel]="customStartDay()"
+                          (ngModelChange)="onCustomStartDayChange($event)"
+                        />
+                        <tui-calendar *tuiDropdown />
+                      </tui-textfield>
+                    </label>
+                  </div>
+                  @if (opts.archiveFrom && opts.archiveTo) {
+                    <p class="tui-text_body-xs muted hint">
+                      Доступный архив: {{ formatDisplayDate(opts.archiveFrom) }} —
+                      {{ formatDisplayDate(opts.archiveTo) }}
+                    </p>
+                  }
+                  <div tuiNotification appearance="info" size="s">
+                    Неслепая сессия: период и тикеры бумаг видны сразу и на арене, и в отчёте.
+                  </div>
+                }
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2 class="tui-text_h6">Бумаги</h2>
+                @if (store.isBlind()) {
+                  <span class="tui-text_body-xs muted">
+                    {{ store.paperCount() }} из {{ opts.maxPapers }}
+                  </span>
+                } @else {
+                  <span class="tui-text_body-xs muted">
+                    выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
+                  </span>
+                }
+              </div>
+              <div class="panel-body">
+                @if (store.isBlind()) {
+                  <div class="field-group">
+                    <span class="tui-text_body-s field-label">Количество бумаг в сессии</span>
+                    <tui-segmented
+                      size="s"
+                      [activeItemIndex]="
+                        paperCountIndex(store.paperCountOptions(), store.paperCount())
+                      "
+                      (activeItemIndexChange)="
+                        onPaperCountIndexChange(store.paperCountOptions(), $event)
+                      "
+                    >
+                      @for (count of store.paperCountOptions(); track count) {
+                        <button type="button">{{ count }}</button>
+                      }
+                    </tui-segmented>
+                  </div>
+                  <p class="tui-text_body-s muted hint">
+                    В слепом режиме система случайно выбирает от {{ opts.minPapers }} до
+                    {{ opts.maxPapers }} бумаг из пула IMOEX. Названия и тикеры не раскрываются до
+                    конца сессии.
+                  </p>
+                } @else {
+                  @if (store.loadingCustomPapers()) {
+                    <p class="tui-text_body-s muted hint">Загрузка списка бумаг…</p>
+                  } @else {
+                    <div class="papers-list">
+                      @for (paper of store.customPapers(); track paper.id) {
+                        @let selected = store.selectedPaperIds().includes(paper.id);
+                        <button
+                          tuiButton
+                          type="button"
+                          size="s"
+                          [appearance]="selected ? 'secondary' : 'outline'"
+                          [class.paper-selected]="selected"
+                          [attr.aria-pressed]="selected"
+                          (click)="store.togglePaper(paper.id)"
+                        >
+                          {{ paper.ticker }} ({{ paper.name }}) · {{ paper.sector }}
+                        </button>
+                      }
+                    </div>
+                  }
+                  <p class="tui-text_body-s muted hint">
+                    Для своей даты выберите от {{ opts.minPapers }} до {{ opts.maxPapers }} бумаг.
+                  </p>
+                }
+              </div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <h2 class="tui-text_h6">Начальный капитал и фоновый алгоритм</h2>
+              </div>
+              <div class="panel-body">
+                <div class="field-group">
+                  <span class="tui-text_body-s field-label">Начальный капитал</span>
+                  <tui-segmented
+                    size="s"
+                    [activeItemIndex]="
+                      capitalIndex(opts.capitalPresetsRub, store.initialCapitalRub())
+                    "
+                    (activeItemIndexChange)="onCapitalIndexChange(opts.capitalPresetsRub, $event)"
+                  >
+                    @for (preset of opts.capitalPresetsRub; track preset) {
+                      <button type="button">{{ formatRub(preset) }}</button>
+                    }
+                  </tui-segmented>
+                  <label tuiLabel for="launch-capital" class="field-label">
+                    Своё значение, ₽
+                    <tui-textfield tuiTextfieldSize="s">
+                      <input
+                        id="launch-capital"
+                        tuiInputNumber
+                        [min]="minCapital"
+                        [max]="maxCapital"
+                        [ngModel]="store.initialCapitalRub()"
+                        (ngModelChange)="store.setInitialCapital($event)"
+                      />
+                    </tui-textfield>
+                  </label>
+                  @if (store.capitalError(); as capitalError) {
+                    <p class="tui-text_body-s capital-error" role="alert">{{ capitalError }}</p>
+                  } @else {
+                    <p class="tui-text_body-s muted hint">
+                      От 10 000 до 100 000 000 ₽, до 2 знаков.
+                    </p>
+                  }
+                </div>
+
+                <div class="field-group">
+                  <label tuiLabel for="launch-background-algorithm" class="field-label">
+                    Фоновый алгоритм сравнения
+                    <tui-textfield
+                      tuiChevron
+                      tuiTextfieldSize="s"
+                      [tuiTextfieldCleaner]="false"
+                      [stringify]="backgroundAlgorithmStringify"
+                    >
+                      <select
+                        id="launch-background-algorithm"
+                        tuiSelect
+                        [items]="backgroundAlgorithmOptions()"
+                        [ngModel]="store.backgroundAlgorithmId() ?? ''"
+                        (ngModelChange)="store.setBackgroundAlgorithm($event ? $event : null)"
+                      ></select>
+                    </tui-textfield>
+                  </label>
+                  @if (store.backgroundAlgorithmsError()) {
+                    <p class="tui-text_body-xs muted hint">
+                      Не удалось загрузить каталог алгоритмов — доступен эталон платформы по
+                      умолчанию.
+                    </p>
+                  } @else {
+                    <p class="tui-text_body-s muted hint">
+                      Фоновый алгоритм торгует на том же отрезке с тем же капиталом и правилами
+                      исполнения.
+                    </p>
+                  }
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+        }
       </div>
 
       <aside class="summary-col">
@@ -322,10 +393,6 @@
             <h2 class="tui-text_h6">Сводка запуска</h2>
           </div>
           <div class="panel-body">
-            <div class="kv">
-              <span class="muted">Кто торгует</span>
-              <span>Торгую сам</span>
-            </div>
             <div class="kv">
               <span class="muted">Длительность</span>
               <span>{{ store.durationDays() }} дн.</span>
@@ -397,6 +464,12 @@
               <span class="muted">Исполнение</span>
               <span>по open следующей свечи</span>
             </div>
+
+            @if (store.isBlind()) {
+              <div class="blind-note">
+                В слепом режиме названия бумаг и даты скрыты до конца сессии
+              </div>
+            }
 
             @if (store.submitBlockHint(); as blockHint) {
               <p class="tui-text_body-xs muted hint">{{ blockHint }}</p>

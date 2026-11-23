@@ -29,6 +29,19 @@ function toChartTime(step: number): UTCTimestamp {
   return (step + 1000) as UTCTimestamp;
 }
 
+export function computeCompareLogicalRange(
+  from: number,
+  to: number,
+): { readonly from: number; readonly to: number } {
+  const maxIndex = Math.max(0, to - from);
+  const leftPad = Math.max(12, Math.round(maxIndex * 0.06));
+  const rightPad = Math.max(1, Math.round(maxIndex * 0.02));
+  return {
+    from: from - leftPad,
+    to: to + rightPad,
+  };
+}
+
 function resolveCssColor(el: HTMLElement, value: string): string {
   const match = /var\((--[^,)]+)(?:,\s*(.+))?\)/.exec(value.trim());
   if (!match) {
@@ -247,11 +260,7 @@ export class WorkshopCompareChart {
     chart.timeScale().fitContent();
     const range = chart.timeScale().getVisibleLogicalRange();
     if (range) {
-      const pad = Math.max(0.8, (range.to - range.from) * 0.04);
-      chart.timeScale().setVisibleLogicalRange({
-        from: range.from - pad,
-        to: range.to + pad * 0.25,
-      });
+      chart.timeScale().setVisibleLogicalRange(computeCompareLogicalRange(range.from, range.to));
     }
   }
 

@@ -153,8 +153,14 @@
   &.active {
     color: var(--tui-text-primary);
     background: var(--tui-background-base);
-    border-bottom-color: var(--tui-background-accent-1, var(--tui-text-action));
+    border-bottom-color: var(--ttsc-accent, var(--tui-text-action));
   }
+}
+
+.btn-active {
+  --t-bs: var(--ttsc-accent, var(--tui-border-hover));
+  background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
+  color: var(--ttsc-accent-text, var(--tui-text-primary));
 }
 
 @media (max-width: 1100px) {
@@ -293,6 +299,13 @@
   align-items: center;
   gap: 0.75rem;
   text-align: center;
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .pagination-bar {

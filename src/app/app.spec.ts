@@ -32,6 +32,17 @@ describe('App', () => {
     }).compileComponents();
   });
 
+  it('показывает кобальтовый логотип и бренд «Честная проверка» без сторонних названий', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const header = root.querySelector('header');
+    expect(header?.querySelector('.brand-title')?.textContent?.trim()).toBe('Честная проверка');
+    expect(header?.querySelector('.brand-badge')?.textContent?.trim()).toBe('Тренажёр стратегий');
+    expect(header?.querySelector('.brand-logo rect')?.getAttribute('fill')).toBe('#2563EB');
+    expect(header?.textContent).not.toMatch(/т-инвестиц|янтарн/i);
+  });
+
   it('показывает разделы новой сессии, арены, мастерской, отчёта и истории', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

@@ -26,6 +26,7 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
 
   // 2. Запуск ручной сессии + проверка селектора фонового алгоритма + Арена + F5 (INV-8).
+  await page.locator('#launch-advanced-toggle').click();
   const bgSelect = page.locator('#launch-background-algorithm');
   await expect(bgSelect).toBeVisible();
   await expect(bgSelect).toContainText('Эталон платформы (по умолчанию)');

@@ -409,7 +409,9 @@ export class ArenaStore {
           this.orders.set(res.partial ? mergeById(this.orders(), res.orders) : res.orders);
         }
         this.editingOrder.set(null);
-        this.notice.set(`Сессия ${res.sessionId} завершена на дне ${res.finishedAtDay}.`);
+        const shortId =
+          res.sessionId.length <= 12 ? res.sessionId : `#${res.sessionId.slice(0, 8)}`;
+        this.notice.set(`Сессия ${shortId} завершена на дне ${res.finishedAtDay}.`);
         if (this.serverDriven) {
           // Раскрытый вид завершённой слепой сессии — только в снимке сервера.
           await this.refreshSnapshot(false, false);

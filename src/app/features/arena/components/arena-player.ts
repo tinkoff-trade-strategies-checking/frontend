@@ -63,6 +63,7 @@ import { ARENA_SPEEDS, ArenaSpeed } from '../data/arena.models';
     .progress-wrap {
       flex: 1;
       min-width: 10rem;
+      --tui-background-accent-1: var(--ttsc-accent, var(--tui-text-action));
     }
 
     .day-counter {

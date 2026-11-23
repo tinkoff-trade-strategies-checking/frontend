@@ -103,7 +103,10 @@ export function tokenizeDslSource(source: string): readonly DslCodeLine[] {
                     tuiButton
                     type="button"
                     size="xs"
-                    [appearance]="activeVersion()?.version === ver.version ? 'primary' : 'outline'"
+                    [appearance]="
+                      activeVersion()?.version === ver.version ? 'secondary' : 'outline'
+                    "
+                    [class.version-active]="activeVersion()?.version === ver.version"
                     (click)="selectVersion(ver.version)"
                   >
                     v{{ ver.version }}
@@ -211,6 +214,12 @@ export function tokenizeDslSource(source: string): readonly DslCodeLine[] {
       color: var(--tui-text-primary);
     }
 
+    .version-active {
+      --t-bs: var(--ttsc-accent, var(--tui-border-hover));
+      background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
+      color: var(--ttsc-accent-text, var(--tui-text-primary));
+    }
+
     .tok-keyword {
       color: var(--tui-text-action);
       font-weight: 600;
@@ -226,7 +235,7 @@ export function tokenizeDslSource(source: string): readonly DslCodeLine[] {
     }
 
     .tok-number {
-      color: var(--tui-text-warning, var(--tui-text-secondary));
+      color: var(--ttsc-code-number, var(--tui-text-secondary));
     }
 
     .muted {

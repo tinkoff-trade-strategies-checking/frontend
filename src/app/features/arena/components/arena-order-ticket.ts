@@ -253,12 +253,17 @@ function round2(value: number): number {
           <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>
           <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
         </div>
+        @if (!finished()) {
+          <p class="tui-text_body-xs muted execution-hint">
+            Исполнение по цене открытия следующей свечи
+          </p>
+        }
         @if (estimateRejection(); as rejection) {
           <p class="tui-text_body-xs estimate-warning" role="status">
             Заявка не будет принята: {{ rejection }}
           </p>
         }
-        @if (estimate()?.legs; as legs) {
+        @if (!finished() && estimate()?.legs; as legs) {
           @if (legs.length > 1) {
             <ul class="tui-text_body-xs estimate-legs">
               @for (leg of legs; track $index) {
@@ -363,6 +368,14 @@ function round2(value: number): number {
       font-variant-numeric: tabular-nums;
     }
 
+    .muted {
+      color: var(--tui-text-secondary);
+    }
+
+    .execution-hint {
+      margin: -0.35rem 0 0;
+    }
+
     .actions {
       display: flex;
       gap: 0.5rem;
@@ -373,15 +386,19 @@ function round2(value: number): number {
     }
 
     .submit-buy {
-      --tui-background-accent-1: var(--tui-text-positive);
-      --tui-background-accent-1-hover: var(--tui-text-positive);
-      --tui-background-accent-1-pressed: var(--tui-text-positive);
+      --tui-background-accent-1: var(--ttsc-buy-bg, #059669);
+      --tui-background-accent-1-hover: var(--ttsc-buy-bg-hover, #047857);
+      --tui-background-accent-1-pressed: var(--ttsc-buy-bg-hover, #047857);
+      --tui-text-primary-on-accent-1: #ffffff;
+      color: #ffffff;
     }
 
     .submit-sell {
-      --tui-background-accent-1: var(--tui-text-negative);
-      --tui-background-accent-1-hover: var(--tui-text-negative);
-      --tui-background-accent-1-pressed: var(--tui-text-negative);
+      --tui-background-accent-1: var(--ttsc-sell-bg, #dc2626);
+      --tui-background-accent-1-hover: var(--ttsc-sell-bg-hover, #b91c1c);
+      --tui-background-accent-1-pressed: var(--ttsc-sell-bg-hover, #b91c1c);
+      --tui-text-primary-on-accent-1: #ffffff;
+      color: #ffffff;
     }
 
     .side-btn-buy {
@@ -403,8 +420,13 @@ export class ArenaOrderTicket {
   readonly finished = input.required<boolean>();
   readonly editingOrder = input<ArenaOrder | null>(null);
   readonly estimate = input<OrderEstimateResult | null>(null);
-  protected readonly estimatedPct = computed(() => this.estimate()?.amountPct ?? null);
+  protected readonly estimatedPct = computed(() =>
+    this.finished() ? null : (this.estimate()?.amountPct ?? null),
+  );
   protected readonly estimateRejection = computed(() => {
+    if (this.finished()) {
+      return null;
+    }
     const est = this.estimate();
     return est && est.canPlace === false ? formatRejectReason(est.reason, est.field) : null;
   });
@@ -505,6 +527,9 @@ export class ArenaOrderTicket {
     });
 
     effect((onCleanup) => {
+      if (this.finished()) {
+        return;
+      }
       // INV-6: оценка запрашивается у источника по параметрам формы (сторона, тип, цены), клиент не считает.
       const type = this.orderType();
       const draft: EstimateDraft = {

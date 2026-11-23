@@ -225,6 +225,15 @@ export class WorkshopStore implements OnDestroy {
     this.clearSearchTimer();
     this.mineOnly.set(mineOnly);
     this.authorId.set(null);
+    if (mineOnly) {
+      if (this.sort() === 'author_asc') {
+        this.sort.set('published_desc');
+      }
+      const detail = this.selectedDetail();
+      if ((detail && !detail.isMine) || this.detailLoading() || this.detailError() !== null) {
+        this.closeDetail();
+      }
+    }
     this.page.set(1);
     void this.load();
   }
@@ -287,7 +296,7 @@ export class WorkshopStore implements OnDestroy {
       this.compareList.update((list) => list.filter((item) => item.id !== entry.id));
       return;
     }
-    if (this.compareLimitReached()) {
+    if (entry.latestVersion <= 0 || this.compareLimitReached()) {
       return;
     }
     this.compareList.update((list) => [...list, entry]);
@@ -638,7 +647,7 @@ export class WorkshopStore implements OnDestroy {
   }
 
   async toggleVisibility(algo: WorkshopAlgorithmSummary): Promise<void> {
-    if (!algo.isMine || algo.isSystem || this.visibilityPending()) {
+    if (algo.latestVersion === 0 || !algo.isMine || algo.isSystem || this.visibilityPending()) {
       return;
     }
     const next = algo.visibility === 'public' ? 'hidden' : 'public';

@@ -28,6 +28,7 @@ describe('ArenaPage', () => {
   let stubApi: StubArenaApi;
 
   beforeEach(async () => {
+    localStorage.removeItem('ttsc.arenaGuideDismissed');
     stubApi = new StubArenaApi();
     vi.spyOn(stubApi, 'estimateOrder').mockResolvedValue({ amountPct: 77.77 });
 
@@ -192,5 +193,56 @@ describe('ArenaPage', () => {
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).textContent ?? '').toContain('Сеть недоступна');
+  });
+
+  it('после завершения сессии в тикете показывает «Оценка: —», а карточки портфеля содержат контейнер .metric-values', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Оценка: 77,77 %');
+
+    fixture.componentInstance['store'].finished.set(true);
+    fixture.detectChanges();
+
+    const ticketText = root.querySelector('app-arena-order-ticket')?.textContent ?? '';
+    expect(ticketText).toContain('Оценка: —');
+    expect(ticketText).not.toContain('0,00 %');
+    expect(root.querySelectorAll('.equity-row .metric-item .metric-values').length).toBe(2);
+  });
+
+  it('показывает сворачиваемый гид на активной арене, скрывает его по кнопке «Понятно» и не показывает в режиме только чтения', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Как торговать:');
+    expect(root.querySelector('app-arena-order-ticket')?.textContent).toContain(
+      'Исполнение по цене открытия следующей свечи',
+    );
+
+    const okBtn = Array.from(root.querySelectorAll('.guide-banner button')).find(
+      (b) => b.textContent?.trim() === 'Понятно',
+    ) as HTMLButtonElement | undefined;
+    okBtn?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('.guide-banner')).toBeNull();
+    expect(localStorage.getItem('ttsc.arenaGuideDismissed')).toBe('1');
+
+    // В режиме только чтения (воспроизведение) гид не показывается даже с пустым localStorage.
+    localStorage.removeItem('ttsc.arenaGuideDismissed');
+    const roFixture = TestBed.createComponent(ArenaPage);
+    roFixture.componentRef.setInput('readOnly', true);
+    roFixture.detectChanges();
+    await roFixture.whenStable();
+    roFixture.detectChanges();
+    expect((roFixture.nativeElement as HTMLElement).querySelector('.guide-banner')).toBeNull();
   });
 });
