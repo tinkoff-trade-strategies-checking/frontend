@@ -250,11 +250,7 @@
             <section class="panel">
               <div class="panel-header">
                 <h2 class="tui-text_h6">Бумаги</h2>
-                @if (store.isBlind()) {
-                  <span class="tui-text_body-xs muted">
-                    {{ store.paperCount() }} из {{ opts.maxPapers }}
-                  </span>
-                } @else {
+                @if (!store.isBlind()) {
                   <span class="tui-text_body-xs muted">
                     выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
                   </span>

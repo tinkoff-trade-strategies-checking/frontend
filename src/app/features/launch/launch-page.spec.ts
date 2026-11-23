@@ -549,4 +549,29 @@ describe('LaunchPage', () => {
 
     expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ backgroundAlgorithmId: null }));
   });
+
+  it('в блоке «Бумаги» не показывает «N из 5» в слепом режиме, но показывает «выбрано N из 5» в неслепом', async () => {
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    fixture.detectChanges();
+
+    const findPapersHeader = (): string => {
+      const panel = Array.from(root.querySelectorAll('section.panel')).find(
+        (s) => s.querySelector('h2')?.textContent?.trim() === 'Бумаги',
+      );
+      return panel?.querySelector('.panel-header')?.textContent?.trim() ?? '';
+    };
+
+    expect(findPapersHeader()).toBe('Бумаги');
+
+    await store.setStartMode('custom');
+    fixture.detectChanges();
+    expect(findPapersHeader()).toContain('выбрано 3 из 5');
+  });
 });

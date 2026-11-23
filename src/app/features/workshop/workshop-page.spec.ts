@@ -810,6 +810,66 @@ describe('WorkshopPage', () => {
     fixture.detectChanges();
     expect(store.editorMode()).toBe('create');
   });
+
+  it('открывает карточку как оверлей поверх таблицы, закрывается по клику на подложку и Escape, но не сбрасывает непустой черновик', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(WorkshopStore);
+
+    findRowButton(el, 'A-0001', 'Открыть')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('.workshop-layout.with-detail')).toBeNull();
+    const backdrop = el.querySelector<HTMLElement>('.detail-backdrop');
+    expect(backdrop).not.toBeNull();
+    expect(el.querySelector('.detail-panel')).not.toBeNull();
+
+    // Клик по подложке закрывает карточку.
+    backdrop!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('.detail-panel')).toBeNull();
+    expect(el.querySelector('.detail-backdrop')).toBeNull();
+
+    // Escape закрывает открытую карточку (если не открыт выпадающий список Taiga UI).
+    findRowButton(el, 'A-0001', 'Открыть')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const fakeDropdown = document.createElement('tui-dropdown');
+    document.body.appendChild(fakeDropdown);
+    try {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      fixture.detectChanges();
+      expect(el.querySelector('.detail-panel')).not.toBeNull();
+    } finally {
+      fakeDropdown.remove();
+    }
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('.detail-panel')).toBeNull();
+
+    // Пустой новый черновик закрывается по Escape.
+    store.openCreateDraft();
+    fixture.detectChanges();
+    expect(el.querySelector('.detail-panel')).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('.detail-panel')).toBeNull();
+
+    // Черновик с введённым текстом не сбрасывается случайным кликом по подложке или Escape.
+    store.openCreateDraft();
+    store.setDraftName('Несохранённый черновик');
+    fixture.detectChanges();
+    el.querySelector<HTMLElement>('.detail-backdrop')!.click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(store.editorMode()).toBe('create');
+    expect(el.querySelector('.detail-panel')).not.toBeNull();
+  });
 });
 
 describe('WorkshopStore race protection', () => {
