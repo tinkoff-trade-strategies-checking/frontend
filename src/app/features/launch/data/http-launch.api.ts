@@ -58,6 +58,8 @@ export function mapLaunchOptions(options: ApiLaunchOptions): LaunchOptions {
       liquidityLimitPct: Number(rules.liquidityLimitPct),
       maxBars: rules.maxBars,
     },
+    archiveFrom: options.archiveFrom ?? null,
+    archiveTo: options.archiveTo ?? null,
   };
 }
 

@@ -87,20 +87,38 @@ export function formatPct(value: number | null, signed = false): string {
   if (value === null) {
     return '—';
   }
-  const formatted = Math.abs(value).toLocaleString('ru-RU', {
+  const normalized = Math.abs(value) < 0.005 ? 0 : value;
+  const formatted = Math.abs(normalized).toLocaleString('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
   if (signed) {
-    if (value > 0) {
+    if (normalized > 0) {
       return `+${formatted} %`;
     }
-    if (value < 0) {
+    if (normalized < 0) {
       return `−${formatted} %`;
     }
     return `${formatted} %`;
   }
-  return `${value < 0 ? '−' : ''}${formatted} %`;
+  return `${normalized < 0 ? '−' : ''}${formatted} %`;
+}
+
+export function formatComparisonBadge(
+  winner: ComparisonWinner,
+  diffLabel: string,
+  diffValue: number,
+): string {
+  if (winner === 'tie' || Math.abs(diffValue) < 0.01) {
+    return 'На уровне алгоритма';
+  }
+  if (diffLabel.startsWith('Вы лучше на ')) {
+    return `Вы впереди на +${diffLabel.slice('Вы лучше на '.length)}`;
+  }
+  if (diffLabel.startsWith('Алгоритм лучше на ')) {
+    return `Алгоритм впереди на +${diffLabel.slice('Алгоритм лучше на '.length)}`;
+  }
+  return diffLabel;
 }
 
 export function formatRatio(value: number | null): string {

@@ -79,6 +79,8 @@ export class WorkshopStore implements OnDestroy {
   readonly runFormOpen = signal(false);
   readonly forking = signal(false);
   readonly visibilityPending = signal(false);
+  readonly deleting = signal(false);
+  readonly deleteConfirmId = signal<string | null>(null);
   readonly actionError = signal<string | null>(null);
 
   readonly items = computed(() => this.pageData()?.items ?? []);
@@ -190,6 +192,7 @@ export class WorkshopStore implements OnDestroy {
     this.detailLoading.set(false);
     this.detailError.set(null);
     this.actionError.set(null);
+    this.deleteConfirmId.set(null);
     this.runFormOpen.set(false);
     this.closeEditor();
   }
@@ -214,11 +217,19 @@ export class WorkshopStore implements OnDestroy {
     void this.load();
   }
 
-  toggleMineOnly(): void {
+  setMineOnly(mineOnly: boolean): void {
+    if (this.mineOnly() === mineOnly) {
+      return;
+    }
     this.clearSearchTimer();
-    this.mineOnly.update((prev) => !prev);
+    this.mineOnly.set(mineOnly);
+    this.authorId.set(null);
     this.page.set(1);
     void this.load();
+  }
+
+  toggleMineOnly(): void {
+    this.setMineOnly(!this.mineOnly());
   }
 
   toggleCleanOnly(): void {
@@ -650,6 +661,38 @@ export class WorkshopStore implements OnDestroy {
       this.actionError.set(errorMessage(error, 'Не удалось изменить видимость алгоритма.'));
     } finally {
       this.visibilityPending.set(false);
+    }
+  }
+
+  requestDelete(id: string): void {
+    this.actionError.set(null);
+    this.deleteConfirmId.set(id);
+  }
+
+  cancelDelete(): void {
+    this.deleteConfirmId.set(null);
+  }
+
+  async confirmDelete(id: string): Promise<boolean> {
+    const detail = this.selectedDetail();
+    if (!detail || detail.id !== id || !detail.isMine || detail.isSystem || this.deleting()) {
+      return false;
+    }
+    this.deleting.set(true);
+    this.actionError.set(null);
+
+    try {
+      await this.api.deleteAlgorithm(id);
+      this.deleteConfirmId.set(null);
+      this.removeFromCompare(id);
+      this.closeDetail();
+      await this.load();
+      return true;
+    } catch (error) {
+      this.actionError.set(errorMessage(error, 'Не удалось удалить алгоритм.'));
+      return false;
+    } finally {
+      this.deleting.set(false);
     }
   }
 

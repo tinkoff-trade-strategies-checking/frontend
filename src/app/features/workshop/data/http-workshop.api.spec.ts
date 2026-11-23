@@ -162,4 +162,12 @@ describe('HttpWorkshopApi', () => {
       diagnostics: [diag],
     });
   });
+
+  it('удаляет алгоритм через DELETE /workshop/algorithms/{id}', async () => {
+    const pending = api.deleteAlgorithm('alg-2');
+    const req = http.expectOne('/api/v1/workshop/algorithms/alg-2');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null, { status: 204, statusText: 'No Content' });
+    await expect(pending).resolves.toBeUndefined();
+  });
 });

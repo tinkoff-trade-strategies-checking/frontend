@@ -103,11 +103,13 @@ export class ReportEquityChart {
   private humanSeries: ISeriesApi<'Line'> | null = null;
   private algoSeries: ISeriesApi<'Line'> | null = null;
   private benchSeries: ISeriesApi<'Line'> | null = null;
+  private themeObserver: MutationObserver | null = null;
   private labelByTime = new Map<number, string>();
 
   constructor() {
     afterNextRender(() => {
       this.initChart();
+      this.observeTheme();
       this.syncData();
     });
 
@@ -117,18 +119,62 @@ export class ReportEquityChart {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.themeObserver?.disconnect();
+      this.themeObserver = null;
       this.chart?.remove();
       this.chart = null;
     });
   }
 
-  private initChart(): void {
+  private observeTheme(): void {
+    if (typeof MutationObserver === 'undefined') {
+      return;
+    }
+    const observer = new MutationObserver(() => this.applyThemeColors());
+    const opts: MutationObserverInit = {
+      attributes: true,
+      attributeFilter: ['tuiTheme', 'tuitheme', 'data-theme', 'class'],
+    };
+    observer.observe(document.documentElement, opts);
+    if (document.body) {
+      observer.observe(document.body, opts);
+    }
+    const themeHost = this.container().nativeElement.closest('[tuiTheme]');
+    if (themeHost && themeHost !== document.documentElement && themeHost !== document.body) {
+      observer.observe(themeHost, opts);
+    }
+    this.themeObserver = observer;
+  }
+
+  private readThemePalette() {
     const el = this.container().nativeElement;
     const textColor = readCssColor(el, '--tui-text-secondary');
     const borderColor = readCssColor(el, '--tui-border-normal');
     const humanColor = readCssColor(el, '--tui-text-action');
     const algoColor = readCssColor(el, '--tui-text-positive');
     const benchColor = readCssColor(el, '--tui-text-tertiary', textColor);
+    return { textColor, borderColor, humanColor, algoColor, benchColor };
+  }
+
+  private applyThemeColors(): void {
+    if (!this.chart || !this.humanSeries || !this.algoSeries || !this.benchSeries) {
+      return;
+    }
+    const { textColor, borderColor, humanColor, algoColor, benchColor } = this.readThemePalette();
+    this.chart.applyOptions({
+      layout: { background: { color: 'transparent' }, textColor },
+      grid: { vertLines: { color: borderColor }, horzLines: { color: borderColor } },
+      rightPriceScale: { borderColor },
+      timeScale: { borderColor },
+    });
+    this.humanSeries.applyOptions({ color: humanColor });
+    this.algoSeries.applyOptions({ color: algoColor });
+    this.benchSeries.applyOptions({ color: benchColor });
+  }
+
+  private initChart(): void {
+    const el = this.container().nativeElement;
+    const { textColor, borderColor, humanColor, algoColor, benchColor } = this.readThemePalette();
 
     this.chart = createChart(el, {
       autoSize: true,

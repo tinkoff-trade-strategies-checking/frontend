@@ -70,6 +70,8 @@ export class StubLaunchApi implements LaunchApi {
         liquidityLimitPct: 10,
         maxBars: MAX_MANUAL_BARS,
       },
+      archiveFrom: '2020-01-03',
+      archiveTo: '2025-12-31',
     };
   }
 

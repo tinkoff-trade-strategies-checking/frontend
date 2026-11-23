@@ -19,6 +19,7 @@ import { ReportExportFormat, ReportExportService } from './data/report-export.se
 import { REPORT_API_IMPL } from '../../api-impls';
 import {
   DIVERGENCE_TYPE_LABELS,
+  formatComparisonBadge,
   formatDeltaBars,
   formatDrawdownDuration,
   formatPct,
@@ -93,6 +94,15 @@ export class ReportPage implements OnInit {
   protected readonly formatDrawdownDuration = formatDrawdownDuration;
   protected readonly formatPct = formatPct;
   protected readonly formatRatio = formatRatio;
+  protected readonly formatComparisonBadge = formatComparisonBadge;
+  protected readonly Math = Math;
+
+  protected pctSign(value: number | null): -1 | 0 | 1 {
+    if (value === null || Math.abs(value) < 0.005) {
+      return 0;
+    }
+    return value > 0 ? 1 : -1;
+  }
 
   ngOnInit(): void {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {

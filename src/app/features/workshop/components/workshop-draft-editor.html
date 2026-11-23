@@ -60,15 +60,24 @@
         <label for="workshop-draft-source" class="tui-text_body-s field-label">
           Исходный код DSL
         </label>
-        <textarea
-          id="workshop-draft-source"
-          class="dsl-textarea"
-          rows="10"
-          spellcheck="false"
-          placeholder='param fast = 20;&#10;rule enter when sma(close, fast) > sma(close, 50)&#10;  buy 50% market because "Пересечение";'
-          [ngModel]="store.draftSource()"
-          (ngModelChange)="store.setDraftSource($event ?? '')"
-        ></textarea>
+        <div class="dsl-editor-wrap">
+          <div #gutter class="dsl-gutter" aria-hidden="true">
+            @for (num of lineNumbers(); track num) {
+              <span>{{ num }}</span>
+            }
+          </div>
+          <textarea
+            #sourceInput
+            id="workshop-draft-source"
+            class="dsl-textarea"
+            rows="16"
+            spellcheck="false"
+            placeholder='param fast = 20;&#10;rule enter when sma(close, fast) > sma(close, 50)&#10;  buy 50% market because "Пересечение";'
+            [ngModel]="store.draftSource()"
+            (ngModelChange)="store.setDraftSource($event ?? '')"
+            (scroll)="syncGutterScroll(sourceInput)"
+          ></textarea>
+        </div>
       </div>
     </div>
 
@@ -111,7 +120,7 @@
 
     @if (store.editorMode() === 'edit') {
       <section class="editor-section">
-        <h3 class="tui-text_h6">Публикация версии (INV-5)</h3>
+        <h3 class="tui-text_h6">Публикация новой неизменяемой версии</h3>
         <label tuiLabel for="workshop-publish-summary" class="field-block">
           Комментарий к версии
           <tui-textfield tuiTextfieldSize="s">

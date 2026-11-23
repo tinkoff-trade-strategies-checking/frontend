@@ -35,11 +35,7 @@
                 "output": "assets/taiga-ui/icons"
               }
             ],
-            "styles": [
-              "node_modules/@taiga-ui/styles/taiga-ui-theme.css",
-              "node_modules/@taiga-ui/styles/taiga-ui-fonts.css",
-              "src/styles.less"
-            ]
+            "styles": ["node_modules/@taiga-ui/styles/taiga-ui-theme.css", "src/styles.less"]
           },
           "configurations": {
             "production": {

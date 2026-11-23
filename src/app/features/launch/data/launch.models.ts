@@ -48,6 +48,8 @@ export interface LaunchOptions {
   readonly maxPapers: number;
   readonly defaultPaperCount: number;
   readonly executionRules: ExecutionRulesSummary;
+  readonly archiveFrom?: string | null;
+  readonly archiveTo?: string | null;
 }
 
 export interface StartSessionCommand {

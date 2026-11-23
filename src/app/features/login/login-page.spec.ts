@@ -116,4 +116,23 @@ describe('LoginPage', () => {
     controller.expectOne('/api/v1/me').flush({ id: 'u', email: 'a@b.c', role: 'USER' });
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/new'));
   });
+
+  it('отображает бренд-шапку с заголовком и тремя преимуществами', async () => {
+    await setup(false);
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+    controller.expectOne('/api/v1/me').flush({}, { status: 401, statusText: 'Unauthorized' });
+    await fixture.whenStable();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('h1')?.textContent).toContain('Тренажёр и лаборатория стратегий');
+    const chips = Array.from(root.querySelectorAll('.login-chips li')).map((li) =>
+      li.textContent?.trim(),
+    );
+    expect(chips).toEqual([
+      'Без заглядывания в будущее',
+      'Реальные комиссии и ликвидность MOEX',
+      'Разбор ошибок по шагам',
+    ]);
+  });
 });

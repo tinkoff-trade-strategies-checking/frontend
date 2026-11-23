@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
-import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
+import { TuiBadge } from '@taiga-ui/kit';
+import { HistoryFilters } from './components/history-filters';
 import { errorMessage } from '../../core/api-problem';
 import {
   HISTORY_API,
@@ -50,7 +51,7 @@ const REGIME_FILTERS: readonly { readonly id: HistoryRegimeFilter; readonly labe
 
 @Component({
   selector: 'app-history-page',
-  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiSegmented],
+  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, HistoryFilters],
   providers: [
     { provide: HISTORY_API, useClass: HISTORY_API_IMPL },
     { provide: RUNS_API, useClass: RUNS_API_IMPL },
@@ -81,6 +82,17 @@ export class HistoryPage implements OnInit {
   protected readonly papersOf = historyPapers;
   protected readonly periodOf = historyPeriod;
   protected readonly netReturnOf = historyNetReturn;
+
+  protected readonly statusFilterIds = STATUS_FILTERS.map((f) => f.id);
+  protected readonly regimeFilterIds = REGIME_FILTERS.map((f) => f.id);
+  protected readonly statusStringify = (id: HistoryStatusFilter): string =>
+    STATUS_FILTERS.find((f) => f.id === id)?.label ?? id;
+  protected readonly regimeStringify = (id: HistoryRegimeFilter): string =>
+    REGIME_FILTERS.find((f) => f.id === id)?.label ?? id;
+
+  protected shortEntryId(id: string): string {
+    return id.length <= 12 ? id : `#${id.slice(0, 8)}`;
+  }
 
   ngOnInit(): void {
     void this.store.load();

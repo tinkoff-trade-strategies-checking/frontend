@@ -13,8 +13,10 @@
       @if (periodLabel(); as period) {
         <span class="tui-text_body-s muted">{{ period }}</span>
       }
-      @if (store.sessionId()) {
-        <span class="tui-text_body-s muted">{{ store.sessionId() }}</span>
+      @if (store.sessionId(); as sid) {
+        <span class="session-id-tag tui-text_body-xs muted" [title]="sid">
+          {{ shortSessionId(sid) }}
+        </span>
       }
       @if (store.finished() && !readOnly()) {
         <span tuiBadge appearance="positive" size="m">Завершена</span>
@@ -26,11 +28,6 @@
         <a tuiButton size="s" appearance="outline" [routerLink]="route">Открыть отчёт</a>
       }
     } @else {
-      @if (store.finished() && store.sessionId()) {
-        <a tuiButton size="s" appearance="primary" [routerLink]="['/report', store.sessionId()]">
-          Открыть отчёт
-        </a>
-      }
       @if (!store.finished()) {
         <button tuiButton type="button" size="s" appearance="outline" (click)="confirmFinish()">
           Завершить сессию
@@ -38,6 +35,20 @@
       }
     }
   </header>
+
+  @if (store.finished() && !readOnly() && store.sessionId()) {
+    <div tuiNotification appearance="positive" size="m" class="finish-banner">
+      <div class="finish-banner-text">
+        <strong>Сессия завершена</strong>
+        <span class="tui-text_body-s">
+          Откройте отчёт, чтобы увидеть раскрытый период, метрики и разбор расхождений с алгоритмом.
+        </span>
+      </div>
+      <a tuiButton size="m" appearance="primary" [routerLink]="['/report', store.sessionId()]">
+        Открыть отчёт
+      </a>
+    </div>
+  }
 
   @if (store.error()) {
     <div tuiNotification appearance="negative" size="s" role="alert">

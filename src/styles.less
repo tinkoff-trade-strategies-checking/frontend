@@ -1,4 +1,170 @@
-/* You can add global styles to this file, and also import other style files */
+@import '@fontsource/manrope/400.css';
+@import '@fontsource/manrope/500.css';
+@import '@fontsource/manrope/600.css';
+@import '@fontsource/manrope/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+/* Дизайн-система «Янтарный Тик» (60 / 30 / 10) */
+:root {
+  --ttsc-font-sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ttsc-font-mono: 'JetBrains Mono', monospace;
+  --tui-typography-family-text: var(--ttsc-font-sans);
+  --tui-typography-family-display: var(--ttsc-font-sans);
+}
+
+:root[data-theme='dark'],
+[tuiTheme='dark'] {
+  color-scheme: dark;
+
+  --ttsc-bg: #0f1115;
+  --ttsc-surface: #1a1d24;
+  --ttsc-surface-alt: #232732;
+  --ttsc-border: #2e3442;
+  --ttsc-accent: #ffdd2d;
+  --ttsc-accent-hover: #f5ce00;
+  --ttsc-on-accent: #111318;
+  --ttsc-text: #f1f5f9;
+  --ttsc-text-muted: #94a3b8;
+  --ttsc-text-subtle: #64748b;
+  --ttsc-positive: #10b981;
+  --ttsc-negative: #f43f5e;
+  --ttsc-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+  --tui-background-base: #0f1115;
+  --tui-background-base-alt: #161920;
+  --tui-background-elevation-1: #1a1d24;
+  --tui-background-elevation-2: #232732;
+  --tui-background-elevation-3: #2b303d;
+  --tui-background-neutral-1: rgba(255, 255, 255, 0.06);
+  --tui-background-neutral-1-hover: rgba(255, 255, 255, 0.12);
+  --tui-background-neutral-1-pressed: rgba(255, 255, 255, 0.18);
+  --tui-background-neutral-2: rgba(255, 255, 255, 0.12);
+  --tui-background-neutral-2-hover: rgba(255, 255, 255, 0.18);
+  --tui-background-neutral-2-pressed: rgba(255, 255, 255, 0.24);
+  --tui-border-normal: #2e3442;
+  --tui-border-hover: #475569;
+  --tui-border-focus: #ffdd2d;
+
+  --tui-text-primary: #f1f5f9;
+  --tui-text-secondary: #94a3b8;
+  --tui-text-tertiary: #64748b;
+  --tui-background-accent-1: #ffdd2d;
+  --tui-background-accent-1-hover: #f5ce00;
+  --tui-background-accent-1-pressed: #e0ba00;
+  --tui-text-primary-on-accent-1: #111318;
+  --tui-text-action: #ffdd2d;
+  --tui-text-action-hover: #f5ce00;
+
+  --tui-text-positive: #10b981;
+  --tui-text-positive-hover: #34d399;
+  --tui-status-positive: #10b981;
+  --tui-status-positive-pale: rgba(16, 185, 129, 0.16);
+  --tui-text-negative: #f43f5e;
+  --tui-text-negative-hover: #fb7185;
+  --tui-status-negative: #f43f5e;
+  --tui-status-negative-pale: rgba(244, 63, 94, 0.16);
+}
+
+:root[data-theme='light'],
+[tuiTheme='light'] {
+  color-scheme: light;
+
+  --ttsc-bg: #f4f6fa;
+  --ttsc-surface: #ffffff;
+  --ttsc-surface-alt: #eef2f7;
+  --ttsc-border: #dce3ee;
+  --ttsc-accent: #ffdd2d;
+  --ttsc-accent-hover: #f5ce00;
+  --ttsc-on-accent: #111318;
+  --ttsc-text: #0f172a;
+  --ttsc-text-muted: #475569;
+  --ttsc-text-subtle: #64748b;
+  --ttsc-positive: #059669;
+  --ttsc-negative: #e11d48;
+  --ttsc-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+
+  --tui-background-base: #f4f6fa;
+  --tui-background-base-alt: #eef2f7;
+  --tui-background-elevation-1: #ffffff;
+  --tui-background-elevation-2: #eef2f7;
+  --tui-background-elevation-3: #e2e8f0;
+  --tui-background-neutral-1: rgba(15, 23, 42, 0.05);
+  --tui-background-neutral-1-hover: rgba(15, 23, 42, 0.09);
+  --tui-background-neutral-1-pressed: rgba(15, 23, 42, 0.14);
+  --tui-background-neutral-2: rgba(15, 23, 42, 0.09);
+  --tui-background-neutral-2-hover: rgba(15, 23, 42, 0.14);
+  --tui-background-neutral-2-pressed: rgba(15, 23, 42, 0.18);
+  --tui-border-normal: #dce3ee;
+  --tui-border-hover: #94a3b8;
+  --tui-border-focus: #8a5b00;
+
+  --tui-text-primary: #0f172a;
+  --tui-text-secondary: #475569;
+  --tui-text-tertiary: #64748b;
+  --tui-background-accent-1: #ffdd2d;
+  --tui-background-accent-1-hover: #f5ce00;
+  --tui-background-accent-1-pressed: #e0ba00;
+  --tui-text-primary-on-accent-1: #111318;
+  --tui-text-action: #8a5b00;
+  --tui-text-action-hover: #734b00;
+
+  --tui-text-positive: #059669;
+  --tui-text-positive-hover: #047857;
+  --tui-status-positive: #059669;
+  --tui-status-positive-pale: rgba(5, 150, 105, 0.12);
+  --tui-text-negative: #e11d48;
+  --tui-text-negative-hover: #be123c;
+  --tui-status-negative: #e11d48;
+  --tui-status-negative-pale: rgba(225, 29, 72, 0.12);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--tui-background-base);
+  color: var(--tui-text-primary);
+  font-family: var(--ttsc-font-sans);
+}
+
+a:not([tuiButton]) {
+  color: var(--tui-text-action);
+}
+
+a:not([tuiButton]):hover {
+  color: var(--tui-text-action-hover);
+}
+
+.num,
+td.num,
+th.num,
+code,
+pre,
+.mono {
+  font-family: var(--ttsc-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+th.num,
+td.num {
+  text-align: right;
+}
+
+tui-segmented {
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.panel {
+  background: var(--tui-background-elevation-1);
+  border: 1px solid var(--ttsc-border);
+  border-radius: 14px;
+  box-shadow: var(--ttsc-shadow);
+}
 
 /* Увеличиваем внутренние отступы и высоту бейджей-капсул единообразно по всему приложению */
 /* :root поднимает специфичность выше стилей Taiga, которые вставляются в <head> позже styles.css */

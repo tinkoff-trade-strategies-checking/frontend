@@ -299,11 +299,11 @@ describe('HistoryStore: фильтры, ошибки, пагинация', () =>
 });
 
 describe('HistoryPage: ошибка и утечки', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    TestBed.configureTestingModule({
       imports: [HistoryPage],
       providers: [provideRouter([]), provideTaiga()],
-    }).compileComponents();
+    });
   });
 
   it('INV-7: «утекающая» запись не попадает на страницу', async () => {
@@ -421,7 +421,7 @@ describe('HistoryPage: ошибка и утечки', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Невалидный');
+    expect(el.textContent).toContain('С ошибкой DSL');
     expect(el.textContent).toContain('Ошибка');
 
     const repeatBtn = Array.from(

@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Api } from '../../../api/api';
 import { checkWorkshopStrategy } from '../../../api/fn/workshop/check-workshop-strategy';
 import { createWorkshopAlgorithm } from '../../../api/fn/workshop/create-workshop-algorithm';
+import { deleteWorkshopAlgorithm } from '../../../api/fn/workshop/delete-workshop-algorithm';
 import { forkWorkshopAlgorithm } from '../../../api/fn/workshop/fork-workshop-algorithm';
 import { getWorkshopAlgorithm } from '../../../api/fn/workshop/get-workshop-algorithm';
 import { getWorkshopDraft } from '../../../api/fn/workshop/get-workshop-draft';
@@ -209,5 +210,9 @@ export class HttpWorkshopApi implements WorkshopApi {
     return mapSummary(
       await this.api.invoke(updateWorkshopVisibility, { id, body: { visibility } }),
     );
+  }
+
+  async deleteAlgorithm(id: string): Promise<void> {
+    await this.api.invoke(deleteWorkshopAlgorithm, { id });
   }
 }

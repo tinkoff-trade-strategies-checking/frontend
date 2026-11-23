@@ -148,14 +148,18 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
     .equity-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
     }
 
     .metric-item {
       display: flex;
       flex-direction: column;
       gap: 0.15rem;
+      padding: 0.55rem 0.65rem;
+      background: var(--tui-background-neutral-1);
+      border-radius: var(--tui-radius-m);
+      min-width: 0;
     }
 
     .kv {
@@ -198,6 +202,8 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
       border-bottom: 0;
     }
 
+    .pos-table th.num,
+    .pos-table td.num,
     .num {
       text-align: right;
       font-variant-numeric: tabular-nums;

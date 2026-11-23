@@ -159,7 +159,9 @@ test('real-smoke: вход, арена и INV-8 F5, отчёт сессии, м�
     );
 
   await detail.getByRole('button', { name: 'Создать черновик' }).click();
-  await expect(detail.getByRole('heading', { name: 'Публикация версии (INV-5)' })).toBeVisible();
+  await expect(
+    detail.getByRole('heading', { name: 'Публикация новой неизменяемой версии' }),
+  ).toBeVisible();
 
   await detail.getByRole('button', { name: 'Проверить' }).click();
   const checkSection = detail.getByRole('region', { name: 'Результаты проверки DSL' });

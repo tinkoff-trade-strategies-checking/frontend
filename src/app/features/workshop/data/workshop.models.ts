@@ -174,6 +174,7 @@ export interface WorkshopApi {
   publish(id: string, command?: PublishWorkshopAlgorithmCommand): Promise<PublishWorkshopResult>;
   fork(id: string, command?: ForkWorkshopAlgorithmCommand): Promise<WorkshopDraft>;
   setVisibility(id: string, visibility: WorkshopVisibility): Promise<WorkshopAlgorithmSummary>;
+  deleteAlgorithm(id: string): Promise<void>;
 }
 
 export const WORKSHOP_API = new InjectionToken<WorkshopApi>('WORKSHOP_API');

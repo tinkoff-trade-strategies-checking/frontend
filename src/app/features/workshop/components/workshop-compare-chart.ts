@@ -20,6 +20,7 @@ import {
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
+import { ThemeService } from '../../../core/theme.service';
 import { CompareChartSeries } from '../workshop-compare.store';
 
 export type CompareChartMode = 'pct' | 'rub';
@@ -121,6 +122,7 @@ function resolveCssColor(el: HTMLElement, value: string): string {
 })
 export class WorkshopCompareChart {
   private readonly destroyRef = inject(DestroyRef);
+  private readonly themeService = inject(ThemeService, { optional: true });
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly series = input.required<readonly CompareChartSeries[]>();
@@ -137,9 +139,11 @@ export class WorkshopCompareChart {
     });
 
     effect(() => {
+      this.themeService?.theme();
       this.series();
       this.mode();
       this.hiddenIds();
+      this.applyThemeOptions();
       this.syncData();
     });
 
@@ -185,6 +189,9 @@ export class WorkshopCompareChart {
         rightPriceScale: { borderColor },
         timeScale: {
           borderColor,
+          fixLeftEdge: false,
+          fixRightEdge: false,
+          minBarSpacing: 4,
           tickMarkFormatter: (time: Time) => `Шаг ${Math.max(0, Number(time) - 1000)}`,
         },
         localization: {
@@ -238,5 +245,29 @@ export class WorkshopCompareChart {
       api.setData(data);
     }
     chart.timeScale().fitContent();
+    const range = chart.timeScale().getVisibleLogicalRange();
+    if (range) {
+      const pad = Math.max(0.8, (range.to - range.from) * 0.04);
+      chart.timeScale().setVisibleLogicalRange({
+        from: range.from - pad,
+        to: range.to + pad * 0.25,
+      });
+    }
+  }
+
+  private applyThemeOptions(): void {
+    const chart = this.chart;
+    if (!chart) {
+      return;
+    }
+    const el = this.container().nativeElement;
+    const textColor = resolveCssColor(el, 'var(--tui-text-secondary)');
+    const borderColor = resolveCssColor(el, 'var(--tui-border-normal)');
+    chart.applyOptions({
+      layout: { background: { color: 'transparent' }, textColor },
+      grid: { vertLines: { color: borderColor }, horzLines: { color: borderColor } },
+      rightPriceScale: { borderColor },
+      timeScale: { borderColor },
+    });
   }
 }

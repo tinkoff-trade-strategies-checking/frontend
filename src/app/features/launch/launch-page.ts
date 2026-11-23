@@ -3,7 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import {
+  TuiBadge,
+  TuiChevron,
+  TuiInputDate,
+  TuiInputNumber,
+  TuiSegmented,
+  TuiSelect,
+} from '@taiga-ui/kit';
 import {
   CandleTimeframe,
   LAUNCH_API,
@@ -39,6 +46,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
     RouterLink,
     TuiButton,
     TuiBadge,
+    TuiChevron,
     TuiInputDate,
     TuiInputNumber,
     TuiNotification,
@@ -61,8 +69,8 @@ export class LaunchPage implements OnInit {
   protected readonly customStartDay = computed<TuiDay | null>(() =>
     parseIsoDay(this.store.customStartDate()),
   );
-  protected readonly backgroundAlgorithmOptions = computed<readonly (string | null)[]>(() => [
-    null,
+  protected readonly backgroundAlgorithmOptions = computed<readonly string[]>(() => [
+    '',
     ...this.store.backgroundAlgorithms().map((algo) => algo.id),
   ]);
   protected readonly backgroundAlgorithmLabel = computed<string>(() => {
@@ -72,9 +80,9 @@ export class LaunchPage implements OnInit {
     }
     return this.store.options()?.backgroundAlgorithmName ?? 'Эталон платформы';
   });
-  protected readonly backgroundAlgorithmStringify = (algorithmId: string | null): string => {
+  protected readonly backgroundAlgorithmStringify = (algorithmId: string): string => {
     const defaultName = this.store.options()?.backgroundAlgorithmName ?? 'Эталон платформы';
-    if (algorithmId === null) {
+    if (!algorithmId) {
       return `${defaultName} (по умолчанию)`;
     }
     const algo = this.store.backgroundAlgorithms().find((item) => item.id === algorithmId);

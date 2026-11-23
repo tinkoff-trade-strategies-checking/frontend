@@ -97,11 +97,13 @@ export class ReportUnderwaterChart {
   private chart: IChartApi | null = null;
   private humanSeries: ISeriesApi<'Area'> | null = null;
   private algoSeries: ISeriesApi<'Line'> | null = null;
+  private themeObserver: MutationObserver | null = null;
   private labelByTime = new Map<number, string>();
 
   constructor() {
     afterNextRender(() => {
       this.initChart();
+      this.observeTheme();
       this.syncData();
     });
 
@@ -111,18 +113,65 @@ export class ReportUnderwaterChart {
     });
 
     this.destroyRef.onDestroy(() => {
+      this.themeObserver?.disconnect();
+      this.themeObserver = null;
       this.chart?.remove();
       this.chart = null;
     });
   }
 
-  private initChart(): void {
+  private observeTheme(): void {
+    if (typeof MutationObserver === 'undefined') {
+      return;
+    }
+    const observer = new MutationObserver(() => this.applyThemeColors());
+    const opts: MutationObserverInit = {
+      attributes: true,
+      attributeFilter: ['tuiTheme', 'tuitheme', 'data-theme', 'class'],
+    };
+    observer.observe(document.documentElement, opts);
+    if (document.body) {
+      observer.observe(document.body, opts);
+    }
+    const themeHost = this.container().nativeElement.closest('[tuiTheme]');
+    if (themeHost && themeHost !== document.documentElement && themeHost !== document.body) {
+      observer.observe(themeHost, opts);
+    }
+    this.themeObserver = observer;
+  }
+
+  private readThemePalette() {
     const el = this.container().nativeElement;
     const textColor = readCssColor(el, '--tui-text-secondary');
     const borderColor = readCssColor(el, '--tui-border-normal');
     const negativeColor = readCssColor(el, '--tui-text-negative');
     const fillBg = readCssColor(el, '--tui-background-neutral-2', 'transparent');
     const algoColor = readCssColor(el, '--tui-text-action');
+    return { textColor, borderColor, negativeColor, fillBg, algoColor };
+  }
+
+  private applyThemeColors(): void {
+    if (!this.chart || !this.humanSeries || !this.algoSeries) {
+      return;
+    }
+    const { textColor, borderColor, negativeColor, fillBg, algoColor } = this.readThemePalette();
+    this.chart.applyOptions({
+      layout: { background: { color: 'transparent' }, textColor },
+      grid: { vertLines: { color: borderColor }, horzLines: { color: borderColor } },
+      rightPriceScale: { borderColor },
+      timeScale: { borderColor },
+    });
+    this.humanSeries.applyOptions({
+      lineColor: negativeColor,
+      topColor: fillBg,
+      bottomColor: 'transparent',
+    });
+    this.algoSeries.applyOptions({ color: algoColor });
+  }
+
+  private initChart(): void {
+    const el = this.container().nativeElement;
+    const { textColor, borderColor, negativeColor, fillBg, algoColor } = this.readThemePalette();
 
     this.chart = createChart(el, {
       autoSize: true,

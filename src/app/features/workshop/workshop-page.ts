@@ -10,10 +10,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import { TuiBadge, TuiChevron, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { LAUNCH_API_IMPL, RUNS_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
 import { LAUNCH_API } from '../launch/data/launch.models';
 import { RUNS_API } from '../runs/data/runs.models';
+import { WorkshopCodeViewer } from './components/workshop-code-viewer';
 import { WorkshopDraftEditor } from './components/workshop-draft-editor';
 import { WorkshopRunForm } from './components/workshop-run-form';
 import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
@@ -37,11 +38,13 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
     RouterLink,
     TuiButton,
     TuiBadge,
+    TuiChevron,
     TuiInput,
     TuiNotification,
     TuiSegmented,
     TuiSelect,
     TuiTextfield,
+    WorkshopCodeViewer,
     WorkshopDraftEditor,
     WorkshopRunForm,
   ],
@@ -68,12 +71,12 @@ export class WorkshopPage implements OnInit {
       this.store.editorMode() !== 'closed' ||
       this.store.runFormOpen(),
   );
-  protected readonly authorOptions = computed<readonly (string | null)[]>(() => [
-    null,
+  protected readonly authorOptions = computed<readonly string[]>(() => [
+    '',
     ...this.store.authors().map((author) => author.id),
   ]);
-  protected readonly authorStringify = (authorId: string | null): string => {
-    if (authorId === null) {
+  protected readonly authorStringify = (authorId: string): string => {
+    if (!authorId) {
       return 'Все авторы';
     }
     return this.store.authors().find((author) => author.id === authorId)?.name ?? authorId;

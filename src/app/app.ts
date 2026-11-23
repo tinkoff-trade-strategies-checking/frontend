@@ -1,16 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
-import { TuiButton, TuiRoot } from '@taiga-ui/core';
+import { TuiButton, TuiIcon, TuiRoot } from '@taiga-ui/core';
 import { filter, map, startWith } from 'rxjs';
 import { STUB_MODE } from './core/api-mode';
 import { AuthService } from './core/auth/auth.service';
+import { ThemeService } from './core/theme.service';
 import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 import { StubSessionRegistry } from './shared/stub-session-registry';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, TuiRoot, TuiButton],
+  imports: [RouterOutlet, RouterLink, TuiRoot, TuiButton, TuiIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.less',
@@ -19,10 +20,12 @@ export class App {
   private readonly sessionRegistry = inject(StubSessionRegistry);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly themeService = inject(ThemeService);
 
   protected readonly user = this.auth.user;
   protected readonly stubMode = inject(STUB_MODE);
   protected readonly showNav = computed(() => this.stubMode || this.user() !== null);
+  protected readonly theme = this.themeService.theme;
 
   private readonly currentUrl = toSignal(
     this.router.events.pipe(
@@ -55,6 +58,10 @@ export class App {
       { path: '/history', title: 'История', activePrefix: '/history' },
     ] as const;
   });
+
+  protected toggleTheme(): void {
+    this.themeService.toggle();
+  }
 
   protected async logout(): Promise<void> {
     try {

@@ -16,7 +16,7 @@ export const HISTORY_STATUS_LABELS: Readonly<Record<HistoryItemStatus, string>> 
   completed: 'Завершена',
   finished_early: 'Досрочно',
   bankrupt: 'Банкротство',
-  invalid: 'Невалидный',
+  invalid: 'С ошибкой DSL',
   failed: 'Ошибка',
 };
 

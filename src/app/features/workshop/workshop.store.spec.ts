@@ -21,6 +21,7 @@ function stubApi(overrides: Pick<WorkshopApi, 'list' | 'getById'>): WorkshopApi 
     publish: () => Promise.reject(new Error('not used')),
     fork: () => Promise.reject(new Error('not used')),
     setVisibility: () => Promise.reject(new Error('not used')),
+    deleteAlgorithm: () => Promise.reject(new Error('not used')),
   };
 }
 

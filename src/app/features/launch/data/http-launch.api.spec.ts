@@ -55,12 +55,16 @@ describe('HttpLaunchApi', () => {
         liquidityLimitPct: '10',
         maxBars: 5000,
       },
+      archiveFrom: '2020-01-03',
+      archiveTo: '2025-12-31',
     });
     const options = await pending;
     expect(options.capitalPresetsRub).toEqual([100000, 1000000]);
     expect(options.defaultCapitalRub).toBe(1000000);
     expect(options.maxDurationDaysByTimeframe['1h']).toBe(357);
     expect(options.executionRules).toMatchObject({ commissionPct: 0.3, maxBars: 5000 });
+    expect(options.archiveFrom).toBe('2020-01-03');
+    expect(options.archiveTo).toBe('2025-12-31');
   });
 
   it('каталог бумаг для своей даты', async () => {

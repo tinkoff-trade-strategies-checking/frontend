@@ -126,7 +126,7 @@
                         {{ statusLabels[item.report.status] }}
                       </span>
                       <a class="tui-text_body-xs" [routerLink]="['/runs', item.runId, 'report']">
-                        Отчёт {{ item.runId }}
+                        Отчёт прогона #{{ shortRunId(item.runId) }}
                       </a>
                     </div>
                   } @else if (item.status === 'no_run') {
@@ -169,10 +169,8 @@
                     <div>{{ item.report.period.label }}</div>
                     <div class="tui-text_body-xs muted">
                       {{ regimeLabels[item.report.regime] }} ·
-                      {{ timeframeLabels[item.report.timeframe] }} ({{ item.report.playedDays }}/{{
-                        item.report.totalDays
-                      }}
-                      дн.)
+                      {{ timeframeLabels[item.report.timeframe] }} ·
+                      {{ item.report.playedDays }} шагов · горизонт {{ item.report.totalDays }} дн.
                     </div>
                   } @else {
                     <span class="muted">—</span>
@@ -196,9 +194,12 @@
               <tr>
                 <td>{{ row.label }}</td>
                 @for (item of store.entries(); track item.id) {
+                  @let tone = item.status === 'ready' ? returnTone(row.key, item) : null;
                   <td
                     class="num"
                     [class.best-cell]="item.status === 'ready' && isBest(row.key, item.id)"
+                    [class.pos-val]="tone === 'positive'"
+                    [class.neg-val]="tone === 'negative'"
                   >
                     @if (item.status === 'ready') {
                       {{ row.format(item) }}

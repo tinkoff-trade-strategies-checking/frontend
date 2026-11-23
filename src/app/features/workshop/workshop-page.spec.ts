@@ -25,7 +25,18 @@ function stubApi(overrides: Pick<WorkshopApi, 'list' | 'getById'>): WorkshopApi 
     publish: () => Promise.reject(new Error('not used')),
     fork: () => Promise.reject(new Error('not used')),
     setVisibility: () => Promise.reject(new Error('not used')),
+    deleteAlgorithm: () => Promise.reject(new Error('not used')),
   };
+}
+
+function findRowButton(
+  el: HTMLElement,
+  algoId: string,
+  label: string,
+): HTMLButtonElement | undefined {
+  return Array.from(
+    el.querySelectorAll<HTMLButtonElement>(`tr[data-algo-id="${algoId}"] button`),
+  ).find((b) => b.textContent?.trim() === label);
 }
 
 describe('WorkshopPage', () => {
@@ -65,7 +76,7 @@ describe('WorkshopPage', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     const mineBtn = Array.from(el.querySelectorAll('button')).find(
-      (b) => b.textContent?.trim() === 'Мои',
+      (b) => b.textContent?.trim() === 'Мои алгоритмы',
     );
     expect(mineBtn).toBeDefined();
     mineBtn?.click();
@@ -112,8 +123,7 @@ describe('WorkshopPage', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    const rowA3 = el.querySelector('tr[data-algo-id="A-0003"]');
-    const openBtn = rowA3?.querySelector('button');
+    const openBtn = findRowButton(el, 'A-0003', 'Открыть');
     openBtn?.click();
 
     await fixture.whenStable();
@@ -152,7 +162,7 @@ describe('WorkshopPage', () => {
     const ids = ['A-0001', 'A-0002', 'A-0003', 'A-0004', 'A-0006'];
 
     for (const id of ids) {
-      const openBtn = el.querySelector(`tr[data-algo-id="${id}"] button`);
+      const openBtn = findRowButton(el, id, 'Открыть');
       openBtn?.dispatchEvent(new Event('click'));
       await fixture.whenStable();
       fixture.detectChanges();
@@ -169,7 +179,7 @@ describe('WorkshopPage', () => {
       `В сравнении: ${WORKSHOP_COMPARE_LIMIT} из ${WORKSHOP_COMPARE_LIMIT}`,
     );
 
-    const openSixth = el.querySelector('tr[data-algo-id="A-0007"] button');
+    const openSixth = findRowButton(el, 'A-0007', 'Открыть');
     openSixth?.dispatchEvent(new Event('click'));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -188,7 +198,7 @@ describe('WorkshopPage', () => {
 
     const el = fixture.nativeElement as HTMLElement;
     const addAlgo = async (id: string) => {
-      el.querySelector(`tr[data-algo-id="${id}"] button`)?.dispatchEvent(new Event('click'));
+      findRowButton(el, id, 'Открыть')?.dispatchEvent(new Event('click'));
       await fixture.whenStable();
       fixture.detectChanges();
       const addBtn = Array.from(el.querySelectorAll('.detail-panel button')).find((b) =>
@@ -359,7 +369,7 @@ describe('WorkshopPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const openBtn = el.querySelector('tr[data-algo-id="A-1"] button');
+    const openBtn = findRowButton(el, 'A-1', 'Открыть');
     openBtn?.dispatchEvent(new Event('click'));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -485,7 +495,7 @@ describe('WorkshopPage', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    const openOwnBtn = el.querySelector('tr[data-algo-id="A-0002"] button');
+    const openOwnBtn = findRowButton(el, 'A-0002', 'Открыть');
     openOwnBtn?.dispatchEvent(new Event('click'));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -558,7 +568,7 @@ describe('WorkshopPage', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    const openBtn = el.querySelector('tr[data-algo-id="A-0001"] button');
+    const openBtn = findRowButton(el, 'A-0001', 'Открыть');
     openBtn?.dispatchEvent(new Event('click'));
     await fixture.whenStable();
     fixture.detectChanges();
@@ -628,6 +638,47 @@ describe('WorkshopPage', () => {
     expect(store.editorMode()).toBe('create');
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Новый алгоритм');
     void of(true);
+  });
+
+  it('показывает исходный код версии в карточке, добавляет в сравнение из строки таблицы и удаляет свой алгоритм', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const compareRowBtn = findRowButton(el, 'A-0002', '+ Сравнить');
+    expect(compareRowBtn).toBeDefined();
+    compareRowBtn?.click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('В сравнении: 1 из 5');
+    expect(findRowButton(el, 'A-0002', '✓ В сравнении')).toBeDefined();
+
+    findRowButton(el, 'A-0002', 'Открыть')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const detail = el.querySelector('.detail-panel');
+    expect(detail?.textContent).toContain('Исходный код версии');
+    expect(detail?.textContent).toContain('Скопировать код');
+    expect(detail?.querySelectorAll('.code-line').length).toBeGreaterThan(0);
+
+    const deleteBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Удалить',
+    ) as HTMLButtonElement | undefined;
+    expect(deleteBtn).toBeDefined();
+    deleteBtn?.click();
+    fixture.detectChanges();
+
+    expect(detail?.textContent).toContain('Удалить алгоритм из Мастерской?');
+    const confirmBtn = Array.from(detail?.querySelectorAll('button') ?? []).find(
+      (b) => b.textContent?.trim() === 'Удалить алгоритм',
+    ) as HTMLButtonElement | undefined;
+    confirmBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('tr[data-algo-id="A-0002"]')).toBeNull();
   });
 });
 

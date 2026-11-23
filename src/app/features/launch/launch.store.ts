@@ -18,6 +18,34 @@ import { errorMessage } from '../../core/api-problem';
 import { isFeatureOpen } from '../../core/real-features';
 import { formatLaunchRejection, LaunchRejectMessage } from './launch.format';
 
+const DEFAULT_CUSTOM_START_DATE = '2024-06-03';
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function pickSafeArchiveDate(archiveFrom?: string | null, archiveTo?: string | null): string {
+  const from = archiveFrom && ISO_DATE_RE.test(archiveFrom) ? archiveFrom : null;
+  const to = archiveTo && ISO_DATE_RE.test(archiveTo) ? archiveTo : null;
+
+  if (from && to && from <= to) {
+    if (DEFAULT_CUSTOM_START_DATE >= from && DEFAULT_CUSTOM_START_DATE <= to) {
+      return DEFAULT_CUSTOM_START_DATE;
+    }
+    const startMs = Date.parse(`${from}T00:00:00Z`);
+    const endMs = Date.parse(`${to}T00:00:00Z`);
+    if (Number.isFinite(startMs) && Number.isFinite(endMs)) {
+      const shiftedMs = Math.min(endMs, startMs + 30 * 86_400_000);
+      return new Date(shiftedMs).toISOString().slice(0, 10);
+    }
+    return from;
+  }
+  if (from) {
+    return DEFAULT_CUSTOM_START_DATE >= from ? DEFAULT_CUSTOM_START_DATE : from;
+  }
+  if (to) {
+    return DEFAULT_CUSTOM_START_DATE <= to ? DEFAULT_CUSTOM_START_DATE : to;
+  }
+  return DEFAULT_CUSTOM_START_DATE;
+}
+
 @Injectable()
 export class LaunchStore {
   private readonly api = inject(LAUNCH_API);
@@ -27,6 +55,7 @@ export class LaunchStore {
   private readonly destroyRef = inject(DestroyRef);
   private customPapersLoadSeq = 0;
   private backgroundAlgorithmsLoadSeq = 0;
+  private customStartDateTouched = false;
   private destroyed = false;
 
   readonly loading = signal(false);
@@ -45,7 +74,7 @@ export class LaunchStore {
   readonly timeframe = signal<CandleTimeframe>('1d');
   readonly regime = signal<MarketRegime>('medium');
   readonly startMode = signal<StartMode>('random');
-  readonly customStartDate = signal('2020-02-26');
+  readonly customStartDate = signal(DEFAULT_CUSTOM_START_DATE);
   readonly paperCount = signal(3);
   readonly selectedPaperIds = signal<readonly string[]>([]);
   readonly initialCapitalRub = signal<number | null>(1_000_000);
@@ -177,6 +206,9 @@ export class LaunchStore {
       this.regime.set(opts.defaultRegime);
       this.initialCapitalRub.set(opts.defaultCapitalRub);
       this.paperCount.set(opts.defaultPaperCount);
+      if (!this.customStartDateTouched) {
+        this.customStartDate.set(pickSafeArchiveDate(opts.archiveFrom, opts.archiveTo));
+      }
     } catch (error) {
       if (!this.destroyed) {
         this.error.set(errorMessage(error, 'Не удалось загрузить параметры запуска.'));
@@ -284,6 +316,7 @@ export class LaunchStore {
   }
 
   setCustomStartDate(date: string): void {
+    this.customStartDateTouched = true;
     this.customStartDate.set(date);
     this.rejection.set(null);
   }
