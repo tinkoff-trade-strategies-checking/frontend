@@ -6,6 +6,7 @@ import {
   DestroyRef,
   inject,
   OnInit,
+  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -17,6 +18,7 @@ import { LAUNCH_API } from '../launch/data/launch.models';
 import { RUNS_API } from '../runs/data/runs.models';
 import { WorkshopCodeViewer } from './components/workshop-code-viewer';
 import { WorkshopDraftEditor } from './components/workshop-draft-editor';
+import { WorkshopDslGuide } from './components/workshop-dsl-guide';
 import { WorkshopRunForm } from './components/workshop-run-form';
 import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
 import {
@@ -47,6 +49,7 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
     TuiTextfield,
     WorkshopCodeViewer,
     WorkshopDraftEditor,
+    WorkshopDslGuide,
     WorkshopRunForm,
   ],
   providers: [
@@ -72,6 +75,7 @@ export class WorkshopPage implements OnInit {
     this.store.mineOnly() ? SORT_OPTIONS.filter((opt) => opt.id !== 'author_asc') : SORT_OPTIONS,
   );
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
+  protected readonly dslGuideOpen = signal(false);
   protected readonly showSidePanel = computed(
     () =>
       this.store.selectedId() !== null ||
@@ -130,12 +134,29 @@ export class WorkshopPage implements OnInit {
     }
   }
 
+  protected openDslGuide(): void {
+    this.dslGuideOpen.set(true);
+  }
+
+  protected closeDslGuide(): void {
+    this.dslGuideOpen.set(false);
+  }
+
+  protected onInsertDslExample(code: string): void {
+    this.store.setDraftSource(code);
+    this.dslGuideOpen.set(false);
+  }
+
   protected onBackdropClick(): void {
     this.dismissSidePanel();
   }
 
   protected onEscapeKey(event: Event): void {
     if (event.defaultPrevented || this.document.querySelector('tui-dropdown')) {
+      return;
+    }
+    if (this.dslGuideOpen()) {
+      this.closeDslGuide();
       return;
     }
     this.dismissSidePanel();

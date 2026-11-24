@@ -1,0 +1,490 @@
+<div class="guide-backdrop" aria-hidden="true" (click)="close()"></div>
+<section
+  class="guide-dialog panel"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="dsl-guide-title"
+>
+  <header class="guide-header">
+    <div>
+      <h2 id="dsl-guide-title" class="tui-text_h5">Справка по языку DSL</h2>
+      <p class="tui-text_body-xs muted">
+        Правила синтаксиса, индикаторы, готовые примеры стратегий и разбор ошибок
+      </p>
+    </div>
+    <button tuiButton type="button" size="xs" appearance="flat" (click)="close()">Закрыть</button>
+  </header>
+
+  <div class="guide-tabs" role="tablist" aria-label="Разделы справки по DSL">
+    @for (tab of tabs; track tab.id) {
+      <button
+        type="button"
+        role="tab"
+        class="guide-tab"
+        [class.active]="activeTab() === tab.id"
+        [attr.aria-selected]="activeTab() === tab.id"
+        (click)="selectTab(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  <div class="guide-content">
+    @switch (activeTab()) {
+      @case ('start') {
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Что такое DSL стратегий</h3>
+          <p class="tui-text_body-s">
+            DSL — это простой декларативный язык для описания торговых правил. Вы задаёте параметры
+            (<code>param</code>) и одно или несколько правил (<code>rule</code>) в формате «<strong
+              >когда</strong
+            >
+            выполняется условие — <strong>тогда</strong> выставить заявку —
+            <strong>потому что</strong> …».
+          </p>
+          <div tuiNotification appearance="info" size="s">
+            Точка с запятой <code>;</code> в конце строк не ставится. Вся стратегия работает строго
+            на прошлых и текущих барах — заглядывать в будущее язык не позволяет.
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <div class="section-head">
+            <h3 class="tui-text_h6">Минимальная рабочая стратегия</h3>
+            <div class="snippet-actions">
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="outline"
+                (click)="copySnippet('quickstart', quickstartCode)"
+              >
+                {{ copiedId() === 'quickstart' ? 'Скопировано' : 'Скопировать' }}
+              </button>
+              @if (canInsert()) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="xs"
+                  appearance="primary"
+                  (click)="insertExample(quickstartCode)"
+                >
+                  Вставить в редактор
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="code-block" role="region" aria-label="Пример минимальной стратегии">
+            @for (line of quickstartLines; track line.lineNumber) {
+              <div class="code-line">
+                <span class="line-no" aria-hidden="true">{{ line.lineNumber }}</span>
+                <code class="line-content">
+                  @for (tok of line.tokens; track $index) {
+                    <span [class]="'tok-' + tok.kind">{{ tok.text }}</span>
+                  }
+                  @if (line.tokens.length === 1 && line.tokens[0].text === '') {
+                    <span> </span>
+                  }
+                </code>
+              </div>
+            }
+          </div>
+
+          <h4 class="tui-text_body-s subhead">Разбор по частям</h4>
+          <dl class="breakdown-list">
+            @for (item of quickstartBreakdown; track item.token) {
+              <div class="breakdown-item">
+                <dt>
+                  <code>{{ item.token }}</code>
+                </dt>
+                <dd class="tui-text_body-s muted">{{ item.summary }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Как исполняется стратегия</h3>
+          <ol class="rules-list tui-text_body-s">
+            @for (rule of executionRules; track $index) {
+              <li>{{ rule }}</li>
+            }
+          </ol>
+        </section>
+      }
+
+      @case ('syntax') {
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Структура файла и параметры</h3>
+          <p class="tui-text_body-s">
+            Сначала идут необязательные объявления <code>param</code>, затем минимум одно правило
+            <code>rule</code>. Комментарии начинаются с <code>#</code> и действуют до конца строки.
+          </p>
+          <pre class="inline-pre"><code>param имя = значение [range от..до step шаг]
+
+rule "уникальное имя"
+  when &lt;логическое условие&gt;
+  then &lt;действие&gt;
+  because "причина с подстановкой &#123;выражение&#125;"</code></pre>
+          <p class="tui-text_body-xs muted">
+            Если параметр используется как период индикатора или смещение <code>[k]</code>, его
+            значение, границы <code>range</code> и <code>step</code> должны быть целыми числами. В
+            строке <code>because</code> числа форматируются до 2 знаков с запятой, <code>na</code> —
+            как «н/д», логические значения — как «да»/«нет». Для буквальных скобок пишите
+            <code>&#123;&#123;</code> и <code>&#125;&#125;</code>.
+          </p>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Действия (then)</h3>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <thead>
+                <tr>
+                  <th>Запись</th>
+                  <th>Что делает</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of actionRows; track row.name) {
+                  <tr>
+                    <td>
+                      <code>{{ row.name }}</code>
+                    </td>
+                    <td>
+                      <div>{{ row.detail }}</div>
+                      @if (row.note) {
+                        <div class="tui-text_body-xs muted">{{ row.note }}</div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Типы данных, na и приоритеты операторов</h3>
+          <p class="tui-text_body-s">
+            В языке два типа: число (<code>number</code>) и логический (<code>bool</code>:
+            <code>true</code> / <code>false</code>). Особое значение <code>na</code> («нет данных»,
+            например в начале истории или при делении на 0) передаётся по арифметике, а в любом
+            сравнении даёт <code>false</code>. Проверить его можно функцией <code>is_na(x)</code>.
+          </p>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <thead>
+                <tr>
+                  <th>Операторы</th>
+                  <th>Приоритет и особенности</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of operatorRows; track row.name) {
+                  <tr>
+                    <td>
+                      <code>{{ row.name }}</code>
+                    </td>
+                    <td>
+                      <div>{{ row.detail }}</div>
+                      @if (row.note) {
+                        <div class="tui-text_body-xs muted">{{ row.note }}</div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Ограничения языка</h3>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <tbody>
+                @for (row of limitRows; track row.name) {
+                  <tr>
+                    <td class="label-cell">{{ row.name }}</td>
+                    <td>{{ row.detail }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+
+      @case ('reference') {
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Данные свечи и смещения</h3>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <tbody>
+                @for (row of seriesRows; track row.name) {
+                  <tr>
+                    <td>
+                      <code>{{ row.name }}</code>
+                    </td>
+                    <td>
+                      <div>{{ row.detail }}</div>
+                      @if (row.note) {
+                        <div class="tui-text_body-xs muted">{{ row.note }}</div>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Состояние портфеля</h3>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <tbody>
+                @for (row of portfolioRows; track row.name) {
+                  <tr>
+                    <td>
+                      <code>{{ row.name }}</code>
+                    </td>
+                    <td>{{ row.detail }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <p class="tui-text_body-xs muted">
+            Важно: переменные портфеля можно использовать в условиях <code>when</code>, действиях
+            <code>then</code>, строке <code>because</code> и в <code>abs/min/max/sqrt/is_na</code>,
+            но нельзя передавать в индикаторы (<code>sma</code>, <code>rsi</code> и т. п.) и нельзя
+            индексировать через <code>[k]</code> (ошибка <code>E-TYPE</code>).
+          </p>
+        </section>
+
+        <section class="guide-section">
+          <div class="section-head">
+            <h3 class="tui-text_h6">Встроенные индикаторы и функции</h3>
+            <tui-textfield tuiTextfieldSize="s" [tuiTextfieldCleaner]="true" class="ref-search">
+              <input
+                id="dsl-guide-ref-search"
+                tuiInput
+                type="text"
+                aria-label="Поиск по индикаторам и функциям"
+                placeholder="Фильтр по названию (sma, rsi, atr…)"
+                [ngModel]="referenceQuery()"
+                (ngModelChange)="referenceQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+          <p class="tui-text_body-xs muted">
+            Период <code>n</code> — целое число <code>1..5000</code> или целочисленный
+            <code>param</code> (произвольные выражения вроде <code>fast + 5</code> в периоде
+            запрещены).
+          </p>
+
+          @if (!hasAnyFilteredFunctions()) {
+            <p class="tui-text_body-s muted">По запросу ничего не найдено.</p>
+          }
+
+          @if (filteredStateful().length > 0) {
+            <h4 class="tui-text_body-s subhead">Индикаторы с состоянием (поддерживают [k])</h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredStateful(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (filteredCrossbar().length > 0) {
+            <h4 class="tui-text_body-s subhead">Межбаровые сравнения</h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredCrossbar(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (filteredStateless().length > 0) {
+            <h4 class="tui-text_body-s subhead">Математика и проверка na</h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredStateless(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+      }
+
+      @case ('examples') {
+        <section class="guide-section">
+          <p class="tui-text_body-s muted">
+            Все примеры ниже полностью соответствуют спецификации DSL и не вызывают предупреждений
+            линтера <code>L001</code>.
+          </p>
+          <div class="examples-stack">
+            @for (example of examples; track example.id) {
+              <article class="example-card">
+                <div class="section-head">
+                  <div>
+                    <h3 class="tui-text_h6">{{ example.title }}</h3>
+                    <div class="example-tags">
+                      @for (tag of example.highlights; track tag) {
+                        <span tuiBadge size="s" appearance="neutral">{{ tag }}</span>
+                      }
+                    </div>
+                  </div>
+                  <div class="snippet-actions">
+                    <button
+                      tuiButton
+                      type="button"
+                      size="xs"
+                      appearance="outline"
+                      (click)="copySnippet(example.id, example.code)"
+                    >
+                      {{ copiedId() === example.id ? 'Скопировано' : 'Скопировать' }}
+                    </button>
+                    @if (canInsert()) {
+                      <button
+                        tuiButton
+                        type="button"
+                        size="xs"
+                        appearance="primary"
+                        (click)="insertExample(example.code)"
+                      >
+                        Вставить в редактор
+                      </button>
+                    }
+                  </div>
+                </div>
+                <p class="tui-text_body-s muted example-summary">{{ example.summary }}</p>
+                <div class="code-block" role="region" [attr.aria-label]="example.title">
+                  @for (line of example.lines; track line.lineNumber) {
+                    <div class="code-line">
+                      <span class="line-no" aria-hidden="true">{{ line.lineNumber }}</span>
+                      <code class="line-content">
+                        @for (tok of line.tokens; track $index) {
+                          <span [class]="'tok-' + tok.kind">{{ tok.text }}</span>
+                        }
+                        @if (line.tokens.length === 1 && line.tokens[0].text === '') {
+                          <span> </span>
+                        }
+                      </code>
+                    </div>
+                  }
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+
+      @case ('errors') {
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Частые ошибки новичков</h3>
+          <div class="mistakes-stack">
+            @for (item of mistakes; track item.code + '-' + item.title) {
+              <article class="mistake-card">
+                <div class="mistake-head">
+                  <span
+                    tuiBadge
+                    size="s"
+                    [appearance]="item.level === 'ERROR' ? 'negative' : 'warning'"
+                  >
+                    {{ item.code }}
+                  </span>
+                  <strong class="tui-text_body-s">{{ item.title }}</strong>
+                </div>
+                <div class="diff-grid">
+                  <div class="diff-col diff-wrong">
+                    <span class="tui-text_body-xs diff-label">Неправильно</span>
+                    <pre class="inline-pre"><code>{{ item.wrong }}</code></pre>
+                  </div>
+                  <div class="diff-col diff-right">
+                    <span class="tui-text_body-xs diff-label">Правильно</span>
+                    <pre class="inline-pre"><code>{{ item.right }}</code></pre>
+                  </div>
+                </div>
+                <p class="tui-text_body-xs muted mistake-note">{{ item.explanation }}</p>
+              </article>
+            }
+          </div>
+        </section>
+
+        <section class="guide-section">
+          <h3 class="tui-text_h6">Справочник кодов проверки</h3>
+          <div class="table-wrap">
+            <table class="guide-table">
+              <thead>
+                <tr>
+                  <th>Код</th>
+                  <th>Публикация</th>
+                  <th>Значение</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (diag of diagnostics; track diag.code) {
+                  <tr>
+                    <td class="nowrap">
+                      <span
+                        tuiBadge
+                        size="s"
+                        [appearance]="diag.level === 'ERROR' ? 'negative' : 'warning'"
+                      >
+                        {{ diag.code }}
+                      </span>
+                    </td>
+                    <td class="nowrap">
+                      {{ diag.blocksPublish ? 'Блокирует' : 'Разрешена' }}
+                    </td>
+                    <td>{{ diag.description }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  </div>
+</section>

@@ -57,9 +57,20 @@
       </label>
 
       <div class="field-block">
-        <label for="workshop-draft-source" class="tui-text_body-s field-label">
-          Исходный код DSL
-        </label>
+        <div class="field-label-row">
+          <label for="workshop-draft-source" class="tui-text_body-s field-label">
+            Исходный код DSL
+          </label>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="outline"
+            (click)="openDslGuide.emit()"
+          >
+            Справка по DSL
+          </button>
+        </div>
         <div class="dsl-editor-wrap">
           <div #gutter class="dsl-gutter" aria-hidden="true">
             @for (num of lineNumbers(); track num) {
@@ -72,7 +83,7 @@
             class="dsl-textarea"
             rows="16"
             spellcheck="false"
-            placeholder='param fast = 20;&#10;rule enter when sma(close, fast) > sma(close, 50)&#10;  buy 50% market because "Пересечение";'
+            placeholder='param fast = 20&#10;param slow = 50&#10;rule "вход"&#10;  when crossover(sma(close, fast), sma(close, slow))&#10;  then buy 50 % cash&#10;  because "Пересечение средних"'
             [ngModel]="store.draftSource()"
             (ngModelChange)="store.setDraftSource($event ?? '')"
             (scroll)="syncGutterScroll(sourceInput)"

@@ -4,6 +4,7 @@ import {
   computed,
   ElementRef,
   inject,
+  output,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -27,6 +28,8 @@ import { WorkshopStore } from '../workshop.store';
 export class WorkshopDraftEditor {
   protected readonly store = inject(WorkshopStore);
   private readonly gutterRef = viewChild<ElementRef<HTMLDivElement>>('gutter');
+
+  readonly openDslGuide = output<void>();
 
   protected readonly lineNumbers = computed<readonly number[]>(() => {
     const count = Math.max(16, this.store.draftSource().split(/\r?\n/).length);
