@@ -7,9 +7,20 @@
         неизменяемы.
       </p>
     </div>
-    <button tuiButton type="button" size="m" appearance="primary" (click)="store.openCreateDraft()">
-      Новый алгоритм
-    </button>
+    <div class="workshop-header-actions">
+      <button tuiButton type="button" size="m" appearance="outline" (click)="openDslGuide()">
+        Справка по DSL
+      </button>
+      <button
+        tuiButton
+        type="button"
+        size="m"
+        appearance="primary"
+        (click)="store.openCreateDraft()"
+      >
+        Новый алгоритм
+      </button>
+    </div>
   </header>
 
   @if (store.error()) {
@@ -348,7 +359,7 @@
       <div class="detail-backdrop" aria-hidden="true" (click)="onBackdropClick()"></div>
       <aside class="panel detail-panel" aria-label="Карточка алгоритма">
         @if (store.editorMode() !== 'closed') {
-          <app-workshop-draft-editor />
+          <app-workshop-draft-editor (openDslGuide)="openDslGuide()" />
         } @else if (store.runFormOpen() && store.selectedDetail(); as runAlgo) {
           <app-workshop-run-form [algorithm]="runAlgo" (closed)="store.closeRunForm()" />
         } @else if (store.detailLoading()) {
@@ -627,4 +638,12 @@
       </aside>
     }
   </div>
+
+  @if (dslGuideOpen()) {
+    <app-workshop-dsl-guide
+      [canInsert]="store.editorMode() !== 'closed'"
+      (closed)="closeDslGuide()"
+      (insertCode)="onInsertDslExample($event)"
+    />
+  }
 </section>

@@ -25,17 +25,28 @@ export interface DslCodeLine {
 
 const DSL_KEYWORDS = new Set([
   'param',
+  'range',
+  'step',
   'rule',
   'when',
   'then',
   'because',
   'buy',
   'sell',
+  'cancel',
+  'lots',
+  'all',
   'market',
   'limit',
+  'stop',
+  'take_profit',
+  'day',
+  'gtc',
   'and',
   'or',
   'not',
+  'true',
+  'false',
 ]);
 
 const TOKEN_PATTERN =

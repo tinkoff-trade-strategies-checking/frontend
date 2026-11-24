@@ -870,6 +870,70 @@ describe('WorkshopPage', () => {
     expect(store.editorMode()).toBe('create');
     expect(el.querySelector('.detail-panel')).not.toBeNull();
   });
+
+  it('открывает справку по DSL из шапки и из редактора черновика, закрывает по Escape без потери кода и вставляет пример', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(WorkshopStore);
+
+    // Открытие из шапки Мастерской (редактор закрыт → нет кнопки вставки).
+    const headerGuideBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.workshop-header button'),
+    ).find((b) => b.textContent?.trim() === 'Справка по DSL');
+    expect(headerGuideBtn).toBeDefined();
+    headerGuideBtn?.click();
+    fixture.detectChanges();
+
+    const dialog = el.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    expect(dialog?.textContent).toContain('Справка по языку DSL');
+    expect(dialog?.textContent).not.toContain('Вставить в редактор');
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+
+    // Открытие из редактора черновика не сбрасывает набранный текст.
+    store.openCreateDraft();
+    store.setDraftName('Моя стратегия');
+    store.setDraftSource('# мой текущий черновик');
+    fixture.detectChanges();
+
+    const editorGuideBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'Справка по DSL');
+    expect(editorGuideBtn).toBeDefined();
+    editorGuideBtn?.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(el.querySelector('[role="dialog"]')?.textContent).toContain('Вставить в редактор');
+
+    // Escape закрывает только справку, оставляя редактор и текст на месте.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+    expect(store.editorMode()).toBe('create');
+    expect(store.draftSource()).toBe('# мой текущий черновик');
+
+    // Вставка примера из справки подставляет код в редактор и закрывает окно.
+    editorGuideBtn?.click();
+    fixture.detectChanges();
+    const insertBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+    ).find((b) => b.textContent?.trim() === 'Вставить в редактор');
+    expect(insertBtn).toBeDefined();
+    insertBtn?.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('[role="dialog"]')).toBeNull();
+    expect(store.draftSource()).toContain('rule "вход"');
+    expect(store.draftSource()).toContain('because');
+  });
 });
 
 describe('WorkshopStore race protection', () => {
