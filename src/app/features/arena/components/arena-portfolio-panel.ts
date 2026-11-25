@@ -1,9 +1,14 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { TuiInput, TuiTextfield } from '@taiga-ui/core';
 import { formatLots, formatPct, formatPrice, formatRub } from '../arena.format';
 import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models';
 
+export const PORTFOLIO_COMPACT_THRESHOLD = 5;
+
 @Component({
   selector: 'app-arena-portfolio-panel',
+  imports: [FormsModule, TuiInput, TuiTextfield],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="panel">
@@ -93,35 +98,88 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
         </div>
       </div>
 
-      <table class="pos-table">
-        <thead>
-          <tr>
-            <th>Бумага</th>
-            <th class="num">Лоты</th>
-            <th class="num">Средняя</th>
-            <th class="num">P&amp;L</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (paper of papers(); track paper.id) {
-            @let pos = positionOf(paper.id);
-            <tr>
-              <td>{{ paper.label }}</td>
-              <td class="num">{{ pos ? formatLots(pos.lots) : '0 лот.' }}</td>
-              <td class="num">
-                {{ pos && pos.avgPrice !== null ? formatPrice(pos.avgPrice) : '—' }}
-              </td>
-              <td
-                class="num"
-                [class.pos]="(pos?.pnlPct ?? 0) > 0"
-                [class.neg]="(pos?.pnlPct ?? 0) < 0"
-              >
-                {{ pos && pos.lots > 0 ? formatPct(pos.pnlPct, true) : '—' }}
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
+      @if (isCompactMode()) {
+        <div class="pos-controls">
+          <div class="pos-filter-tabs" role="tablist" aria-label="Фильтр позиций портфеля">
+            <button
+              type="button"
+              role="tab"
+              class="pos-filter-btn"
+              [class.active]="showHeldOnly()"
+              [attr.aria-selected]="showHeldOnly()"
+              (click)="showHeldOnly.set(true)"
+            >
+              С позицией ({{ heldCount() }})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="pos-filter-btn"
+              [class.active]="!showHeldOnly()"
+              [attr.aria-selected]="!showHeldOnly()"
+              (click)="showHeldOnly.set(false)"
+            >
+              Все ({{ papers().length }})
+            </button>
+          </div>
+          <tui-textfield tuiTextfieldSize="s" class="pos-search">
+            <input
+              tuiInput
+              type="search"
+              autocomplete="off"
+              placeholder="Фильтр бумаг…"
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+            />
+          </tui-textfield>
+        </div>
+      }
+
+      <div class="pos-table-wrap" [class.bounded]="isCompactMode()">
+        @if (visiblePapers().length === 0 && isCompactMode()) {
+          <div class="pos-empty tui-text_body-xs muted">
+            @if (searchQuery().trim()) {
+              Ничего не найдено по запросу.
+            } @else {
+              Открытых позиций пока нет — переключитесь на «Все ({{ papers().length }})».
+            }
+          </div>
+        } @else {
+          <table class="pos-table">
+            <thead>
+              <tr>
+                <th>Бумага</th>
+                <th class="num">Лоты</th>
+                <th class="num">Средняя</th>
+                <th class="num">P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (paper of visiblePapers(); track paper.id) {
+                @let pos = positionOf(paper.id);
+                <tr
+                  [class.clickable]="isCompactMode()"
+                  [class.selected]="paper.id === selectedPaperId()"
+                  (click)="onRowClick(paper.id)"
+                >
+                  <td>{{ paper.label }}</td>
+                  <td class="num">{{ pos ? formatLots(pos.lots) : '0 лот.' }}</td>
+                  <td class="num">
+                    {{ pos && pos.avgPrice !== null ? formatPrice(pos.avgPrice) : '—' }}
+                  </td>
+                  <td
+                    class="num"
+                    [class.pos]="(pos?.pnlPct ?? 0) > 0"
+                    [class.neg]="(pos?.pnlPct ?? 0) < 0"
+                  >
+                    {{ pos && pos.lots > 0 ? formatPct(pos.pnlPct, true) : '—' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
     </section>
   `,
   styles: `
@@ -191,6 +249,55 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
       color: var(--tui-text-primary);
     }
 
+    .pos-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      border-top: 1px solid var(--tui-border-normal);
+      background: var(--tui-background-neutral-1);
+    }
+
+    .pos-filter-tabs {
+      display: flex;
+      gap: 0.35rem;
+    }
+
+    .pos-filter-btn {
+      flex: 1;
+      padding: 0.22rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid var(--tui-border-normal);
+      background: var(--tui-background-base);
+      color: var(--tui-text-secondary);
+      font: inherit;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    .pos-filter-btn.active {
+      border-color: var(--ttsc-accent, var(--tui-background-accent-1));
+      background: var(--ttsc-accent-soft, var(--tui-background-neutral-2));
+      color: var(--ttsc-accent-text, var(--tui-text-primary));
+      font-weight: 600;
+    }
+
+    .pos-search {
+      width: 100%;
+    }
+
+    .pos-table-wrap.bounded {
+      max-height: 16rem;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .pos-empty {
+      padding: 0.85rem 0.75rem;
+      text-align: center;
+      border-top: 1px solid var(--tui-border-normal);
+    }
+
     .pos-table {
       width: 100%;
       border-collapse: collapse;
@@ -198,6 +305,9 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
     }
 
     .pos-table th {
+      position: sticky;
+      top: 0;
+      background: var(--tui-background-base);
       text-align: left;
       font-size: 0.75rem;
       font-weight: 500;
@@ -213,6 +323,18 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
 
     .pos-table tr:last-child td {
       border-bottom: 0;
+    }
+
+    .pos-table tr.clickable {
+      cursor: pointer;
+    }
+
+    .pos-table tr.clickable:hover td {
+      background: var(--tui-background-neutral-1-hover);
+    }
+
+    .pos-table tr.selected td {
+      background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
     }
 
     .pos-table th.num,
@@ -234,13 +356,54 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
 export class ArenaPortfolioPanel {
   readonly papers = input.required<readonly ArenaPaper[]>();
   readonly portfolio = input.required<ArenaPortfolio>();
+  readonly selectedPaperId = input<string | null>(null);
+
+  readonly selectPaper = output<string>();
+
+  protected readonly showHeldOnly = signal(true);
+  protected readonly searchQuery = signal('');
 
   protected readonly formatLots = formatLots;
   protected readonly formatPrice = formatPrice;
   protected readonly formatPct = formatPct;
   protected readonly formatRub = formatRub;
 
+  protected readonly isCompactMode = computed(
+    () => this.papers().length > PORTFOLIO_COMPACT_THRESHOLD,
+  );
+
+  protected readonly heldCount = computed(() => {
+    const positions = this.portfolio().positions;
+    return this.papers().reduce((acc, p) => acc + ((positions[p.id]?.lots ?? 0) > 0 ? 1 : 0), 0);
+  });
+
+  protected readonly visiblePapers = computed<readonly ArenaPaper[]>(() => {
+    const all = this.papers();
+    if (!this.isCompactMode()) {
+      return all;
+    }
+    const positions = this.portfolio().positions;
+    const query = this.searchQuery().trim().toLowerCase();
+    let list = this.showHeldOnly() ? all.filter((p) => (positions[p.id]?.lots ?? 0) > 0) : all;
+
+    if (query) {
+      list = list.filter(
+        (p) =>
+          p.label.toLowerCase().includes(query) ||
+          p.id.toLowerCase().includes(query) ||
+          p.sector.toLowerCase().includes(query),
+      );
+    }
+    return list;
+  });
+
   protected positionOf(paperId: string): ArenaPosition | undefined {
     return this.portfolio().positions[paperId];
+  }
+
+  protected onRowClick(paperId: string): void {
+    if (this.isCompactMode()) {
+      this.selectPaper.emit(paperId);
+    }
   }
 }

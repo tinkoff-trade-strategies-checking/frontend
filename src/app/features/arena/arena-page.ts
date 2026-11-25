@@ -12,11 +12,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiDialogService, TuiNotification } from '@taiga-ui/core';
 import { TUI_CONFIRM, TuiBadge } from '@taiga-ui/kit';
-import { formatPct, formatPrice } from './arena.format';
 import { ArenaStore } from './arena.store';
 import { ArenaChart } from './components/arena-chart';
 import { ArenaOrderTicket } from './components/arena-order-ticket';
 import { ArenaOrdersPanel } from './components/arena-orders-panel';
+import { ArenaPaperSwitcher } from './components/arena-paper-switcher';
 import { ArenaPlayer } from './components/arena-player';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaApi } from './data/arena.models';
@@ -42,6 +42,7 @@ function readGuideDismissed(): boolean {
     TuiBadge,
     TuiNotification,
     ArenaPlayer,
+    ArenaPaperSwitcher,
     ArenaChart,
     ArenaOrdersPanel,
     ArenaOrderTicket,
@@ -67,8 +68,6 @@ export class ArenaPage implements OnInit {
   protected readonly showSma20 = signal(false);
   protected readonly showSma50 = signal(false);
   protected readonly guideDismissed = signal(readGuideDismissed());
-  protected readonly formatPct = formatPct;
-  protected readonly formatPrice = formatPrice;
 
   protected shortSessionId(id: string | null): string {
     if (!id) {

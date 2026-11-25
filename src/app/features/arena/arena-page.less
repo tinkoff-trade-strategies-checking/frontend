@@ -79,58 +79,10 @@
   overflow: hidden;
 }
 
-.papers-bar {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  border-bottom: 1px solid var(--tui-border-normal);
-}
-
-.paper-tab {
-  appearance: none;
-  border: 0;
-  border-left: 1px solid var(--tui-border-normal);
-  background: transparent;
-  padding: 0.75rem 1rem;
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: inherit;
-  font: inherit;
-  position: relative;
-
-  &:first-child {
-    border-left: 0;
-  }
-
-  &.active {
-    background: var(--tui-background-neutral-1);
-    box-shadow: inset 0 -2px 0 var(--ttsc-accent, var(--tui-text-action));
-  }
-}
-
 .indicator-active {
   --t-bs: var(--ttsc-accent, var(--tui-border-hover));
   background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
   color: var(--ttsc-accent-text, var(--tui-text-primary));
-}
-
-.paper-top,
-.paper-bottom {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.paper-name {
-  font-weight: 700;
-}
-
-.paper-price {
-  font-size: 1.05rem;
-  font-weight: 700;
 }
 
 .chart-toolbar {

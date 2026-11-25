@@ -27,6 +27,30 @@
         }
       </div>
 
+      @if (papers().length > 0) {
+        <div
+          class="picker-categories"
+          role="tablist"
+          aria-label="Фильтр бумаг по категориям и секторам"
+        >
+          @for (cat of categories(); track cat.id) {
+            @let active = effectiveCategory() === cat.id;
+            <button
+              type="button"
+              role="tab"
+              class="category-chip"
+              [class.active]="active"
+              [attr.aria-selected]="active"
+              [attr.data-category]="cat.id"
+              (click)="selectCategory(cat.id)"
+            >
+              <span>{{ cat.label }}</span>
+              <span class="category-chip-count num">{{ cat.count }}</span>
+            </button>
+          }
+        </div>
+      }
+
       <div class="picker-meta-row">
         <div class="picker-counters">
           <span
@@ -37,12 +61,26 @@
           >
             Выбрано: {{ selectedIds().length }} из {{ papers().length }}
           </span>
-          @if (normalizedQuery()) {
-            <span class="tui-text_body-xs muted num"> Найдено: {{ filteredPapers().length }} </span>
+          @if (isFiltered()) {
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ filteredPapers().length }}
+            </span>
           }
         </div>
 
         <div class="picker-bulk-actions">
+          @if (hasMultipleSectors()) {
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="groupBySector() ? 'secondary' : 'outline'"
+              [attr.aria-pressed]="groupBySector()"
+              (click)="toggleGroupBySector()"
+            >
+              По секторам
+            </button>
+          }
           <button
             tuiButton
             type="button"
@@ -61,7 +99,7 @@
             [disabled]="!canSelectFiltered()"
             (click)="selectFiltered()"
           >
-            Выбрать найденные
+            {{ selectFilteredLabel() }}
           </button>
           <button
             tuiButton
@@ -91,7 +129,7 @@
       } @else {
         <div class="selected-chips">
           @for (paper of visibleSelectedChips(); track paper.id) {
-            <span class="selected-chip" [attr.title]="paper.name + ' · ' + paper.sector">
+            <span class="selected-chip" [attr.title]="paper.name + ' · ' + paperSectorLabel(paper)">
               <span class="selected-chip-ticker mono">{{ paper.ticker }}</span>
               <button
                 type="button"
@@ -122,6 +160,10 @@
           <span class="tui-text_body-s muted">
             @if (normalizedQuery()) {
               По запросу «{{ searchQuery().trim() }}» ничего не найдено.
+            } @else if (effectiveCategory() === '__selected__') {
+              Нет выбранных бумаг.
+            } @else if (effectiveCategory() !== '__all__') {
+              В этой категории бумаг нет.
             } @else {
               Список доступных бумаг пуст.
             }
@@ -130,8 +172,65 @@
             <button tuiButton type="button" size="xs" appearance="outline" (click)="clearSearch()">
               Сбросить поиск
             </button>
+          } @else if (effectiveCategory() !== '__all__') {
+            <button tuiButton type="button" size="xs" appearance="outline" (click)="resetFilters()">
+              Показать все
+            </button>
           }
         </div>
+      } @else if (showGroupedView()) {
+        @for (group of groupedPapers(); track group.key) {
+          @let collapsed = isGroupCollapsed(group.key);
+          <div class="picker-group" [attr.data-sector-group]="group.key">
+            <div class="picker-group-header">
+              <button
+                type="button"
+                class="picker-group-toggle"
+                [attr.aria-expanded]="!collapsed"
+                (click)="toggleGroupCollapsed(group.key)"
+              >
+                <span class="picker-group-chevron" aria-hidden="true">
+                  {{ collapsed ? '▸' : '▾' }}
+                </span>
+                <span class="picker-group-title">{{ group.label }}</span>
+                <span class="picker-group-count num muted">
+                  {{ group.selectedCount }}/{{ group.papers.length }}
+                </span>
+              </button>
+              <button
+                type="button"
+                class="picker-group-select"
+                (click)="toggleGroupSelection(group, $event)"
+              >
+                {{ group.selectedCount === group.papers.length ? 'Снять' : 'Выбрать' }}
+              </button>
+            </div>
+
+            @if (!collapsed) {
+              @for (paper of group.papers; track paper.id) {
+                @let selected = selectedSet().has(paper.id);
+                <button
+                  type="button"
+                  role="option"
+                  class="picker-row"
+                  [class.selected]="selected"
+                  [attr.aria-selected]="selected"
+                  [attr.data-paper-id]="paper.id"
+                  (click)="toggle(paper.id)"
+                >
+                  <span class="picker-check" [class.checked]="selected" aria-hidden="true">
+                    @if (selected) {
+                      ✓
+                    }
+                  </span>
+                  <span class="picker-ticker mono">{{ paper.ticker }}</span>
+                  <span class="picker-name">{{ paper.name }}</span>
+                  <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
+                </button>
+              }
+            }
+          </div>
+        }
       } @else {
         @for (paper of filteredPapers(); track paper.id) {
           @let selected = selectedSet().has(paper.id);
@@ -151,7 +250,7 @@
             </span>
             <span class="picker-ticker mono">{{ paper.ticker }}</span>
             <span class="picker-name">{{ paper.name }}</span>
-            <span class="picker-sector">{{ paper.sector }}</span>
+            <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
           </button>
         }
       }

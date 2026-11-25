@@ -15,6 +15,7 @@ import { OrderStatus } from '../../api/models/order-status';
 import { errorMessage } from '../../core/api-problem';
 import { ReportEquityChart } from '../report/components/report-equity-chart';
 import { ReportUnderwaterChart } from '../report/components/report-underwater-chart';
+import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
 import { ReportExportFormat, ReportExportService } from '../report/data/report-export.service';
 import {
   formatDrawdownDuration,
@@ -54,6 +55,7 @@ const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
     TuiSegmented,
     ReportEquityChart,
     ReportUnderwaterChart,
+    PapersReveal,
   ],
   providers: [{ provide: RUNS_API, useClass: RUNS_API_IMPL }, RunReportStore],
   changeDetection: ChangeDetectionStrategy.OnPush,

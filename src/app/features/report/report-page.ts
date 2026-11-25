@@ -14,6 +14,7 @@ import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
+import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
 import { DivergenceType, EquityCurvePoint, REPORT_API, SessionReport } from './data/report.models';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
@@ -66,6 +67,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
     TuiSegmented,
     ReportEquityChart,
     ReportUnderwaterChart,
+    PapersReveal,
   ],
   providers: [{ provide: REPORT_API, useClass: REPORT_API_IMPL }, ReportStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -138,8 +140,15 @@ export class ReportPage implements OnInit {
 
   /** Заголовок как в истории: «бумаги · период»; идентификатор показывается рядом мелко. */
   protected reportTitle(rep: SessionReport): string {
-    const tickers = rep.papers.map((p) => p.ticker).join(', ');
-    return tickers ? `${tickers} · ${rep.period.label}` : rep.period.label;
+    const tickers = rep.papers.map((p) => p.ticker);
+    if (tickers.length === 0) {
+      return rep.period.label;
+    }
+    const summary =
+      tickers.length <= 5
+        ? tickers.join(', ')
+        : `${tickers.slice(0, 5).join(', ')} и ещё ${tickers.length - 5}`;
+    return `${summary} · ${rep.period.label}`;
   }
 
   protected equityCurveSubtitle(points: readonly EquityCurvePoint[]): string {

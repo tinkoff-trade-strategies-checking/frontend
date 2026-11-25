@@ -77,6 +77,14 @@ test('launch: пикер бумаг поддерживает поиск, мас�
   await expect(picker).toContainText('Выбрано: 0 из 60');
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeDisabled();
 
+  // Фильтрация по категории сектора и выбор внутри категории.
+  await picker.locator('.category-chip[data-category="Финансы"]').click();
+  await expect(picker.getByRole('button', { name: 'Выбрать в категории' })).toBeEnabled();
+  await picker.getByRole('button', { name: 'Выбрать в категории' }).click();
+  await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
+  await picker.locator('.category-chip[data-category="__all__"]').click();
+  await picker.getByRole('button', { name: 'Сбросить' }).click();
+
   // Поиск по тикеру/названию + «Выбрать найденные».
   const search = page.locator('#launch-papers-search');
   await search.fill('газ');
