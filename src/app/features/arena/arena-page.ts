@@ -21,6 +21,7 @@ import { ArenaPaperSwitcher } from './components/arena-paper-switcher';
 import { ArenaPlayer } from './components/arena-player';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ArenaTaSummary } from './components/arena-ta-summary';
+import { ArenaFundamentalsTrigger } from '../../shared/paper-fundamentals/arena-fundamentals-trigger';
 import { ARENA_API, ArenaApi } from './data/arena.models';
 import { ARENA_API_IMPL } from '../../api-impls';
 
@@ -50,6 +51,7 @@ function readGuideDismissed(): boolean {
     ArenaOrdersPanel,
     ArenaOrderTicket,
     ArenaPortfolioPanel,
+    ArenaFundamentalsTrigger,
   ],
   providers: [{ provide: ARENA_API, useClass: ARENA_API_IMPL }, ArenaStore],
   changeDetection: ChangeDetectionStrategy.OnPush,

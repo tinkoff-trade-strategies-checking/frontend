@@ -1,0 +1,105 @@
+<div class="fundamentals-panel" [class.compact]="compact()">
+  @if (hiddenByBlindMode()) {
+    <div
+      tuiNotification
+      appearance="info"
+      size="m"
+      class="fundamentals-state blind-state"
+      data-testid="fundamentals-blind-notice"
+    >
+      <strong>Фундаментальные показатели скрыты</strong>
+      <p class="tui-text_body-s state-copy">
+        В слепом режиме фундаментальные показатели скрыты до завершения сессии
+      </p>
+    </div>
+  } @else if (loading()) {
+    <div class="fundamentals-state loading-state tui-text_body-s muted">
+      Загрузка фундаментальных показателей…
+    </div>
+  } @else if (error(); as err) {
+    <div tuiNotification appearance="negative" size="s" role="alert">
+      {{ err }}
+    </div>
+  } @else if (!fundamentals()) {
+    <div
+      class="fundamentals-state empty-state tui-text_body-s muted"
+      data-testid="fundamentals-empty"
+    >
+      Фундаментальные данные для этой бумаги пока не загружены
+    </div>
+  } @else {
+    <header class="fundamentals-header">
+      <div class="fundamentals-identity">
+        @if (displayTicker(); as t) {
+          <span class="ticker-pill mono">{{ t }}</span>
+        }
+        @if (paperName(); as name) {
+          <strong class="paper-title tui-text_body-l">{{ name }}</strong>
+        }
+        @if (sector(); as sec) {
+          <span tuiBadge size="s" appearance="neutral">{{ sec }}</span>
+        }
+      </div>
+
+      <div class="fundamentals-meta tui-text_body-xs muted">
+        <span>
+          Дата отчётности:
+          <strong class="meta-date num">{{ formattedReportDate() }}</strong>
+        </span>
+        @if (fundamentals()?.periodType; as periodType) {
+          <span class="meta-sep">·</span>
+          <span>{{ periodType }}</span>
+        }
+        @if (formattedAsOfDate(); as asOf) {
+          <span class="meta-sep">·</span>
+          <span
+            >На дату сессии: <strong class="meta-date num">{{ asOf }}</strong></span
+          >
+        }
+      </div>
+    </header>
+
+    <div class="categories-grid">
+      @for (category of categories(); track category.id) {
+        <section class="category-card" [attr.data-category]="category.id">
+          <h3 class="category-title">{{ category.title }}</h3>
+          <dl class="metrics-list">
+            @for (metric of category.metrics; track metric.key) {
+              @let hintOpen = expandedHintKey() === metric.key;
+              <div class="metric-entry">
+                <div class="metric-row">
+                  <dt class="metric-label">
+                    <span>{{ metric.label }}</span>
+                    <button
+                      type="button"
+                      class="hint-btn"
+                      [class.active]="hintOpen"
+                      [attr.title]="metric.hint"
+                      [attr.aria-label]="'Справка: ' + metric.label"
+                      [attr.aria-expanded]="hintOpen"
+                      (click)="toggleHint(metric.key)"
+                    >
+                      ?
+                    </button>
+                  </dt>
+                  <dd
+                    class="metric-value num"
+                    [class.pos]="metric.tone === 'positive'"
+                    [class.neg]="metric.tone === 'negative'"
+                    [class.muted]="metric.empty"
+                    [attr.data-metric]="metric.key"
+                  >
+                    {{ metric.formatted }}
+                  </dd>
+                </div>
+                @if (hintOpen) {
+                  <p class="metric-hint tui-text_body-xs muted">{{ metric.hint }}</p>
+                }
+              </div>
+            }
+          </dl>
+        </section>
+      }
+    </div>
+  }
+</div>

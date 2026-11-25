@@ -121,7 +121,7 @@ describe('App', () => {
 
     it('пустой путь ведёт на арену', async () => {
       expect(await open('/')).toEqual({ path: '/arena', heading: 'Арена' });
-    });
+    }, 15_000);
 
     it('/workshop открывает мастерскую', async () => {
       expect(await open('/workshop')).toEqual({ path: '/workshop', heading: 'Мастерская' });

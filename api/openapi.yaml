@@ -143,6 +143,28 @@ paths:
                 items: { $ref: '#/components/schemas/LaunchPaper' }
         '401': { $ref: '#/components/responses/Problem' }
         '503': { $ref: '#/components/responses/ArchiveUnavailable' }
+  /papers/{ticker}/fundamentals:
+    get:
+      tags: [marketdata]
+      operationId: getPaperFundamentals
+      summary: Последний доступный срез фундаментальных показателей бумаги
+      description: |
+        Возвращает последний снимок фундаментальных показателей по тикеру для экрана запуска (выбор бумаги в
+        неслепом режиме). Если данных по тикеру нет, возвращает `200` с `available: false` и `snapshot: null`.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: Тикер бумаги MOEX (например, `SBER`)
+          schema: { type: string, minLength: 1, maxLength: 32 }
+      responses:
+        '200':
+          description: 'Фундаментальные показатели бумаги (или `available: false`)'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaperFundamentalsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
   /sessions:
     post:
       tags: [sessions]
@@ -198,6 +220,27 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Snapshot' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /sessions/{sessionId}/fundamentals:
+    get:
+      tags: [sessions]
+      operationId: getSessionFundamentals
+      summary: Фундаментальные показатели бумаг сессии на дату курсора (point-in-time)
+      description: |
+        Инвариант INV-7: для идущей слепой сессии (`blind && status == running`) возвращает
+        `{ hiddenByBlindMode: true, asOfDate: null, items: [] }` без каких-либо данных бумаг.
+        Инвариант INV-1: для открытой или завершённой (раскрытой) сессии возвращает только последний срез с
+        `availableAt <= asOfDate` (дата бара на текущем курсоре), никогда не раскрывая будущую отчётность.
+      parameters: [{ $ref: '#/components/parameters/SessionId' }]
+      responses:
+        '200':
+          description: Фундаментальные показатели бумаг сессии (или пустой маскированный ответ в слепом режиме)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionFundamentalsResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
@@ -2832,3 +2875,92 @@ components:
           BUILDING: '#/components/schemas/RunReportBuilding'
           NOT_FINISHED: '#/components/schemas/RunNotFinished'
           NOT_FOUND: '#/components/schemas/RunNotFound'
+    # ---------- фундаментальные показатели (INV-1, INV-7, INV-9) ----------
+    FundamentalSnapshot:
+      type: object
+      description: Point-in-time срез фундаментальных показателей бумаги (в стиле ru.investing.com); проценты уже ×100
+      required:
+        - ticker
+        - reportDate
+        - availableAt
+        - periodType
+        - currency
+        - marketCapRub
+        - peRatio
+        - pbRatio
+        - psRatio
+        - evEbitda
+        - roe
+        - roa
+        - grossMargin
+        - operatingMargin
+        - netMargin
+        - revenueGrowthYoy
+        - epsGrowthYoy
+        - debtToEquity
+        - currentRatio
+        - eps
+        - bookValuePerShare
+        - dividendYield
+        - payoutRatio
+        - freeFloat
+        - beta
+      properties:
+        ticker: { type: string }
+        reportDate: { type: string, format: date, description: Отчётная дата периода (конец квартала или года) }
+        availableAt: { type: string, format: date, description: Дата публикации/доступности отчётности (INV-1) }
+        periodType: { type: string, enum: [FY, Q1, Q2, Q3, Q4, TTM] }
+        currency: { type: string, examples: ['RUB'] }
+        marketCapRub: { $ref: '#/components/schemas/MoneyOrNull' }
+        peRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        pbRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        psRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        evEbitda: { $ref: '#/components/schemas/RatioOrNull' }
+        roe: { $ref: '#/components/schemas/PctOrNull' }
+        roa: { $ref: '#/components/schemas/PctOrNull' }
+        grossMargin: { $ref: '#/components/schemas/PctOrNull' }
+        operatingMargin: { $ref: '#/components/schemas/PctOrNull' }
+        netMargin: { $ref: '#/components/schemas/PctOrNull' }
+        revenueGrowthYoy: { $ref: '#/components/schemas/PctOrNull' }
+        epsGrowthYoy: { $ref: '#/components/schemas/PctOrNull' }
+        debtToEquity: { $ref: '#/components/schemas/RatioOrNull' }
+        currentRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        eps: { $ref: '#/components/schemas/MoneyOrNull' }
+        bookValuePerShare: { $ref: '#/components/schemas/MoneyOrNull' }
+        dividendYield: { $ref: '#/components/schemas/PctOrNull' }
+        payoutRatio: { $ref: '#/components/schemas/PctOrNull' }
+        freeFloat: { $ref: '#/components/schemas/PctOrNull' }
+        beta: { $ref: '#/components/schemas/RatioOrNull' }
+    FundamentalSnapshotOrNull:
+      oneOf: [{ $ref: '#/components/schemas/FundamentalSnapshot' }, { type: 'null' }]
+    PaperFundamentalsResponse:
+      type: object
+      required: [ticker, available, snapshot]
+      properties:
+        ticker: { type: string }
+        available: { type: boolean }
+        snapshot: { $ref: '#/components/schemas/FundamentalSnapshotOrNull' }
+    SessionFundamentalsItem:
+      type: object
+      required: [paperId, ticker, name, sector, available, snapshot]
+      properties:
+        paperId: { $ref: '#/components/schemas/Uuid' }
+        ticker: { type: string }
+        name: { type: string }
+        sector: { type: string }
+        available: { type: boolean }
+        snapshot: { $ref: '#/components/schemas/FundamentalSnapshotOrNull' }
+    SessionFundamentalsResponse:
+      type: object
+      required: [hiddenByBlindMode, asOfDate, items]
+      properties:
+        hiddenByBlindMode:
+          type: boolean
+          description: 'true для активной слепой сессии (INV-7); в этом случае asOfDate = null и items = []'
+        asOfDate:
+          type: [string, 'null']
+          format: date
+          description: 'Дата курсора сессии, на которую отфильтрована отчётность (availableAt <= asOfDate, INV-1)'
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SessionFundamentalsItem' }
