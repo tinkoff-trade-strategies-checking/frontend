@@ -227,4 +227,29 @@ describe('LaunchStore: фоновый алгоритм', () => {
     expect(store.activePresetId()).toBe('stress');
     expect(store.regime()).toBe('stress');
   });
+
+  it('позволяет выбрать произвольное количество бумаг без верхнего лимита и блокирует запуск при 0 бумаг', async () => {
+    const { store, launchApi } = setup(() => Promise.resolve(makeWorkshopPage([])));
+    const startSpy = vi.spyOn(launchApi, 'startSession');
+    await store.init();
+    await store.setStartMode('custom');
+
+    const allIds = store.customPapers().map((p) => p.id);
+    expect(allIds.length).toBeGreaterThanOrEqual(50);
+
+    // Выбор всех бумаг не ограничен 5 штуками.
+    store.setSelectedPaperIds(allIds);
+    expect(store.selectedPaperIds().length).toBe(allIds.length);
+    expect(store.canSubmit()).toBe(true);
+    expect(await store.launch()).toBe(true);
+    expect(startSpy).toHaveBeenLastCalledWith(expect.objectContaining({ paperIds: allIds }));
+
+    // Сброс всех бумаг блокирует запуск до выбора хотя бы одной.
+    store.setSelectedPaperIds([]);
+    expect(store.canSubmit()).toBe(false);
+    expect(store.submitBlockHint()).toContain('хотя бы одну бумагу');
+
+    // Пресеты количества бумаг в слепом режиме компактны, а не 60 кнопок.
+    expect(store.paperCountOptions().length).toBeLessThanOrEqual(7);
+  });
 });

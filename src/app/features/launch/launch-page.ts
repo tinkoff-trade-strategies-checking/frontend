@@ -32,6 +32,7 @@ import {
   TIMEFRAME_LABELS,
 } from './data/launch.models';
 import { LAUNCH_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
+import { PaperPicker } from '../../shared/paper-picker/paper-picker';
 import { WORKSHOP_API } from '../workshop/data/workshop.models';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
@@ -53,6 +54,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
   selector: 'app-launch-page',
   imports: [
     FormsModule,
+    PaperPicker,
     RouterLink,
     TuiButton,
     TuiBadge,
@@ -198,14 +200,35 @@ export class LaunchPage implements OnInit {
     this.store.setCustomStartDate(day ? day.toJSON() : '');
   }
 
+  protected readonly selectedPapersSummary = computed<string>(() => {
+    const selected = this.store.selectedCustomPapers();
+    if (selected.length === 0) {
+      return 'не выбраны';
+    }
+    if (selected.length <= 5) {
+      return selected.map((paper) => paper.ticker).join(', ');
+    }
+    const head = selected
+      .slice(0, 5)
+      .map((paper) => paper.ticker)
+      .join(', ');
+    return `${head} и ещё ${selected.length - 5}`;
+  });
+
   protected paperCountIndex(counts: readonly number[], current: number): number {
-    return Math.max(0, counts.indexOf(current));
+    return counts.indexOf(current);
   }
 
   protected onPaperCountIndexChange(counts: readonly number[], index: number): void {
     const next = counts[index];
     if (next !== undefined) {
       this.store.setPaperCount(next);
+    }
+  }
+
+  protected onCustomPaperCountChange(value: number | null): void {
+    if (value !== null && Number.isFinite(value)) {
+      this.store.setPaperCount(Math.round(value));
     }
   }
 

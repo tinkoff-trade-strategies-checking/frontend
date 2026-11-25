@@ -16,7 +16,9 @@ import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiCheckbox, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { errorMessage } from '../../../core/api-problem';
+import { PaperPicker } from '../../../shared/paper-picker/paper-picker';
 import {
+  buildPaperCountPresets,
   CandleTimeframe,
   LAUNCH_API,
   LaunchCustomPaper,
@@ -55,6 +57,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
   selector: 'app-workshop-run-form',
   imports: [
     FormsModule,
+    PaperPicker,
     TuiBadge,
     TuiButton,
     TuiCheckbox,
@@ -146,11 +149,7 @@ export class WorkshopRunForm implements OnInit {
     if (!opts) {
       return [];
     }
-    const counts: number[] = [];
-    for (let n = opts.minPapers; n <= opts.maxPapers; n++) {
-      counts.push(n);
-    }
-    return counts;
+    return buildPaperCountPresets(opts.minPapers, opts.maxPapers);
   });
 
   protected readonly capitalError = computed<string | null>(() => {
@@ -184,9 +183,7 @@ export class WorkshopRunForm implements OnInit {
       return this.paperCount() >= opts.minPapers && this.paperCount() <= opts.maxPapers;
     }
     return (
-      Boolean(this.customStartDate().trim()) &&
-      this.selectedPaperIds().length >= opts.minPapers &&
-      this.selectedPaperIds().length <= opts.maxPapers
+      Boolean(this.customStartDate().trim()) && this.selectedPaperIds().length >= opts.minPapers
     );
   });
 
@@ -324,6 +321,10 @@ export class WorkshopRunForm implements OnInit {
     this.rejection.set(null);
   }
 
+  protected paperCountIndex(counts: readonly number[], current: number): number {
+    return counts.indexOf(current);
+  }
+
   protected onPaperCountIndexChange(counts: readonly number[], index: number): void {
     const next = counts[index];
     if (next !== undefined) {
@@ -332,23 +333,15 @@ export class WorkshopRunForm implements OnInit {
     }
   }
 
-  protected togglePaper(paperId: string): void {
-    const opts = this.options();
-    const min = opts?.minPapers ?? 1;
-    const max = opts?.maxPapers ?? 5;
-    const current = this.selectedPaperIds();
-
-    if (current.includes(paperId)) {
-      if (current.length <= min) {
-        return;
-      }
-      this.selectedPaperIds.set(current.filter((id) => id !== paperId));
-    } else {
-      if (current.length >= max) {
-        return;
-      }
-      this.selectedPaperIds.set([...current, paperId]);
+  protected onCustomPaperCountChange(value: number | null): void {
+    if (value !== null && Number.isFinite(value)) {
+      this.paperCount.set(Math.round(value));
+      this.rejection.set(null);
     }
+  }
+
+  protected onSelectedPaperIdsChange(ids: readonly string[]): void {
+    this.selectedPaperIds.set(Array.from(new Set(ids)));
     this.rejection.set(null);
   }
 

@@ -142,13 +142,28 @@
           <span class="tui-text_body-xs muted">Количество бумаг</span>
           <tui-segmented
             size="s"
-            [activeItemIndex]="optionIndex(paperCountOptions(), paperCount())"
+            [activeItemIndex]="paperCountIndex(paperCountOptions(), paperCount())"
             (activeItemIndexChange)="onPaperCountIndexChange(paperCountOptions(), $event)"
           >
             @for (count of paperCountOptions(); track count) {
               <button type="button">{{ count }}</button>
             }
           </tui-segmented>
+          @if (opts.maxPapers > 5) {
+            <label tuiLabel for="run-paper-count" class="field-block paper-count-field">
+              Своё количество (до {{ opts.maxPapers }})
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="run-paper-count"
+                  tuiInputNumber
+                  [min]="opts.minPapers"
+                  [max]="opts.maxPapers"
+                  [ngModel]="paperCount()"
+                  (ngModelChange)="onCustomPaperCountChange($event)"
+                />
+              </tui-textfield>
+            </label>
+          }
         </div>
       } @else {
         <label tuiLabel for="run-custom-date" class="field-block">
@@ -165,27 +180,16 @@
         </label>
 
         <div class="field-block">
-          <span class="tui-text_body-xs muted">
-            Бумаги ({{ selectedPaperIds().length }} из {{ opts.maxPapers }})
-          </span>
-          @if (loadingPapers()) {
-            <span class="tui-text_body-s muted">Загрузка списка бумаг…</span>
-          } @else {
-            <div class="papers-list">
-              @for (paper of availablePapers(); track paper.id) {
-                @let selected = selectedPaperIds().includes(paper.id);
-                <button
-                  tuiButton
-                  type="button"
-                  size="xs"
-                  [appearance]="selected ? 'primary' : 'outline'"
-                  (click)="togglePaper(paper.id)"
-                >
-                  {{ paper.ticker }} ({{ paper.name }})
-                </button>
-              }
-            </div>
-          }
+          <span class="tui-text_body-xs muted">Бумаги</span>
+          <app-paper-picker
+            [papers]="availablePapers()"
+            [selectedIds]="selectedPaperIds()"
+            [loading]="loadingPapers()"
+            [compact]="true"
+            [minSelected]="opts.minPapers"
+            inputId="run-papers-search"
+            (selectedIdsChange)="onSelectedPaperIdsChange($event)"
+          />
         </div>
       }
 

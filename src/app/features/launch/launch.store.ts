@@ -1,6 +1,7 @@
 import { computed, DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
+  buildPaperCountPresets,
   CandleTimeframe,
   LAUNCH_API,
   LAUNCH_PRESETS,
@@ -165,11 +166,7 @@ export class LaunchStore {
     if (!opts) {
       return [];
     }
-    const counts: number[] = [];
-    for (let n = opts.minPapers; n <= opts.maxPapers; n++) {
-      counts.push(n);
-    }
-    return counts;
+    return buildPaperCountPresets(opts.minPapers, opts.maxPapers);
   });
 
   readonly selectedCustomPapers = computed(() => {
@@ -209,7 +206,9 @@ export class LaunchStore {
       return 'Укажите дату начала периода.';
     }
     if (this.selectedPaperIds().length < opts.minPapers) {
-      return `Выберите от ${opts.minPapers} до ${opts.maxPapers} бумаг.`;
+      return opts.minPapers === 1
+        ? 'Выберите хотя бы одну бумагу.'
+        : `Выберите не менее ${opts.minPapers} бумаг.`;
     }
     return null;
   });
@@ -432,21 +431,17 @@ export class LaunchStore {
     this.rejection.set(null);
   }
 
+  setSelectedPaperIds(paperIds: readonly string[]): void {
+    this.selectedPaperIds.set(Array.from(new Set(paperIds)));
+    this.rejection.set(null);
+  }
+
   togglePaper(paperId: string): void {
-    const opts = this.options();
-    const min = opts?.minPapers ?? 1;
-    const max = opts?.maxPapers ?? 5;
     const current = this.selectedPaperIds();
 
     if (current.includes(paperId)) {
-      if (current.length <= min) {
-        return;
-      }
       this.selectedPaperIds.set(current.filter((id) => id !== paperId));
     } else {
-      if (current.length >= max) {
-        return;
-      }
       this.selectedPaperIds.set([...current, paperId]);
     }
     this.rejection.set(null);
