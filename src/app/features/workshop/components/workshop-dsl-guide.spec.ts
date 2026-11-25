@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
-import { DSL_GUIDE_EXAMPLES, DSL_QUICKSTART_CODE } from '../data/dsl-guide.data';
+import {
+  DSL_CANDLE_PATTERN_FUNCTIONS,
+  DSL_GUIDE_EXAMPLES,
+  DSL_LEVEL_TREND_FUNCTIONS,
+  DSL_QUICKSTART_CODE,
+  DSL_STRUCTURE_FUNCTIONS,
+} from '../data/dsl-guide.data';
 import { WorkshopDslGuide } from './workshop-dsl-guide';
 
 function findTab(el: HTMLElement, label: string): HTMLButtonElement | undefined {
@@ -50,6 +56,13 @@ describe('WorkshopDslGuide', () => {
     expect(el.textContent).toContain('Данные свечи и смещения');
     expect(el.textContent).toContain('bars_in_position');
     expect(el.textContent).toContain('crossover(a, b)');
+    expect(el.textContent).toContain('Уровни разворота, каналы и тренд');
+    expect(el.textContent).toContain('supertrend(n, k)');
+    expect(el.textContent).toContain('Свечные паттерны — Price Action');
+    expect(el.textContent).toContain('is_bullish_engulfing()');
+    expect(el.textContent).toContain('Структура графика и свинги');
+    expect(el.textContent).toContain('swing_high(left, right)');
+    expect(el.textContent).toContain('bars_since(cond)');
 
     const searchInput = el.querySelector('#dsl-guide-ref-search') as HTMLInputElement;
     expect(searchInput).not.toBeNull();
@@ -58,6 +71,12 @@ describe('WorkshopDslGuide', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('atr(n)');
     expect(el.textContent).not.toContain('sma(x, n)');
+
+    searchInput.value = 'is_hammer';
+    searchInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('is_hammer()');
+    expect(el.textContent).not.toContain('atr(n)');
 
     searchInput.value = 'неизвестная_функция_xyz';
     searchInput.dispatchEvent(new Event('input'));
@@ -68,6 +87,8 @@ describe('WorkshopDslGuide', () => {
     fixture.detectChanges();
     expect(el.textContent).toContain('Эталон платформы');
     expect(el.textContent).toContain('Пробой канала Дончиана');
+    expect(el.textContent).toContain('SuperTrend и свечной паттерн Price Action');
+    expect(el.textContent).toContain('Пробой Pivot R1 с каналом Кельтнера и свингами');
 
     findTab(el, 'Частые ошибки')?.click();
     fixture.detectChanges();
@@ -130,5 +151,11 @@ describe('WorkshopDslGuide', () => {
       expect(code).toMatch(/\bthen\b/);
       expect(code).toMatch(/\bbecause\s+"[^"]+"/);
     }
+  });
+
+  it('содержит все 22 функции графического анализа по категориям', () => {
+    expect(DSL_LEVEL_TREND_FUNCTIONS).toHaveLength(10);
+    expect(DSL_CANDLE_PATTERN_FUNCTIONS).toHaveLength(7);
+    expect(DSL_STRUCTURE_FUNCTIONS).toHaveLength(5);
   });
 });

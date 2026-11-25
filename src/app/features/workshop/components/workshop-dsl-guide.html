@@ -312,6 +312,73 @@ rule "уникальное имя"
             </div>
           }
 
+          @if (filteredLevelTrend().length > 0) {
+            <h4 class="tui-text_body-s subhead">
+              Уровни разворота, каналы и тренд (поддерживают [k])
+            </h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredLevelTrend(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (filteredCandlePatterns().length > 0) {
+            <h4 class="tui-text_body-s subhead">Свечные паттерны — Price Action (без [k])</h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredCandlePatterns(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
+          @if (filteredStructure().length > 0) {
+            <h4 class="tui-text_body-s subhead">
+              Структура графика и свинги (без заглядывания в будущее)
+            </h4>
+            <div class="table-wrap">
+              <table class="guide-table">
+                <tbody>
+                  @for (fn of filteredStructure(); track fn.signature) {
+                    <tr>
+                      <td class="nowrap">
+                        <code>{{ fn.signature }}</code>
+                      </td>
+                      <td class="nowrap">
+                        <span tuiBadge size="s" appearance="neutral">{{ fn.returns }}</span>
+                      </td>
+                      <td>{{ fn.description }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+
           @if (filteredCrossbar().length > 0) {
             <h4 class="tui-text_body-s subhead">Межбаровые сравнения</h4>
             <div class="table-wrap">
