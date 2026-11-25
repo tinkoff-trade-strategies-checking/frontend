@@ -378,6 +378,140 @@ export const DSL_STATEFUL_FUNCTIONS: readonly DslGuideFunctionItem[] = [
   },
 ];
 
+export const DSL_LEVEL_TREND_FUNCTIONS: readonly DslGuideFunctionItem[] = [
+  {
+    signature: 'pivot(n)',
+    returns: 'number',
+    description:
+      'Классический уровень разворота (H + L + C) / 3 по завершённому окну из n предыдущих баров без заглядывания в будущее (прогрев n + 1 бар).',
+  },
+  {
+    signature: 'pivot_r1(n)',
+    returns: 'number',
+    description: 'Первое сопротивление Pivot Points: 2 * P − L по завершённому окну из n баров.',
+  },
+  {
+    signature: 'pivot_r2(n)',
+    returns: 'number',
+    description: 'Второе сопротивление Pivot Points: P + (H − L) по завершённому окну из n баров.',
+  },
+  {
+    signature: 'pivot_s1(n)',
+    returns: 'number',
+    description: 'Первая поддержка Pivot Points: 2 * P − H по завершённому окну из n баров.',
+  },
+  {
+    signature: 'pivot_s2(n)',
+    returns: 'number',
+    description: 'Вторая поддержка Pivot Points: P − (H − L) по завершённому окну из n баров.',
+  },
+  {
+    signature: 'supertrend(n, k)',
+    returns: 'number',
+    description:
+      'Линия SuperTrend на базе atr(n) и множителя k (прогрев n баров): в восходящем тренде идёт ниже цены как поддержка, в нисходящем — выше как сопротивление.',
+  },
+  {
+    signature: 'keltner_upper(n, k)',
+    returns: 'number',
+    description: 'Верхняя граница канала Кельтнера: ema(close, n) + k * atr(n) (прогрев n баров).',
+  },
+  {
+    signature: 'keltner_lower(n, k)',
+    returns: 'number',
+    description: 'Нижняя граница канала Кельтнера: ema(close, n) − k * atr(n) (прогрев n баров).',
+  },
+  {
+    signature: 'linreg(x, n)',
+    returns: 'number',
+    description: 'Значение линейной регрессии (линии тренда) ряда x на текущем баре за n баров.',
+  },
+  {
+    signature: 'slope(x, n)',
+    returns: 'number',
+    description:
+      'Наклон линейной регрессии ряда x за n баров (приращение за 1 бар): > 0 — рост, < 0 — снижение.',
+  },
+];
+
+export const DSL_CANDLE_PATTERN_FUNCTIONS: readonly DslGuideFunctionItem[] = [
+  {
+    signature: 'is_doji()',
+    returns: 'bool',
+    description:
+      'Свеча Доджи: узкое тело (abs(close − open) <= 0.1 * (high − low) при high > low) — признак нерешительности рынка.',
+  },
+  {
+    signature: 'is_hammer()',
+    returns: 'bool',
+    description:
+      'Молот: длинная нижняя тень (>= 2 * тело) и короткая верхняя (<= 0.5 * тело) при high > low — возможный разворот вверх.',
+  },
+  {
+    signature: 'is_shooting_star()',
+    returns: 'bool',
+    description:
+      'Падающая звезда: длинная верхняя тень (>= 2 * тело) и короткая нижняя (<= 0.5 * тело) при high > low — возможный разворот вниз.',
+  },
+  {
+    signature: 'is_bullish_engulfing()',
+    returns: 'bool',
+    description:
+      'Бычье поглощение: предыдущая свеча медвежья, текущая бычья и перекрывает её тело (open <= close[1] и close >= open[1]).',
+  },
+  {
+    signature: 'is_bearish_engulfing()',
+    returns: 'bool',
+    description:
+      'Медвежье поглощение: предыдущая свеча бычья, текущая медвежья и перекрывает её тело (open >= close[1] и close <= open[1]).',
+  },
+  {
+    signature: 'is_inside_bar()',
+    returns: 'bool',
+    description:
+      'Внутренний бар: текущая свеча целиком внутри диапазона предыдущей (high <= high[1] и low >= low[1]) — сжатие перед импульсом.',
+  },
+  {
+    signature: 'is_pin_bar()',
+    returns: 'bool',
+    description:
+      'Пин-бар: доминирующая тень >= 2 * тело и занимает не менее 60% всего диапазона свечи (high − low).',
+  },
+];
+
+export const DSL_STRUCTURE_FUNCTIONS: readonly DslGuideFunctionItem[] = [
+  {
+    signature: 'swing_high(left, right)',
+    returns: 'number',
+    description:
+      'Цена последнего подтверждённого локального максимума (поддерживает [k]): бар t − right выше left баров слева и right баров справа; подтверждается на баре t (na до первого подтверждения).',
+  },
+  {
+    signature: 'swing_low(left, right)',
+    returns: 'number',
+    description:
+      'Цена последнего подтверждённого локального минимума (поддерживает [k]): бар t − right ниже left баров слева и right баров справа; подтверждается на баре t (na до первого подтверждения).',
+  },
+  {
+    signature: 'rising(x, n)',
+    returns: 'bool',
+    description:
+      'Истина, если ряд x строго растёт последние n переходов подряд (x > x[1] > … > x[n]); без [k].',
+  },
+  {
+    signature: 'falling(x, n)',
+    returns: 'bool',
+    description:
+      'Истина, если ряд x строго падает последние n переходов подряд (x < x[1] < … < x[n]); без [k].',
+  },
+  {
+    signature: 'bars_since(cond)',
+    returns: 'number',
+    description:
+      'Число баров с последнего момента, когда условие cond было истинно (0 — сейчас, na — ещё не было); поддерживает [k], переменные портфеля внутри cond запрещены.',
+  },
+];
+
 export const DSL_CROSSBAR_FUNCTIONS: readonly DslGuideFunctionItem[] = [
   {
     signature: 'change(x, n)',
@@ -514,6 +648,64 @@ rule "выход по каналу"
   when position > 0 and close < lowest(low, exit_n)[1]
   then sell all
   because "пробой минимума {exit_n} баров вниз"`,
+  },
+  {
+    id: 'supertrend-price-action',
+    title: 'SuperTrend и свечной паттерн Price Action',
+    summary:
+      'Входит в лонг по восходящему тренду (цена выше SuperTrend и положительный наклон линейной регрессии) при появлении бычьего поглощения или молота; защищает сделку стопом по SuperTrend и выходит при развороте или падающей звезде.',
+    highlights: ['supertrend', 'slope', 'is_bullish_engulfing / is_hammer', 'без L001'],
+    code: `# Трендовый вход по SuperTrend и паттернам Price Action
+param st_n = 10 range 5..30 step 1
+param st_mult = 3 range 1.5..5 step 0.5
+param slope_n = 14 range 5..40 step 1
+param size_pct = 80 range 10..100 step 10
+
+rule "вход по тренду и паттерну"
+  when position == 0 and close > supertrend(st_n, st_mult) and slope(close, slope_n) > 0 and (is_bullish_engulfing() or is_hammer())
+  then buy size_pct % cash
+  because "цена выше SuperTrend({st_n}, {st_mult}), наклон > 0 и бычий паттерн"
+
+rule "трейлинг-стоп по SuperTrend"
+  when position > 0 and not is_na(supertrend(st_n, st_mult)) and supertrend(st_n, st_mult) < close
+  then sell all stop supertrend(st_n, st_mult)
+  because "защитный стоп по линии SuperTrend = {supertrend(st_n, st_mult)}"
+
+rule "выход по развороту"
+  when position > 0 and (close < supertrend(st_n, st_mult) or is_shooting_star())
+  then sell all
+  because "разворот: цена ниже SuperTrend или падающая звезда"`,
+  },
+  {
+    id: 'pivot-swing-keltner',
+    title: 'Пробой Pivot R1 с каналом Кельтнера и свингами',
+    summary:
+      'Покупает на пробое первого сопротивления Pivot R1 при росте линии регрессии и недавнем сжатии (внутренний бар), ставит стоп под последний подтверждённый свинг-минимум и фиксирует прибыль у верхней границы канала Кельтнера.',
+    highlights: ['pivot_r1', 'swing_low', 'keltner_upper', 'bars_since / rising'],
+    code: `# Пробой сопротивления Pivot R1 с подтверждением структуры графика
+param piv_n = 20 range 10..60 step 5
+param kc_n = 20 range 10..50 step 5
+param kc_mult = 2 range 1..4 step 0.5
+param sw_left = 3 range 2..10 step 1
+param sw_right = 3 range 2..10 step 1
+param rise_n = 3 range 2..10 step 1
+param inside_max_age = 5 range 1..15 step 1
+param size_pct = 75 range 10..100 step 5
+
+rule "пробой Pivot R1"
+  when position == 0 and crossover(close, pivot_r1(piv_n)) and rising(linreg(close, piv_n), rise_n) and bars_since(is_inside_bar()) <= inside_max_age
+  then buy size_pct % cash
+  because "пробой Pivot R1({piv_n}) = {pivot_r1(piv_n)} после сжатия"
+
+rule "стоп под свингом"
+  when position > 0 and not is_na(swing_low(sw_left, sw_right)) and swing_low(sw_left, sw_right) < close
+  then sell all stop swing_low(sw_left, sw_right)
+  because "стоп под подтверждённым свингом {swing_low(sw_left, sw_right)}"
+
+rule "фиксация у канала Кельтнера"
+  when position > 0 and close >= keltner_upper(kc_n, kc_mult)
+  then sell all
+  because "цена достигла верхней границы Кельтнера {keltner_upper(kc_n, kc_mult)}"`,
   },
 ];
 

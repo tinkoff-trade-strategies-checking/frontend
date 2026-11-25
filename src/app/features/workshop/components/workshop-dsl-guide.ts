@@ -13,12 +13,14 @@ import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/co
 import { TuiBadge } from '@taiga-ui/kit';
 import {
   DSL_ACTION_ROWS,
+  DSL_CANDLE_PATTERN_FUNCTIONS,
   DSL_COMMON_MISTAKES,
   DSL_CROSSBAR_FUNCTIONS,
   DSL_DIAGNOSTICS_TABLE,
   DSL_EXECUTION_RULES,
   DSL_GUIDE_EXAMPLES,
   DSL_GUIDE_TABS,
+  DSL_LEVEL_TREND_FUNCTIONS,
   DSL_LIMIT_ROWS,
   DSL_OPERATOR_ROWS,
   DSL_PORTFOLIO_ROWS,
@@ -27,6 +29,7 @@ import {
   DSL_SERIES_ROWS,
   DSL_STATEFUL_FUNCTIONS,
   DSL_STATELESS_FUNCTIONS,
+  DSL_STRUCTURE_FUNCTIONS,
   DslGuideExample,
   DslGuideFunctionItem,
   DslGuideTabId,
@@ -90,6 +93,15 @@ export class WorkshopDslGuide {
   protected readonly filteredStateful = computed(() =>
     DSL_STATEFUL_FUNCTIONS.filter((fn) => matchesQuery(fn, this.normalizedQuery())),
   );
+  protected readonly filteredLevelTrend = computed(() =>
+    DSL_LEVEL_TREND_FUNCTIONS.filter((fn) => matchesQuery(fn, this.normalizedQuery())),
+  );
+  protected readonly filteredCandlePatterns = computed(() =>
+    DSL_CANDLE_PATTERN_FUNCTIONS.filter((fn) => matchesQuery(fn, this.normalizedQuery())),
+  );
+  protected readonly filteredStructure = computed(() =>
+    DSL_STRUCTURE_FUNCTIONS.filter((fn) => matchesQuery(fn, this.normalizedQuery())),
+  );
   protected readonly filteredCrossbar = computed(() =>
     DSL_CROSSBAR_FUNCTIONS.filter((fn) => matchesQuery(fn, this.normalizedQuery())),
   );
@@ -99,6 +111,9 @@ export class WorkshopDslGuide {
   protected readonly hasAnyFilteredFunctions = computed(
     () =>
       this.filteredStateful().length > 0 ||
+      this.filteredLevelTrend().length > 0 ||
+      this.filteredCandlePatterns().length > 0 ||
+      this.filteredStructure().length > 0 ||
       this.filteredCrossbar().length > 0 ||
       this.filteredStateless().length > 0,
   );
