@@ -257,8 +257,36 @@
                         @if (item.latestVersion === 0) {
                           <span tuiBadge size="s" appearance="warning">Черновик</span>
                         }
-                        @if (item.visibility === 'hidden') {
-                          <span tuiBadge size="s" appearance="warning">Скрыт</span>
+                        @if (item.visibility === 'public') {
+                          <span tuiBadge size="s" appearance="neutral">Публичный</span>
+                        } @else if (item.visibility === 'closed') {
+                          <span tuiBadge size="s" appearance="info" class="closed-code-badge">
+                            <svg
+                              class="lock-icon"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              aria-hidden="true"
+                            >
+                              <rect
+                                x="3"
+                                y="7"
+                                width="10"
+                                height="7"
+                                rx="1.5"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                              />
+                              <path
+                                d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                              />
+                            </svg>
+                            Закрытый код
+                          </span>
+                        } @else {
+                          <span tuiBadge size="s" appearance="warning">Приватный</span>
                         }
                       </div>
                       <p class="tui-text_body-xs muted desc-preview">{{ item.description }}</p>
@@ -406,8 +434,31 @@
                   } @else {
                     <span tuiBadge size="s" appearance="warning">Черновик</span>
                   }
-                  @if (algo.visibility === 'hidden') {
-                    <span tuiBadge size="s" appearance="warning">Скрыт</span>
+                  @if (algo.visibility === 'public') {
+                    <span tuiBadge size="s" appearance="neutral">Публичный</span>
+                  } @else if (algo.visibility === 'closed') {
+                    <span tuiBadge size="s" appearance="info" class="closed-code-badge">
+                      <svg class="lock-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <rect
+                          x="3"
+                          y="7"
+                          width="10"
+                          height="7"
+                          rx="1.5"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                        />
+                        <path
+                          d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                      Закрытый код
+                    </span>
+                  } @else {
+                    <span tuiBadge size="s" appearance="warning">Приватный</span>
                   }
                 </div>
               </div>
@@ -459,19 +510,23 @@
                 </button>
               }
 
-              <button
-                tuiButton
-                type="button"
-                size="s"
-                appearance="outline"
-                [disabled]="algo.latestVersion === 0 || store.forking()"
-                [title]="
-                  algo.latestVersion === 0 ? 'Нельзя сделать форк неопубликованного черновика' : ''
-                "
-                (click)="store.forkAlgorithm(algo.id, algo.latestVersion)"
-              >
-                Форк
-              </button>
+              @if (!isSourceLocked(algo)) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  [disabled]="algo.latestVersion === 0 || store.forking()"
+                  [title]="
+                    algo.latestVersion === 0
+                      ? 'Нельзя сделать форк неопубликованного черновика'
+                      : ''
+                  "
+                  (click)="store.forkAlgorithm(algo.id, algo.latestVersion)"
+                >
+                  Форк
+                </button>
+              }
 
               @if (algo.isMine && !algo.isSystem) {
                 <button
@@ -483,19 +538,6 @@
                 >
                   Редактировать черновик
                 </button>
-
-                @if (algo.latestVersion > 0) {
-                  <button
-                    tuiButton
-                    type="button"
-                    size="s"
-                    appearance="outline"
-                    [disabled]="store.visibilityPending()"
-                    (click)="store.toggleVisibility(algo)"
-                  >
-                    {{ algo.visibility === 'public' ? 'Скрыть' : 'Вернуть в каталог' }}
-                  </button>
-                }
 
                 <button
                   tuiButton
@@ -525,6 +567,30 @@
                 Запустить прогон
               </button>
             </div>
+
+            @if (algo.isMine && !algo.isSystem && algo.latestVersion > 0) {
+              <div
+                class="visibility-switcher"
+                role="group"
+                aria-label="Уровень видимости алгоритма"
+              >
+                <span class="tui-text_body-xs muted">Видимость алгоритма</span>
+                <tui-segmented
+                  size="s"
+                  [activeItemIndex]="visibilityIndex(algo.visibility)"
+                  (activeItemIndexChange)="onVisibilityIndexChange(algo, $event)"
+                >
+                  @for (opt of visibilityOptions; track opt.id) {
+                    <button type="button" [disabled]="store.visibilityPending()">
+                      {{ opt.label }}
+                    </button>
+                  }
+                </tui-segmented>
+                <span class="tui-text_body-xs muted">
+                  {{ visibilityDescription(algo.visibility) }}
+                </span>
+              </div>
+            }
 
             @if (store.deleteConfirmId() === algo.id) {
               <div
@@ -568,10 +634,49 @@
               </p>
             }
 
-            <app-workshop-code-viewer
-              [versions]="algo.versions"
-              [latestVersion]="algo.latestVersion"
-            />
+            @if (isSourceLocked(algo)) {
+              <section class="locked-source-card" aria-label="Исходный код скрыт автором">
+                <div class="locked-source-head">
+                  <svg
+                    class="lock-icon lock-icon-lg"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <rect
+                      x="3"
+                      y="7"
+                      width="10"
+                      height="7"
+                      rx="1.5"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    />
+                    <path
+                      d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  <h3 class="tui-text_h6">Исходный код скрыт автором</h3>
+                </div>
+                <p class="tui-text_body-s muted">
+                  Исходный код скрыт автором — алгоритм можно запускать и сравнивать.
+                </p>
+              </section>
+            } @else {
+              @if (algo.visibility === 'closed' && algo.isMine) {
+                <div tuiNotification appearance="info" size="s" class="closed-owner-note">
+                  Код скрыт от других пользователей — вы как автор продолжаете видеть и
+                  редактировать его.
+                </div>
+              }
+              <app-workshop-code-viewer
+                [versions]="algo.versions"
+                [latestVersion]="algo.latestVersion"
+              />
+            }
 
             <section class="detail-section">
               <div class="section-head">

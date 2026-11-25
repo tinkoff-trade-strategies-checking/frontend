@@ -13,6 +13,7 @@ import {
   WorkshopDraft,
   WorkshopPage as WorkshopPageData,
   WorkshopSortField,
+  WorkshopVisibility,
 } from './data/workshop.models';
 
 export const WORKSHOP_SEARCH_DEBOUNCE_MS = 300;
@@ -72,6 +73,7 @@ export class WorkshopStore implements OnDestroy {
   readonly draftSuccess = signal<string | null>(null);
   readonly draftName = signal('');
   readonly draftDescription = signal('');
+  readonly draftVisibility = signal<WorkshopVisibility>('public');
   readonly draftSource = signal('');
   readonly publishSummary = signal('');
   readonly checkResult = signal<CheckStrategyResult | null>(null);
@@ -368,6 +370,7 @@ export class WorkshopStore implements OnDestroy {
     this.draft.set(null);
     this.draftName.set('');
     this.draftDescription.set('');
+    this.draftVisibility.set('public');
     this.draftSource.set('');
     this.publishSummary.set('');
     this.checkResult.set(null);
@@ -393,6 +396,18 @@ export class WorkshopStore implements OnDestroy {
     this.draftSuccess.set(null);
   }
 
+  setDraftVisibility(visibility: WorkshopVisibility): void {
+    if (this.draftVisibility() === visibility) {
+      return;
+    }
+    this.draftVisibility.set(visibility);
+    this.draftSuccess.set(null);
+    const current = this.draft();
+    if (this.editorMode() === 'edit' && current) {
+      void this.updateDraftVisibility(current.strategyId, visibility);
+    }
+  }
+
   setDraftSource(value: string): void {
     this.draftSource.set(value);
     this.checkResult.set(null);
@@ -414,6 +429,7 @@ export class WorkshopStore implements OnDestroy {
     const seq = this.draftSeq;
     const rawDescription = this.draftDescription();
     const source = this.draftSource();
+    const visibility = this.draftVisibility();
     this.draftSaving.set(true);
     this.clearDraftNotices();
 
@@ -422,6 +438,7 @@ export class WorkshopStore implements OnDestroy {
         name,
         description: rawDescription.trim(),
         source,
+        ...(visibility !== 'public' ? { visibility } : {}),
       });
       if (seq !== this.draftSeq) {
         return false;
@@ -646,32 +663,74 @@ export class WorkshopStore implements OnDestroy {
     }
   }
 
-  async toggleVisibility(algo: WorkshopAlgorithmSummary): Promise<void> {
-    if (algo.latestVersion === 0 || !algo.isMine || algo.isSystem || this.visibilityPending()) {
+  async setVisibility(
+    algo: WorkshopAlgorithmSummary,
+    visibility: WorkshopVisibility,
+  ): Promise<void> {
+    if (
+      algo.latestVersion === 0 ||
+      !algo.isMine ||
+      algo.isSystem ||
+      algo.visibility === visibility ||
+      this.visibilityPending()
+    ) {
       return;
     }
-    const next = algo.visibility === 'public' ? 'hidden' : 'public';
     this.visibilityPending.set(true);
     this.actionError.set(null);
 
     try {
-      const updated = await this.api.setVisibility(algo.id, next);
-      this.selectedDetail.update((detail) =>
-        detail && detail.id === algo.id ? { ...detail, visibility: updated.visibility } : detail,
-      );
-      this.pageData.update((page) =>
-        page
-          ? {
-              ...page,
-              items: page.items.map((item) => (item.id === algo.id ? updated : item)),
-            }
-          : null,
-      );
+      const updated = await this.api.setVisibility(algo.id, visibility);
+      this.applyVisibilityUpdate(algo.id, updated);
     } catch (error) {
       this.actionError.set(errorMessage(error, 'Не удалось изменить видимость алгоритма.'));
     } finally {
       this.visibilityPending.set(false);
     }
+  }
+
+  async toggleVisibility(algo: WorkshopAlgorithmSummary): Promise<void> {
+    const next: WorkshopVisibility = algo.visibility === 'public' ? 'hidden' : 'public';
+    await this.setVisibility(algo, next);
+  }
+
+  private async updateDraftVisibility(id: string, visibility: WorkshopVisibility): Promise<void> {
+    if (this.visibilityPending()) {
+      return;
+    }
+    const prev = this.draft()?.visibility ?? this.selectedDetail()?.visibility ?? 'public';
+    this.visibilityPending.set(true);
+    this.draftError.set(null);
+
+    try {
+      const updated = await this.api.setVisibility(id, visibility);
+      this.applyVisibilityUpdate(id, updated);
+    } catch (error) {
+      this.draftVisibility.set(prev);
+      this.draftError.set(errorMessage(error, 'Не удалось изменить видимость алгоритма.'));
+    } finally {
+      this.visibilityPending.set(false);
+    }
+  }
+
+  private applyVisibilityUpdate(id: string, updated: WorkshopAlgorithmSummary): void {
+    this.selectedDetail.update((detail) =>
+      detail && detail.id === id ? { ...detail, visibility: updated.visibility } : detail,
+    );
+    this.draft.update((cur) =>
+      cur && cur.strategyId === id ? { ...cur, visibility: updated.visibility } : cur,
+    );
+    if (this.draft()?.strategyId === id) {
+      this.draftVisibility.set(updated.visibility);
+    }
+    this.pageData.update((page) =>
+      page
+        ? {
+            ...page,
+            items: page.items.map((item) => (item.id === id ? updated : item)),
+          }
+        : null,
+    );
   }
 
   requestDelete(id: string): void {
@@ -715,6 +774,11 @@ export class WorkshopStore implements OnDestroy {
     this.draft.set(draft);
     this.draftName.set(draft.name);
     this.draftDescription.set(draft.description);
+    if (draft.visibility) {
+      this.draftVisibility.set(draft.visibility);
+    } else if (this.selectedDetail()?.id === draft.strategyId) {
+      this.draftVisibility.set(this.selectedDetail()!.visibility);
+    }
     this.draftSource.set(draft.source);
     this.checkResult.set(draft.check);
   }
@@ -726,6 +790,9 @@ export class WorkshopStore implements OnDestroy {
     sentSource: string,
   ): void {
     this.draft.set(draft);
+    if (draft.visibility) {
+      this.draftVisibility.set(draft.visibility);
+    }
     if (this.draftName() === sentName) {
       this.draftName.set(draft.name);
     }

@@ -62,7 +62,11 @@ describe('WorkshopPage', () => {
 
     const ownHiddenRow = el.querySelector('tr[data-algo-id="A-0004"]');
     expect(ownHiddenRow).not.toBeNull();
-    expect(ownHiddenRow?.textContent).toContain('Скрыт');
+    expect(ownHiddenRow?.textContent).toContain('Приватный');
+
+    const foreignClosedRow = el.querySelector('tr[data-algo-id="A-0015"]');
+    expect(foreignClosedRow).not.toBeNull();
+    expect(foreignClosedRow?.textContent).toContain('Закрытый код');
 
     expect(el.querySelector('tr[data-algo-id="A-0005"]')).toBeNull();
   });
@@ -488,7 +492,7 @@ describe('WorkshopPage', () => {
     expect(runBtnAfter?.disabled).toBe(false);
   });
 
-  it('выполняет форк алгоритма и переключает видимость своего алгоритма', async () => {
+  it('выполняет форк алгоритма и переключает видимость своего алгоритма (Публичный / Закрытый код / Приватный)', async () => {
     const fixture = TestBed.createComponent(WorkshopPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -500,19 +504,32 @@ describe('WorkshopPage', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const hideBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
-      (b) => b.textContent?.trim() === 'Скрыть',
-    );
-    expect(hideBtn).toBeDefined();
-    hideBtn?.click();
+    const visGroup = el.querySelector('.detail-panel .visibility-switcher');
+    expect(visGroup).not.toBeNull();
+    const visBtns = Array.from(visGroup?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    expect(visBtns.map((b) => b.textContent?.trim())).toEqual([
+      'Публичный',
+      'Закрытый код',
+      'Приватный',
+    ]);
+
+    // Автор переводит алгоритм в «Закрытый код» — продолжает видеть и редактировать свой код.
+    visBtns[1]?.click();
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(el.querySelector('tr[data-algo-id="A-0002"]')?.textContent).toContain('Скрыт');
-    const restoreBtn = Array.from(
-      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
-    ).find((b) => b.textContent?.trim() === 'Вернуть в каталог');
-    expect(restoreBtn).toBeDefined();
+    expect(el.querySelector('tr[data-algo-id="A-0002"]')?.textContent).toContain('Закрытый код');
+    expect(el.querySelector('.detail-panel')?.textContent).toContain('Закрытый код');
+    expect(el.querySelector('.detail-panel .closed-owner-note')?.textContent).toContain(
+      'Код скрыт от других пользователей',
+    );
+    expect(el.querySelector('.detail-panel app-workshop-code-viewer')).not.toBeNull();
+
+    // Автор переводит алгоритм в «Приватный».
+    visBtns[2]?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('tr[data-algo-id="A-0002"]')?.textContent).toContain('Приватный');
 
     const forkBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
       (b) => b.textContent?.trim() === 'Форк',
@@ -933,6 +950,87 @@ describe('WorkshopPage', () => {
     expect(el.querySelector('[role="dialog"]')).toBeNull();
     expect(store.draftSource()).toContain('rule "вход"');
     expect(store.draftSource()).toContain('because');
+  });
+
+  it('для не-автора чужого алгоритма с закрытым кодом скрывает просмотрщик и «Форк», показывает карточку блокировки, сохраняя запуск и сравнение', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    findRowButton(el, 'A-0015', 'Открыть')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const detail = el.querySelector('.detail-panel')!;
+    expect(detail.textContent).toContain('Закрытый код');
+    expect(detail.querySelector('app-workshop-code-viewer')).toBeNull();
+    expect(detail.querySelector('.locked-source-card')?.textContent).toContain(
+      'Исходный код скрыт автором — алгоритм можно запускать и сравнивать.',
+    );
+    expect(detail.querySelector('.visibility-switcher')).toBeNull();
+
+    const btns = Array.from(detail.querySelectorAll<HTMLButtonElement>('button'));
+    const labels = btns.map((b) => b.textContent?.trim());
+    expect(labels).not.toContain('Форк');
+    expect(labels).not.toContain('Редактировать черновик');
+    expect(labels).not.toContain('Скачать .dsl');
+
+    const runBtn = btns.find((b) => b.textContent?.trim() === 'Запустить прогон');
+    const compareBtn = btns.find((b) => b.textContent?.trim() === 'Добавить в сравнение');
+    expect(runBtn?.disabled).toBe(false);
+    expect(compareBtn?.disabled).toBe(false);
+  });
+
+  it('создаёт алгоритм с выбранным уровнем «Закрытый код» и сохраняет его после публикации', async () => {
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const newBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Новый алгоритм',
+    );
+    newBtn?.click();
+    fixture.detectChanges();
+
+    const nameInput = el.querySelector('#workshop-draft-name') as HTMLInputElement;
+    const sourceInput = el.querySelector('#workshop-draft-source') as HTMLTextAreaElement;
+    nameInput.value = 'Мой закрытый алгоритм';
+    nameInput.dispatchEvent(new Event('input'));
+    sourceInput.value = 'param fast = 20;\nrule enter when close > 0 because "ok";';
+    sourceInput.dispatchEvent(new Event('input'));
+
+    const visBtns = Array.from(el.querySelectorAll<HTMLButtonElement>('.visibility-field button'));
+    visBtns.find((b) => b.textContent?.trim() === 'Закрытый код')?.click();
+    fixture.detectChanges();
+
+    const createBtn = Array.from(el.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Создать черновик',
+    );
+    createBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const publishBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('button')).find(
+      (b) => b.textContent?.trim() === 'Опубликовать версию',
+    );
+    publishBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const toCardBtn = Array.from(
+      el.querySelectorAll<HTMLButtonElement>('.detail-panel button'),
+    ).find((b) => b.textContent?.trim() === 'К карточке');
+    toCardBtn?.click();
+    fixture.detectChanges();
+
+    const detail = el.querySelector('.detail-panel')!;
+    expect(detail.textContent).toContain('Закрытый код');
+    expect(detail.querySelector('app-workshop-code-viewer')).not.toBeNull();
+    expect(detail.querySelector('.closed-owner-note')).not.toBeNull();
   });
 });
 

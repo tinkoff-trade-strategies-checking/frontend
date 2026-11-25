@@ -4,8 +4,10 @@ import {
   CheckLevel,
   StrategyDiagnostic,
   StrategyParamDecl,
+  WorkshopAlgorithmSummary,
   WorkshopLinterWarning,
   WorkshopSortField,
+  WorkshopVisibility,
 } from './data/workshop.models';
 
 export const WORKSHOP_SORT_LABELS: Readonly<Record<WorkshopSortField, string>> = {
@@ -13,6 +15,45 @@ export const WORKSHOP_SORT_LABELS: Readonly<Record<WorkshopSortField, string>> =
   name_asc: 'По названию',
   author_asc: 'По автору',
 };
+
+export const WORKSHOP_VISIBILITY_OPTIONS: readonly {
+  readonly id: WorkshopVisibility;
+  readonly label: string;
+  readonly description: string;
+}[] = [
+  {
+    id: 'public',
+    label: 'Публичный',
+    description: 'Видят все, код открыт для просмотра и форка.',
+  },
+  {
+    id: 'closed',
+    label: 'Закрытый код',
+    description:
+      'Запускать и сравнивать могут все, код скрыт от других. Автор продолжает видеть и редактировать свой код.',
+  },
+  {
+    id: 'hidden',
+    label: 'Приватный',
+    description: 'Видит и запускает только автор.',
+  },
+];
+
+export const WORKSHOP_VISIBILITY_LABELS: Readonly<Record<WorkshopVisibility, string>> = {
+  public: 'Публичный',
+  closed: 'Закрытый код',
+  hidden: 'Приватный',
+};
+
+export function formatVisibilityDescription(visibility: WorkshopVisibility): string {
+  return WORKSHOP_VISIBILITY_OPTIONS.find((opt) => opt.id === visibility)?.description ?? '';
+}
+
+export function isSourceLockedForViewer(
+  algo: Pick<WorkshopAlgorithmSummary, 'visibility' | 'isMine'>,
+): boolean {
+  return algo.visibility === 'closed' && !algo.isMine;
+}
 
 export const CHECK_LEVEL_LABELS: Readonly<Record<CheckLevel, string>> = {
   OK: 'Без ошибок',

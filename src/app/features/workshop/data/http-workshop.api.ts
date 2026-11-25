@@ -115,6 +115,7 @@ function mapDraft(d: ApiWorkshopDraft): WorkshopDraft {
     strategyId: d.strategyId,
     name: d.name,
     description: d.description,
+    visibility: d.visibility,
     source: d.source,
     updatedAt: d.updatedAt,
     check: d.check,

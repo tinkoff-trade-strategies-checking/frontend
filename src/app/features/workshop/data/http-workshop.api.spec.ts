@@ -170,4 +170,89 @@ describe('HttpWorkshopApi', () => {
     req.flush(null, { status: 204, statusText: 'No Content' });
     await expect(pending).resolves.toBeUndefined();
   });
+
+  it('поддерживает 3-уровневую видимость (public / closed / hidden) при создании, смене и чтении с source: null', async () => {
+    const pCreate = api.createAlgorithm({
+      name: 'Closed Algo',
+      source: 'rule x when close > 0 then buy 10 % cash because "ok"',
+      visibility: 'closed',
+    });
+    const rCreate = http.expectOne('/api/v1/workshop/algorithms');
+    expect(rCreate.request.method).toBe('POST');
+    expect(rCreate.request.body).toMatchObject({ visibility: 'closed' });
+    rCreate.flush(
+      {
+        strategyId: 'alg-closed',
+        name: 'Closed Algo',
+        description: '',
+        visibility: 'closed',
+        forkedFrom: null,
+        source: 'rule x when close > 0 then buy 10 % cash because "ok"',
+        latestVersion: 0,
+        updatedAt: '2026-11-22T12:00:00Z',
+        check: { lookaheadLevel: 'OK', diagnostics: [], params: [] },
+      },
+      { status: 201, statusText: 'Created' },
+    );
+    const created = await pCreate;
+    expect(created.visibility).toBe('closed');
+    expect(created.source).toContain('rule x');
+
+    const pVis = api.setVisibility('alg-closed', 'closed');
+    const rVis = http.expectOne('/api/v1/workshop/algorithms/alg-closed/visibility');
+    expect(rVis.request.method).toBe('PATCH');
+    expect(rVis.request.body).toEqual({ visibility: 'closed' });
+    rVis.flush({
+      id: 'alg-closed',
+      name: 'Closed Algo',
+      description: '',
+      authorId: 'u-1',
+      author: 'Вы',
+      isMine: true,
+      isSystem: false,
+      visibility: 'closed',
+      latestVersion: 1,
+      latestVersionId: 'ver-1',
+      publishedAt: '2026-11-22T12:05:00Z',
+      license: 'MIT',
+      linterWarnings: [],
+    });
+    expect((await pVis).visibility).toBe('closed');
+
+    const pDetail = api.getById('alg-foreign-closed');
+    http.expectOne('/api/v1/workshop/algorithms/alg-foreign-closed').flush({
+      status: 'READY',
+      algorithm: {
+        id: 'alg-foreign-closed',
+        name: 'Foreign Closed',
+        description: '',
+        authorId: 'u-2',
+        author: 'Другой автор',
+        isMine: false,
+        isSystem: false,
+        visibility: 'closed',
+        latestVersion: 1,
+        latestVersionId: 'ver-f1',
+        publishedAt: '2026-11-22T12:05:00Z',
+        license: 'MIT',
+        linterWarnings: [],
+        versions: [
+          {
+            id: 'ver-f1',
+            version: 1,
+            publishedAt: '2026-11-22T12:05:00Z',
+            summary: 'v1',
+            immutable: true,
+            source: null,
+          },
+        ],
+      },
+    });
+    const detail = await pDetail;
+    expect(detail.status).toBe('READY');
+    if (detail.status === 'READY') {
+      expect(detail.algorithm.visibility).toBe('closed');
+      expect(detail.algorithm.versions[0].source).toBeNull();
+    }
+  });
 });

@@ -172,4 +172,38 @@ describe('StubWorkshopApi', () => {
     expect(forked.name).toBe('Forked Ref');
     expect(forked.strategyId).not.toBe('A-0001');
   });
+
+  it('поддерживает 3-уровневую видимость: чужой closed скрывает source и запрещает fork, автор видит и редактирует свой closed', async () => {
+    const api = new StubWorkshopApi();
+
+    const foreignClosed = await api.getById('A-0015');
+    expect(foreignClosed.status).toBe('READY');
+    if (foreignClosed.status === 'READY') {
+      expect(foreignClosed.algorithm.visibility).toBe('closed');
+      expect(foreignClosed.algorithm.isMine).toBe(false);
+      expect(foreignClosed.algorithm.versions[0].source).toBeNull();
+    }
+    await expect(api.fork('A-0015')).rejects.toMatchObject({ status: 409 });
+
+    const ownClosedDraft = await api.createAlgorithm({
+      name: 'Own Closed',
+      description: 'Secret',
+      source: 'param fast = 10;\nrule enter when close > 0 because "ok";',
+      visibility: 'closed',
+    });
+    expect(ownClosedDraft.visibility).toBe('closed');
+    expect(ownClosedDraft.source).toContain('param fast = 10;');
+
+    const pub = await api.publish(ownClosedDraft.strategyId, { summary: 'v1' });
+    expect(pub.ok).toBe(true);
+    const ownDetail = await api.getById(ownClosedDraft.strategyId);
+    expect(ownDetail.status).toBe('READY');
+    if (ownDetail.status === 'READY') {
+      expect(ownDetail.algorithm.visibility).toBe('closed');
+      expect(ownDetail.algorithm.versions[0].source).toContain('param fast = 10;');
+    }
+
+    const ownFork = await api.fork(ownClosedDraft.strategyId);
+    expect(ownFork.source).toContain('param fast = 10;');
+  });
 });

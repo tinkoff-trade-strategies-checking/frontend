@@ -12,7 +12,7 @@ test('каталог мастерской: навигация, пагинаци�
 
   const ownHiddenRow = page.locator('tr[data-algo-id="A-0004"]');
   await expect(ownHiddenRow).toBeVisible();
-  await expect(ownHiddenRow).toContainText('Скрыт');
+  await expect(ownHiddenRow).toContainText('Приватный');
   await expect(page.locator('tr[data-algo-id="A-0005"]')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Вперёд' }).click();
@@ -104,11 +104,14 @@ test('форк, проверка DSL с автоисправлением, пуб
   await expect(detail).toContainText('v1');
   await expect(detail).toContainText('неизменяема');
 
-  // Скрываем свой алгоритм и возвращаем обратно в каталог.
-  await detail.getByRole('button', { name: 'Скрыть' }).click();
-  await expect(detail).toContainText('Скрыт');
-  await detail.getByRole('button', { name: 'Вернуть в каталог' }).click();
-  await expect(detail.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+  // Переключаем 3-уровневую видимость: Закрытый код -> Приватный -> Публичный.
+  const visGroup = detail.getByRole('group', { name: 'Уровень видимости алгоритма' });
+  await visGroup.getByRole('button', { name: 'Закрытый код' }).click();
+  await expect(detail).toContainText('Код скрыт от других пользователей');
+  await visGroup.getByRole('button', { name: 'Приватный' }).click();
+  await expect(detail).toContainText('Приватный');
+  await visGroup.getByRole('button', { name: 'Публичный' }).click();
+  await expect(detail).toContainText('Публичный');
 
   // Открываем форму запуска прогона и запускаем прогон.
   await detail.getByRole('button', { name: 'Запустить прогон' }).click();

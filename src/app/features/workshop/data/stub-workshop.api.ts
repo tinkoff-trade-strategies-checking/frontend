@@ -462,7 +462,7 @@ const RAW_STUB_ALGORITHMS: readonly Omit<WorkshopAlgorithmDetail, 'authorId'>[] 
     author: 'Дмитрий Соколов',
     isMine: false,
     isSystem: false,
-    visibility: 'public',
+    visibility: 'closed',
     latestVersion: 1,
     publishedAt: '2026-11-13T18:10:00+03:00',
     license: 'MIT',
@@ -788,7 +788,7 @@ function seedAlgorithms(): WorkshopAlgorithmDetail[] {
     const versions: WorkshopAlgorithmVersion[] = item.versions.map((v) => ({
       ...v,
       id: `${item.id}-v${v.version}`,
-      source: DEFAULT_DSL_SOURCE,
+      source: item.visibility === 'closed' && !item.isMine ? null : DEFAULT_DSL_SOURCE,
       lookaheadLevel,
       diagnostics: warnings,
       params,
@@ -821,7 +821,7 @@ function toSummary(detail: WorkshopAlgorithmDetail): WorkshopAlgorithmSummary {
 }
 
 function isVisibleToViewer(item: WorkshopAlgorithmSummary): boolean {
-  return item.visibility === 'public' || item.isMine;
+  return item.visibility === 'public' || item.visibility === 'closed' || item.isMine;
 }
 
 function compareAlgorithms(
@@ -1021,6 +1021,7 @@ export class StubWorkshopApi implements WorkshopApi {
 
   async createAlgorithm(command: CreateWorkshopAlgorithmCommand): Promise<WorkshopDraft> {
     const id = `A-${String(this.nextIdSeq++).padStart(4, '0')}`;
+    const visibility: WorkshopVisibility = command.visibility ?? 'public';
     const check = analyzeStubSource(command.source);
     const now = new Date().toISOString();
     const detail: WorkshopAlgorithmDetail = {
@@ -1031,7 +1032,7 @@ export class StubWorkshopApi implements WorkshopApi {
       author: 'Вы',
       isMine: true,
       isSystem: false,
-      visibility: 'hidden',
+      visibility,
       latestVersion: 0,
       latestVersionId: null,
       publishedAt: null,
@@ -1044,6 +1045,7 @@ export class StubWorkshopApi implements WorkshopApi {
       strategyId: id,
       name: detail.name,
       description: detail.description,
+      visibility,
       source: command.source,
       updatedAt: now,
       check,
@@ -1056,13 +1058,14 @@ export class StubWorkshopApi implements WorkshopApi {
     const algo = this.requireOwned(id);
     const existing = this.drafts.get(id);
     if (existing) {
-      return existing;
+      return { ...existing, visibility: algo.visibility };
     }
     const source = algo.versions[0]?.source ?? DEFAULT_DSL_SOURCE;
     const draft: WorkshopDraft = {
       strategyId: id,
       name: algo.name,
       description: algo.description,
+      visibility: algo.visibility,
       source,
       updatedAt: algo.publishedAt ?? new Date().toISOString(),
       check: analyzeStubSource(source),
@@ -1083,6 +1086,7 @@ export class StubWorkshopApi implements WorkshopApi {
       strategyId: id,
       name,
       description,
+      visibility: algo.visibility,
       source,
       updatedAt: new Date().toISOString(),
       check,
@@ -1135,7 +1139,7 @@ export class StubWorkshopApi implements WorkshopApi {
 
     this.algorithms[idx] = {
       ...algo,
-      visibility: algo.latestVersion === 0 ? 'public' : algo.visibility,
+      visibility: algo.visibility,
       latestVersion: nextVer,
       latestVersionId: version.id,
       publishedAt: now,
@@ -1150,6 +1154,9 @@ export class StubWorkshopApi implements WorkshopApi {
     const sourceAlgo = this.algorithms.find((item) => item.id === id);
     if (!sourceAlgo || !isVisibleToViewer(sourceAlgo)) {
       throw problemError(404, 'NOT_FOUND', 'Алгоритм не найден.');
+    }
+    if (sourceAlgo.visibility === 'closed' && !sourceAlgo.isMine) {
+      throw problemError(409, 'CONFLICT', 'Нельзя сделать форк алгоритма с закрытым кодом.');
     }
     const ver = command.version
       ? sourceAlgo.versions.find((v) => v.version === command.version)
@@ -1169,10 +1176,14 @@ export class StubWorkshopApi implements WorkshopApi {
     const idx = this.algorithms.findIndex((item) => item.id === id);
     const algo = this.requireOwned(id);
     if (algo.isSystem) {
-      throw problemError(403, 'FORBIDDEN', 'Системный алгоритм нельзя скрыть.');
+      throw problemError(409, 'CONFLICT', 'Нельзя изменить видимость системного алгоритма.');
     }
     const updated = { ...algo, visibility };
     this.algorithms[idx] = updated;
+    const existingDraft = this.drafts.get(id);
+    if (existingDraft) {
+      this.drafts.set(id, { ...existingDraft, visibility });
+    }
     return toSummary(updated);
   }
 

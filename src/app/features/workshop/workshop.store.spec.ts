@@ -505,7 +505,7 @@ describe('WorkshopStore', () => {
 
   it('выполняет fork, открывает черновик и переключает видимость только для своих несистемных алгоритмов', async () => {
     const forkCalls: { id: string; version?: number | null }[] = [];
-    const visCalls: { id: string; visibility: 'public' | 'hidden' }[] = [];
+    const visCalls: { id: string; visibility: 'public' | 'closed' | 'hidden' }[] = [];
 
     const ownAlgo = makeAlgo('A-OWN', 'Own Algo');
     const systemAlgo = { ...makeAlgo('A-SYS', 'System'), isMine: false, isSystem: true };
@@ -1100,5 +1100,36 @@ describe('WorkshopStore', () => {
 
     await store.toggleVisibility(draft);
     expect(visibilityCalls).toBe(0);
+  });
+
+  it('setVisibility переключает свой алгоритм на closed и обновляет selectedDetail и items', async () => {
+    const mine = { ...makeAlgo('A-MINE', 'My Algo'), isMine: true };
+    const calls: string[] = [];
+    const api: WorkshopApi = {
+      ...stubApi({
+        async list(): Promise<WorkshopPageData> {
+          return makePage([mine]);
+        },
+        async getById(): Promise<WorkshopDetailResult> {
+          return { status: 'READY', algorithm: mine };
+        },
+      }),
+      async setVisibility(_id, visibility) {
+        calls.push(visibility);
+        return { ...mine, visibility };
+      },
+    };
+
+    TestBed.configureTestingModule({
+      providers: [{ provide: WORKSHOP_API, useValue: api }, WorkshopStore],
+    });
+    const store = TestBed.inject(WorkshopStore);
+    await store.load();
+    await store.selectAlgorithm('A-MINE');
+
+    await store.setVisibility(mine, 'closed');
+    expect(calls).toEqual(['closed']);
+    expect(store.selectedDetail()?.visibility).toBe('closed');
+    expect(store.items()[0].visibility).toBe('closed');
   });
 });
