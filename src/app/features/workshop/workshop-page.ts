@@ -20,11 +20,20 @@ import { WorkshopCodeViewer } from './components/workshop-code-viewer';
 import { WorkshopDraftEditor } from './components/workshop-draft-editor';
 import { WorkshopDslGuide } from './components/workshop-dsl-guide';
 import { WorkshopRunForm } from './components/workshop-run-form';
-import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
+import {
+  WORKSHOP_API,
+  WORKSHOP_COMPARE_LIMIT,
+  WorkshopAlgorithmSummary,
+  WorkshopSortField,
+  WorkshopVisibility,
+} from './data/workshop.models';
 import {
   formatLinterSummary,
+  formatVisibilityDescription,
   formatWorkshopDateTime,
+  isSourceLockedForViewer,
   WORKSHOP_SORT_LABELS,
+  WORKSHOP_VISIBILITY_OPTIONS,
 } from './workshop.format';
 import { WorkshopStore } from './workshop.store';
 
@@ -95,6 +104,9 @@ export class WorkshopPage implements OnInit {
 
   protected readonly formatDateTime = formatWorkshopDateTime;
   protected readonly formatLinter = formatLinterSummary;
+  protected readonly visibilityOptions = WORKSHOP_VISIBILITY_OPTIONS;
+  protected readonly visibilityDescription = formatVisibilityDescription;
+  protected readonly isSourceLocked = isSourceLockedForViewer;
 
   ngOnInit(): void {
     void this.store.load();
@@ -131,6 +143,20 @@ export class WorkshopPage implements OnInit {
     const next = this.sortOptions()[index];
     if (next) {
       this.store.setSort(next.id);
+    }
+  }
+
+  protected visibilityIndex(current: WorkshopVisibility): number {
+    return Math.max(
+      0,
+      this.visibilityOptions.findIndex((opt) => opt.id === current),
+    );
+  }
+
+  protected onVisibilityIndexChange(algo: WorkshopAlgorithmSummary, index: number): void {
+    const next = this.visibilityOptions[index];
+    if (next) {
+      void this.store.setVisibility(algo, next.id);
     }
   }
 
@@ -172,7 +198,8 @@ export class WorkshopPage implements OnInit {
         mode === 'create' &&
         !this.store.draftName().trim() &&
         !this.store.draftDescription().trim() &&
-        !this.store.draftSource().trim();
+        !this.store.draftSource().trim() &&
+        this.store.draftVisibility() === 'public';
       if (pristineCreate) {
         this.store.closeEditor();
       }

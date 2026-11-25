@@ -2463,7 +2463,12 @@ components:
       enum: [MIT]
     WorkshopVisibility:
       type: string
-      enum: [public, hidden]
+      enum: [public, closed, hidden]
+      description: |
+        Уровень видимости алгоритма в Мастерской:
+        - `public` — публичный (видят все, исходный код открыт, доступен форк и запуск)
+        - `closed` — закрытый код (видят, запускают и сравнивают все, исходный код скрыт от других и форк запрещён; автор всегда видит и редактирует свой код)
+        - `hidden` — приватный (видит и запускает только автор)
     CheckLevel:
       type: string
       enum: [OK, WARNING, ERROR]
@@ -2536,7 +2541,9 @@ components:
         publishedAt: { type: string, format: date-time }
         summary: { type: string }
         immutable: { type: boolean, const: true }
-        source: { type: string }
+        source:
+          type: [string, 'null']
+          description: Исходный DSL-код версии; `null` для алгоритмов с `visibility = closed` при просмотре не-автором.
         lookaheadLevel: { $ref: '#/components/schemas/CheckLevel' }
         diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
         params: { type: array, items: { $ref: '#/components/schemas/StrategyParamDecl' } }
@@ -2626,6 +2633,9 @@ components:
         name: { type: string, minLength: 1, maxLength: 80 }
         description: { type: string, maxLength: 2000 }
         source: { type: string }
+        visibility:
+          $ref: '#/components/schemas/WorkshopVisibility'
+          default: public
     UpdateWorkshopDraftRequest:
       type: object
       properties:

@@ -229,4 +229,33 @@ describe('WorkshopDraftEditor', () => {
     revokeObjectURL.mockRestore();
     createObjectURL.mockRestore();
   });
+
+  it('отображает 3-уровневый переключатель видимости (Публичный / Закрытый код / Приватный) при создании алгоритма', () => {
+    const fixture = TestBed.createComponent(WorkshopDraftEditor);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const visibilityGroup = el.querySelector('.visibility-field');
+    expect(visibilityGroup).not.toBeNull();
+
+    const buttons = Array.from(
+      visibilityGroup?.querySelectorAll<HTMLButtonElement>('button') ?? [],
+    );
+    expect(buttons.map((b) => b.textContent?.trim())).toEqual([
+      'Публичный',
+      'Закрытый код',
+      'Приватный',
+    ]);
+    expect(store.draftVisibility()).toBe('public');
+
+    buttons[1].click();
+    fixture.detectChanges();
+    expect(store.draftVisibility()).toBe('closed');
+    expect(visibilityGroup?.textContent).toContain('код скрыт от других');
+
+    buttons[2].click();
+    fixture.detectChanges();
+    expect(store.draftVisibility()).toBe('hidden');
+    expect(visibilityGroup?.textContent).toContain('Видит и запускает только автор');
+  });
 });

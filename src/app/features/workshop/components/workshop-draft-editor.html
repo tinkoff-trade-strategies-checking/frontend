@@ -56,6 +56,26 @@
         </tui-textfield>
       </label>
 
+      <div
+        class="field-block visibility-field"
+        role="group"
+        aria-label="Уровень видимости алгоритма"
+      >
+        <span class="tui-text_body-s field-label">Видимость алгоритма</span>
+        <tui-segmented
+          size="s"
+          [activeItemIndex]="visibilityIndex(store.draftVisibility())"
+          (activeItemIndexChange)="onVisibilityIndexChange($event)"
+        >
+          @for (opt of visibilityOptions; track opt.id) {
+            <button type="button" [disabled]="store.visibilityPending()">{{ opt.label }}</button>
+          }
+        </tui-segmented>
+        <span class="tui-text_body-xs muted">
+          {{ visibilityDescription(store.draftVisibility()) }}
+        </span>
+      </div>
+
       <div class="field-block">
         <div class="field-label-row">
           <label for="workshop-draft-source" class="tui-text_body-s field-label">

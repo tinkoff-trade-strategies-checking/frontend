@@ -10,7 +10,7 @@ export type WorkshopSortField = 'published_desc' | 'name_asc' | 'author_asc';
 
 export type WorkshopLicense = 'MIT';
 
-export type WorkshopVisibility = 'public' | 'hidden';
+export type WorkshopVisibility = 'public' | 'closed' | 'hidden';
 
 export type CheckLevel = 'OK' | 'WARNING' | 'ERROR';
 
@@ -64,7 +64,7 @@ export interface WorkshopAlgorithmVersion {
   readonly publishedAt: string;
   readonly summary: string;
   readonly immutable: true;
-  readonly source?: string;
+  readonly source?: string | null;
   readonly lookaheadLevel?: CheckLevel;
   readonly diagnostics?: readonly StrategyDiagnostic[];
   readonly params?: readonly StrategyParamDecl[];
@@ -122,6 +122,7 @@ export interface WorkshopDraft {
   readonly strategyId: string;
   readonly name: string;
   readonly description: string;
+  readonly visibility?: WorkshopVisibility;
   readonly source: string;
   readonly updatedAt: string;
   readonly check: CheckStrategyResult | null;
@@ -131,6 +132,7 @@ export interface CreateWorkshopAlgorithmCommand {
   readonly name: string;
   readonly description?: string;
   readonly source: string;
+  readonly visibility?: WorkshopVisibility;
 }
 
 export interface SaveWorkshopDraftCommand {

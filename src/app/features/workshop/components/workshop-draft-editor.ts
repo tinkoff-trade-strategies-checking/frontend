@@ -11,23 +11,34 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/core';
-import { TuiBadge } from '@taiga-ui/kit';
+import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import {
   buildDslDownloadFilename,
   DSL_FILE_ACCEPT,
   readAndValidateDslFile,
 } from '../data/dsl-file';
+import { WorkshopVisibility } from '../data/workshop.models';
 import {
   CHECK_LEVEL_LABELS,
   formatCheckLevelAppearance,
   formatDiagnosticLocation,
+  formatVisibilityDescription,
   formatWorkshopDateTime,
+  WORKSHOP_VISIBILITY_OPTIONS,
 } from '../workshop.format';
 import { WorkshopStore } from '../workshop.store';
 
 @Component({
   selector: 'app-workshop-draft-editor',
-  imports: [FormsModule, TuiBadge, TuiButton, TuiInput, TuiNotification, TuiTextfield],
+  imports: [
+    FormsModule,
+    TuiBadge,
+    TuiButton,
+    TuiInput,
+    TuiNotification,
+    TuiSegmented,
+    TuiTextfield,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workshop-draft-editor.html',
   styleUrl: './workshop-draft-editor.less',
@@ -56,6 +67,22 @@ export class WorkshopDraftEditor {
   protected readonly levelAppearance = formatCheckLevelAppearance;
   protected readonly formatLocation = formatDiagnosticLocation;
   protected readonly formatDateTime = formatWorkshopDateTime;
+  protected readonly visibilityOptions = WORKSHOP_VISIBILITY_OPTIONS;
+  protected readonly visibilityDescription = formatVisibilityDescription;
+
+  protected visibilityIndex(current: WorkshopVisibility): number {
+    return Math.max(
+      0,
+      this.visibilityOptions.findIndex((opt) => opt.id === current),
+    );
+  }
+
+  protected onVisibilityIndexChange(index: number): void {
+    const next = this.visibilityOptions[index];
+    if (next) {
+      this.store.setDraftVisibility(next.id);
+    }
+  }
 
   protected syncGutterScroll(textarea: HTMLTextAreaElement): void {
     const gutter = this.gutterRef()?.nativeElement;
