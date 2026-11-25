@@ -61,17 +61,61 @@
           <label for="workshop-draft-source" class="tui-text_body-s field-label">
             Исходный код DSL
           </label>
-          <button
-            tuiButton
-            type="button"
-            size="xs"
-            appearance="outline"
-            (click)="openDslGuide.emit()"
-          >
-            Справка по DSL
-          </button>
+          <div class="field-label-actions">
+            <input
+              #fileInput
+              type="file"
+              class="dsl-file-input"
+              [accept]="fileAccept"
+              aria-label="Выбрать файл со стратегией DSL"
+              (change)="onFileSelected($event)"
+            />
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="openFilePicker()"
+            >
+              Загрузить файл
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              [disabled]="!canDownload()"
+              (click)="downloadDsl()"
+            >
+              Скачать .dsl
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="openDslGuide.emit()"
+            >
+              Справка по DSL
+            </button>
+          </div>
         </div>
-        <div class="dsl-editor-wrap">
+
+        @if (fileError(); as fErr) {
+          <div tuiNotification appearance="negative" size="s" role="alert">{{ fErr }}</div>
+        }
+        @if (fileSuccess(); as fMsg) {
+          <div tuiNotification appearance="positive" size="s">{{ fMsg }}</div>
+        }
+
+        <div
+          class="dsl-editor-wrap"
+          [class.dsl-editor-wrap_dragging]="isDraggingFile()"
+          (dragenter)="onDragEnter($event)"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+        >
           <div #gutter class="dsl-gutter" aria-hidden="true">
             @for (num of lineNumbers(); track num) {
               <span>{{ num }}</span>
@@ -85,10 +129,13 @@
             spellcheck="false"
             placeholder='param fast = 20&#10;param slow = 50&#10;rule "вход"&#10;  when crossover(sma(close, fast), sma(close, slow))&#10;  then buy 50 % cash&#10;  because "Пересечение средних"'
             [ngModel]="store.draftSource()"
-            (ngModelChange)="store.setDraftSource($event ?? '')"
+            (ngModelChange)="onSourceChange($event ?? '')"
             (scroll)="syncGutterScroll(sourceInput)"
           ></textarea>
         </div>
+        <span class="tui-text_body-xs muted">
+          Поддерживаются файлы .dsl и .txt до 64 КиБ — можно перетащить в поле редактора.
+        </span>
       </div>
     </div>
 
