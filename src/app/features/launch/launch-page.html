@@ -251,8 +251,9 @@
               <div class="panel-header">
                 <h2 class="tui-text_h6">Бумаги</h2>
                 @if (!store.isBlind()) {
-                  <span class="tui-text_body-xs muted">
-                    выбрано {{ store.selectedPaperIds().length }} из {{ opts.maxPapers }}
+                  <span class="tui-text_body-xs muted num">
+                    Выбрано: {{ store.selectedPaperIds().length }} из
+                    {{ store.customPapers().length }}
                   </span>
                 }
               </div>
@@ -273,35 +274,42 @@
                         <button type="button">{{ count }}</button>
                       }
                     </tui-segmented>
+                    @if (opts.maxPapers > 5) {
+                      <label
+                        tuiLabel
+                        for="launch-paper-count"
+                        class="field-label paper-count-field"
+                      >
+                        Своё количество (до {{ opts.maxPapers }})
+                        <tui-textfield tuiTextfieldSize="s">
+                          <input
+                            id="launch-paper-count"
+                            tuiInputNumber
+                            [min]="opts.minPapers"
+                            [max]="opts.maxPapers"
+                            [ngModel]="store.paperCount()"
+                            (ngModelChange)="onCustomPaperCountChange($event)"
+                          />
+                        </tui-textfield>
+                      </label>
+                    }
                   </div>
                   <p class="tui-text_body-s muted hint">
                     В слепом режиме система случайно выбирает от {{ opts.minPapers }} до
-                    {{ opts.maxPapers }} бумаг из пула IMOEX. Названия и тикеры не раскрываются до
+                    {{ opts.maxPapers }} бумаг из пула MOEX. Названия и тикеры не раскрываются до
                     конца сессии.
                   </p>
                 } @else {
-                  @if (store.loadingCustomPapers()) {
-                    <p class="tui-text_body-s muted hint">Загрузка списка бумаг…</p>
-                  } @else {
-                    <div class="papers-list">
-                      @for (paper of store.customPapers(); track paper.id) {
-                        @let selected = store.selectedPaperIds().includes(paper.id);
-                        <button
-                          tuiButton
-                          type="button"
-                          size="s"
-                          [appearance]="selected ? 'secondary' : 'outline'"
-                          [class.paper-selected]="selected"
-                          [attr.aria-pressed]="selected"
-                          (click)="store.togglePaper(paper.id)"
-                        >
-                          {{ paper.ticker }} ({{ paper.name }}) · {{ paper.sector }}
-                        </button>
-                      }
-                    </div>
-                  }
-                  <p class="tui-text_body-s muted hint">
-                    Для своей даты выберите от {{ opts.minPapers }} до {{ opts.maxPapers }} бумаг.
+                  <app-paper-picker
+                    [papers]="store.customPapers()"
+                    [selectedIds]="store.selectedPaperIds()"
+                    [loading]="store.loadingCustomPapers()"
+                    [minSelected]="opts.minPapers"
+                    inputId="launch-papers-search"
+                    (selectedIdsChange)="store.setSelectedPaperIds($event)"
+                  />
+                  <p class="tui-text_body-xs muted hint">
+                    Выберите любые бумаги из каталога (не менее {{ opts.minPapers }}).
                   </p>
                 }
               </div>
@@ -415,13 +423,11 @@
             </div>
             <div class="kv">
               <span class="muted">Бумаги</span>
-              <span>
+              <span class="summary-papers">
                 @if (store.isBlind()) {
-                  {{ store.paperCount() }} случайных из пула IMOEX
+                  {{ store.paperCount() }} случайных из пула MOEX
                 } @else {
-                  @for (paper of store.selectedCustomPapers(); track paper.id; let last = $last) {
-                    {{ paper.ticker }}{{ last ? '' : ', ' }}
-                  }
+                  {{ selectedPapersSummary() }}
                 }
               </span>
             </div>

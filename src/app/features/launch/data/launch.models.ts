@@ -159,3 +159,20 @@ export const REGIME_HINTS: Readonly<Record<MarketRegime, string>> = {
   medium: 'Умеренные колебания рынка между спокойным и стрессовым',
   stress: 'Высокая волатильность (≥ P80) или просадка IMOEX ≥ 20 %',
 };
+
+const PAPER_COUNT_CANDIDATES = [1, 2, 3, 5, 10, 20, 50] as const;
+
+/** Быстрые пресеты количества случайных бумаг без раздувания segmented-контрола при сотнях бумаг в каталоге. */
+export function buildPaperCountPresets(minPapers: number, maxPapers: number): readonly number[] {
+  const min = Math.max(1, Math.floor(minPapers));
+  const max = Math.max(min, Math.floor(maxPapers));
+  if (max <= 5) {
+    const counts: number[] = [];
+    for (let n = min; n <= max; n++) {
+      counts.push(n);
+    }
+    return counts;
+  }
+  const presets = PAPER_COUNT_CANDIDATES.filter((n) => n >= min && n <= max);
+  return presets.length > 0 ? presets : [min];
+}

@@ -1,0 +1,160 @@
+<div class="paper-picker" [class.compact]="compact()">
+  @if (loading()) {
+    <p class="tui-text_body-s muted picker-status">Загрузка списка бумаг…</p>
+  } @else {
+    <div class="picker-toolbar">
+      <div class="picker-search-wrap">
+        <tui-textfield tuiTextfieldSize="s" class="picker-search-field">
+          <input
+            [id]="inputId()"
+            tuiInput
+            type="search"
+            autocomplete="off"
+            placeholder="Поиск по тикеру, названию или сектору…"
+            [ngModel]="searchQuery()"
+            (ngModelChange)="onSearchChange($event)"
+          />
+        </tui-textfield>
+        @if (searchQuery()) {
+          <button
+            type="button"
+            class="picker-search-clear"
+            aria-label="Очистить поиск"
+            (click)="clearSearch()"
+          >
+            ×
+          </button>
+        }
+      </div>
+
+      <div class="picker-meta-row">
+        <div class="picker-counters">
+          <span
+            tuiBadge
+            size="s"
+            [appearance]="selectedIds().length < minSelected() ? 'warning' : 'neutral'"
+            class="picker-counter-badge num"
+          >
+            Выбрано: {{ selectedIds().length }} из {{ papers().length }}
+          </span>
+          @if (normalizedQuery()) {
+            <span class="tui-text_body-xs muted num"> Найдено: {{ filteredPapers().length }} </span>
+          }
+        </div>
+
+        <div class="picker-bulk-actions">
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="outline"
+            [disabled]="!canSelectAll()"
+            (click)="selectAll()"
+          >
+            Выбрать все
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="outline"
+            [disabled]="!canSelectFiltered()"
+            (click)="selectFiltered()"
+          >
+            Выбрать найденные
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="flat"
+            [disabled]="!canClear()"
+            (click)="clearAll()"
+          >
+            Сбросить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="selected-tray"
+      [class.expanded]="chipsExpanded()"
+      [class.empty]="selectedPapers().length === 0"
+      aria-label="Выбранные бумаги"
+    >
+      @if (selectedPapers().length === 0) {
+        <span class="tui-text_body-xs muted">
+          Бумаги не выбраны — отметьте хотя бы {{ minSelected() === 1 ? 'одну' : minSelected() }}
+          из списка ниже.
+        </span>
+      } @else {
+        <div class="selected-chips">
+          @for (paper of visibleSelectedChips(); track paper.id) {
+            <span class="selected-chip" [attr.title]="paper.name + ' · ' + paper.sector">
+              <span class="selected-chip-ticker mono">{{ paper.ticker }}</span>
+              <button
+                type="button"
+                class="selected-chip-remove"
+                [attr.aria-label]="'Убрать ' + paper.ticker"
+                (click)="remove(paper.id)"
+              >
+                ×
+              </button>
+            </span>
+          }
+          @if (hiddenSelectedCount() > 0) {
+            <button type="button" class="selected-chip-toggle" (click)="toggleChipsExpanded()">
+              + ещё {{ hiddenSelectedCount() }}
+            </button>
+          } @else if (chipsExpanded() && selectedPapers().length > 24) {
+            <button type="button" class="selected-chip-toggle" (click)="toggleChipsExpanded()">
+              Свернуть
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="picker-list" role="listbox" aria-multiselectable="true" aria-label="Список бумаг">
+      @if (filteredPapers().length === 0) {
+        <div class="picker-empty">
+          <span class="tui-text_body-s muted">
+            @if (normalizedQuery()) {
+              По запросу «{{ searchQuery().trim() }}» ничего не найдено.
+            } @else {
+              Список доступных бумаг пуст.
+            }
+          </span>
+          @if (normalizedQuery()) {
+            <button tuiButton type="button" size="xs" appearance="outline" (click)="clearSearch()">
+              Сбросить поиск
+            </button>
+          }
+        </div>
+      } @else {
+        @for (paper of filteredPapers(); track paper.id) {
+          @let selected = selectedSet().has(paper.id);
+          <button
+            type="button"
+            role="option"
+            class="picker-row"
+            [class.selected]="selected"
+            [attr.aria-selected]="selected"
+            [attr.data-paper-id]="paper.id"
+            (click)="toggle(paper.id)"
+          >
+            <span class="picker-check" [class.checked]="selected" aria-hidden="true">
+              @if (selected) {
+                ✓
+              }
+            </span>
+            <span class="picker-ticker mono">{{ paper.ticker }}</span>
+            <span class="picker-name">{{ paper.name }}</span>
+            <span class="picker-sector">{{ paper.sector }}</span>
+          </button>
+        }
+      }
+    </div>
+  }
+</div>

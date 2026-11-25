@@ -21,7 +21,7 @@ describe('StubLaunchApi', () => {
     expect(opts.capitalPresetsRub.length).toBeGreaterThan(0);
     expect(opts.backgroundAlgorithmName).toBe('Эталон платформы');
     expect(opts.minPapers).toBe(1);
-    expect(opts.maxPapers).toBe(5);
+    expect(opts.maxPapers).toBeGreaterThanOrEqual(50);
     expect(opts.defaultPaperCount).toBe(3);
     expect(opts.executionRules.maxBars).toBe(5000);
     expect(opts.executionRules.slippageKappa).toBe(0.1);
@@ -50,7 +50,7 @@ describe('StubLaunchApi', () => {
     expect(blindRes.accepted).toBe(true);
 
     const papers = await api.getAvailablePapers();
-    expect(papers.length).toBe(5);
+    expect(papers.length).toBeGreaterThanOrEqual(50);
 
     const customRes = await api.startSession({
       traderKind: 'human',
@@ -60,7 +60,7 @@ describe('StubLaunchApi', () => {
       startMode: 'custom',
       customStartDate: '2020-02-26',
       paperCount: null,
-      paperIds: ['SBER'],
+      paperIds: papers.slice(0, 12).map((p) => p.id),
       initialCapital: '500000.00',
       backgroundAlgorithmId: 'A-0002',
     });

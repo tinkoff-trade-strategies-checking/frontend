@@ -179,7 +179,7 @@ describe('LaunchPage', () => {
     await store.setStartMode('custom');
     fixture.detectChanges();
     expect(store.selectedPaperIds().length).toBe(3);
-    expect(store.customPapers().length).toBe(5);
+    expect(store.customPapers().length).toBeGreaterThanOrEqual(50);
     const customText = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(customText).toContain('03.06.2024');
     expect(customText).toContain('Доступный архив: 03.01.2020 — 31.12.2025');
@@ -550,7 +550,7 @@ describe('LaunchPage', () => {
     expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ backgroundAlgorithmId: null }));
   });
 
-  it('в блоке «Бумаги» не показывает «N из 5» в слепом режиме, но показывает «выбрано N из 5» в неслепом', async () => {
+  it('в блоке «Бумаги» не показывает счётчик в слепом режиме, а в неслепом показывает «Выбрано: N из M» и компактную сводку', async () => {
     const fixture = TestBed.createComponent(LaunchPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -572,6 +572,15 @@ describe('LaunchPage', () => {
 
     await store.setStartMode('custom');
     fixture.detectChanges();
-    expect(findPapersHeader()).toContain('выбрано 3 из 5');
+    const total = store.customPapers().length;
+    expect(findPapersHeader().replace(/\s+/g, ' ')).toContain(`Выбрано: 3 из ${total}`);
+
+    // Выбор всех бумаг обновляет счётчик и компактно сокращает список в сводке.
+    store.setSelectedPaperIds(store.customPapers().map((p) => p.id));
+    fixture.detectChanges();
+    expect(findPapersHeader().replace(/\s+/g, ' ')).toContain(`Выбрано: ${total} из ${total}`);
+    expect(root.querySelector('aside.summary-col')?.textContent ?? '').toContain(
+      `и ещё ${total - 5}`,
+    );
   });
 });
