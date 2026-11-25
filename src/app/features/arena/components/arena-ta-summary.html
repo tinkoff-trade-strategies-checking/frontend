@@ -1,0 +1,198 @@
+<section class="ta-panel" aria-label="Сводка технического анализа">
+  <header class="ta-header">
+    <div class="ta-title-row">
+      <div class="ta-heading">
+        <span class="tui-text_body-m ta-title">Сводка теханализа</span>
+        @if (paperLabel()) {
+          <span class="tui-text_body-xs muted">{{ paperLabel() }}</span>
+        }
+      </div>
+
+      <div class="ta-overall-block">
+        <span class="ta-rating-badge" [class]="'tone-' + ratingTone(summary().overall.rating)">
+          {{ ratingLabel(summary().overall.rating) }}
+        </span>
+        <span class="ta-counters tui-text_body-xs">
+          <span class="pos num">Покупать: {{ summary().overall.buy }}</span>
+          <span class="muted">·</span>
+          <span class="neg num">Продавать: {{ summary().overall.sell }}</span>
+        </span>
+      </div>
+    </div>
+
+    <button
+      tuiButton
+      type="button"
+      size="xs"
+      appearance="flat"
+      aria-label="Свернуть панель теханализа"
+      (click)="closePanel.emit()"
+    >
+      Свернуть
+    </button>
+  </header>
+
+  <div class="ta-sub-summaries">
+    <div class="ta-sub-chip">
+      <span class="tui-text_body-xs muted">Тех. индикаторы</span>
+      <span
+        class="ta-mini-badge"
+        [class]="'tone-' + ratingTone(summary().indicatorsSummary.rating)"
+      >
+        {{ ratingLabel(summary().indicatorsSummary.rating) }}
+      </span>
+      <span class="tui-text_body-xs num muted">
+        ({{ summary().indicatorsSummary.buy }} / {{ summary().indicatorsSummary.sell }})
+      </span>
+    </div>
+
+    <div class="ta-sub-chip">
+      <span class="tui-text_body-xs muted">Скользящие средние</span>
+      <span
+        class="ta-mini-badge"
+        [class]="'tone-' + ratingTone(summary().movingAveragesSummary.rating)"
+      >
+        {{ ratingLabel(summary().movingAveragesSummary.rating) }}
+      </span>
+      <span class="tui-text_body-xs num muted">
+        ({{ summary().movingAveragesSummary.buy }} / {{ summary().movingAveragesSummary.sell }})
+      </span>
+    </div>
+  </div>
+
+  <div class="ta-tabs" role="tablist" aria-label="Разделы теханализа">
+    <button
+      type="button"
+      role="tab"
+      class="ta-tab"
+      [class.active]="activeTab() === 'indicators'"
+      [attr.aria-selected]="activeTab() === 'indicators'"
+      (click)="activeTab.set('indicators')"
+    >
+      Индикаторы (12)
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="ta-tab"
+      [class.active]="activeTab() === 'moving_averages'"
+      [attr.aria-selected]="activeTab() === 'moving_averages'"
+      (click)="activeTab.set('moving_averages')"
+    >
+      Скользящие (12)
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="ta-tab"
+      [class.active]="activeTab() === 'pivots'"
+      [attr.aria-selected]="activeTab() === 'pivots'"
+      (click)="activeTab.set('pivots')"
+    >
+      Точки разворота
+    </button>
+  </div>
+
+  <div class="ta-body">
+    @if (activeTab() === 'indicators') {
+      <table class="ta-table">
+        <thead>
+          <tr>
+            <th>Индикатор</th>
+            <th class="right">Значение</th>
+            <th class="right">Сигнал</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of summary().indicators; track row.id) {
+            <tr>
+              <td>{{ row.name }}</td>
+              <td class="right num">{{ formatNum(row.value) }}</td>
+              <td class="right">
+                <span class="ta-signal" [class]="'sig-' + actionTone(row.action)">
+                  {{ actionLabel(row.action) }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (activeTab() === 'moving_averages') {
+      <table class="ta-table">
+        <thead>
+          <tr>
+            <th>Период</th>
+            <th class="right">Простая (SMA)</th>
+            <th class="right">Экспон. (EMA)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of summary().movingAverages; track row.period) {
+            <tr>
+              <td>{{ row.label }}</td>
+              <td class="right num">
+                <span>{{ formatNum(row.sma) }}</span>
+                <span
+                  class="ta-ma-sig"
+                  [class]="
+                    'sig-' +
+                    (row.smaAction === 'buy' ? 'pos' : row.smaAction === 'sell' ? 'neg' : 'neutral')
+                  "
+                >
+                  {{ voteLabel(row.smaAction) }}
+                </span>
+              </td>
+              <td class="right num">
+                <span>{{ formatNum(row.ema) }}</span>
+                <span
+                  class="ta-ma-sig"
+                  [class]="
+                    'sig-' +
+                    (row.emaAction === 'buy' ? 'pos' : row.emaAction === 'sell' ? 'neg' : 'neutral')
+                  "
+                >
+                  {{ voteLabel(row.emaAction) }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (activeTab() === 'pivots') {
+      <div class="ta-pivots-scroll">
+        <table class="ta-table ta-pivots-table">
+          <thead>
+            <tr>
+              <th>Метод</th>
+              <th class="right">S3</th>
+              <th class="right">S2</th>
+              <th class="right">S1</th>
+              <th class="right pivot-col">Pivot</th>
+              <th class="right">R1</th>
+              <th class="right">R2</th>
+              <th class="right">R3</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of summary().pivots; track row.method) {
+              <tr>
+                <td>{{ row.label }}</td>
+                <td class="right num">{{ formatNum(row.s3) }}</td>
+                <td class="right num">{{ formatNum(row.s2) }}</td>
+                <td class="right num">{{ formatNum(row.s1) }}</td>
+                <td class="right num pivot-col">{{ formatNum(row.pivot) }}</td>
+                <td class="right num">{{ formatNum(row.r1) }}</td>
+                <td class="right num">{{ formatNum(row.r2) }}</td>
+                <td class="right num">{{ formatNum(row.r3) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+</section>

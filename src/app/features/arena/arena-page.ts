@@ -13,12 +13,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiDialogService, TuiNotification } from '@taiga-ui/core';
 import { TUI_CONFIRM, TuiBadge } from '@taiga-ui/kit';
 import { ArenaStore } from './arena.store';
+import { TA_OSCILLATOR_OPTIONS, TaOscillatorId } from './arena-ta';
 import { ArenaChart } from './components/arena-chart';
 import { ArenaOrderTicket } from './components/arena-order-ticket';
 import { ArenaOrdersPanel } from './components/arena-orders-panel';
 import { ArenaPaperSwitcher } from './components/arena-paper-switcher';
 import { ArenaPlayer } from './components/arena-player';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
+import { ArenaTaSummary } from './components/arena-ta-summary';
 import { ARENA_API, ArenaApi } from './data/arena.models';
 import { ARENA_API_IMPL } from '../../api-impls';
 
@@ -44,6 +46,7 @@ function readGuideDismissed(): boolean {
     ArenaPlayer,
     ArenaPaperSwitcher,
     ArenaChart,
+    ArenaTaSummary,
     ArenaOrdersPanel,
     ArenaOrderTicket,
     ArenaPortfolioPanel,
@@ -65,9 +68,21 @@ export class ArenaPage implements OnInit {
   readonly reportRoute = input<string | null>(null);
   readonly apiSource = input<ArenaApi | null>(null);
 
+  protected readonly oscillatorOptions = TA_OSCILLATOR_OPTIONS;
   protected readonly showSma20 = signal(false);
   protected readonly showSma50 = signal(false);
+  protected readonly showEma20 = signal(false);
+  protected readonly showEma50 = signal(false);
+  protected readonly showBollinger = signal(false);
+  protected readonly showVwap = signal(false);
+  protected readonly oscillator = signal<TaOscillatorId>('none');
+  protected readonly showTaPanel = signal(false);
   protected readonly guideDismissed = signal(readGuideDismissed());
+
+  protected onOscillatorChange(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value as TaOscillatorId;
+    this.oscillator.set(value);
+  }
 
   protected shortSessionId(id: string | null): string {
     if (!id) {
