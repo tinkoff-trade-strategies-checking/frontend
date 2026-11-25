@@ -176,6 +176,7 @@ export class ReportUnderwaterChart {
     this.chart = createChart(el, {
       autoSize: true,
       layout: {
+        attributionLogo: false,
         background: { color: 'transparent' },
         textColor,
       },

@@ -179,6 +179,7 @@ export class ReportEquityChart {
     this.chart = createChart(el, {
       autoSize: true,
       layout: {
+        attributionLogo: false,
         background: { color: 'transparent' },
         textColor,
       },

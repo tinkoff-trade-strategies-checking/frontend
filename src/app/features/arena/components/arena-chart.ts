@@ -290,6 +290,7 @@ export class ArenaChart {
       autoSize: true,
       height: this.oscillator() !== 'none' ? MULTI_PANE_CHART_HEIGHT : BASE_CHART_HEIGHT,
       layout: {
+        attributionLogo: false,
         background: { color: 'transparent' },
         textColor: palette.textColor,
       },
