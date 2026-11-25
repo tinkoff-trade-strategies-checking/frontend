@@ -102,29 +102,101 @@
         />
 
         <div class="chart-toolbar">
-          <span class="tui-text_body-xs muted">Индикаторы</span>
-          <button
-            tuiButton
-            type="button"
-            size="xs"
-            [appearance]="showSma20() ? 'secondary' : 'outline'"
-            [class.indicator-active]="showSma20()"
-            [attr.aria-pressed]="showSma20()"
-            (click)="showSma20.set(!showSma20())"
-          >
-            SMA 20
-          </button>
-          <button
-            tuiButton
-            type="button"
-            size="xs"
-            [appearance]="showSma50() ? 'secondary' : 'outline'"
-            [class.indicator-active]="showSma50()"
-            [attr.aria-pressed]="showSma50()"
-            (click)="showSma50.set(!showSma50())"
-          >
-            SMA 50
-          </button>
+          <div class="toolbar-overlays">
+            <span class="tui-text_body-xs muted">Индикаторы</span>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showSma20() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showSma20()"
+              [attr.aria-pressed]="showSma20()"
+              (click)="showSma20.set(!showSma20())"
+            >
+              SMA 20
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showSma50() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showSma50()"
+              [attr.aria-pressed]="showSma50()"
+              (click)="showSma50.set(!showSma50())"
+            >
+              SMA 50
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showEma20() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showEma20()"
+              [attr.aria-pressed]="showEma20()"
+              (click)="showEma20.set(!showEma20())"
+            >
+              EMA 20
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showEma50() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showEma50()"
+              [attr.aria-pressed]="showEma50()"
+              (click)="showEma50.set(!showEma50())"
+            >
+              EMA 50
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showBollinger() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showBollinger()"
+              [attr.aria-pressed]="showBollinger()"
+              (click)="showBollinger.set(!showBollinger())"
+            >
+              Bollinger
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showVwap() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showVwap()"
+              [attr.aria-pressed]="showVwap()"
+              (click)="showVwap.set(!showVwap())"
+            >
+              VWAP
+            </button>
+          </div>
+
+          <div class="toolbar-ta-controls">
+            <select
+              id="arena-oscillator-select"
+              class="oscillator-select"
+              aria-label="Осциллятор"
+              [value]="oscillator()"
+              (change)="onOscillatorChange($event)"
+            >
+              @for (opt of oscillatorOptions; track opt.id) {
+                <option [value]="opt.id">{{ opt.label }}</option>
+              }
+            </select>
+
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="showTaPanel() ? 'secondary' : 'outline'"
+              [class.indicator-active]="showTaPanel()"
+              [attr.aria-expanded]="showTaPanel()"
+              (click)="showTaPanel.set(!showTaPanel())"
+            >
+              Теханализ
+            </button>
+          </div>
         </div>
 
         @if (store.selectedPaper(); as paper) {
@@ -136,8 +208,21 @@
               [fills]="selectedPaperFills()"
               [showSma20]="showSma20()"
               [showSma50]="showSma50()"
+              [showEma20]="showEma20()"
+              [showEma50]="showEma50()"
+              [showBollinger]="showBollinger()"
+              [showVwap]="showVwap()"
+              [oscillator]="oscillator()"
             />
           </div>
+
+          @if (showTaPanel()) {
+            <app-arena-ta-summary
+              [candles]="paper.candles"
+              [paperLabel]="paper.label"
+              (closePanel)="showTaPanel.set(false)"
+            />
+          }
         }
       </section>
 

@@ -263,6 +263,119 @@ export const DSL_STATEFUL_FUNCTIONS: readonly DslGuideFunctionItem[] = [
     returns: 'number',
     description: 'Минимум среди последних n валидных значений x (включая текущий бар).',
   },
+  {
+    signature: 'wma(x, n)',
+    returns: 'number',
+    description: 'Линейно взвешенная скользящая средняя (веса 1..n).',
+  },
+  {
+    signature: 'bb_mid(x, n)',
+    returns: 'number',
+    description: 'Средняя линия полос Боллинджера (эквивалент sma(x, n)).',
+  },
+  {
+    signature: 'bb_upper(x, n, k)',
+    returns: 'number',
+    description: 'Верхняя граница полос Боллинджера: sma(x, n) + k * stdev(x, n).',
+  },
+  {
+    signature: 'bb_lower(x, n, k)',
+    returns: 'number',
+    description: 'Нижняя граница полос Боллинджера: sma(x, n) - k * stdev(x, n).',
+  },
+  {
+    signature: 'vwap(n)',
+    returns: 'number',
+    description:
+      'Скользящая средневзвешенная по объёму цена за n баров: Σ(tp * volume) / Σ(volume).',
+  },
+  {
+    signature: 'macd(x, fast, slow)',
+    returns: 'number',
+    description: 'Линия MACD: ema(x, fast) - ema(x, slow) (классически 12 и 26).',
+  },
+  {
+    signature: 'macd_signal(x, fast, slow, sig)',
+    returns: 'number',
+    description: 'Сигнальная линия MACD: ema(macd(x, fast, slow), sig) (классически sig = 9).',
+  },
+  {
+    signature: 'macd_hist(x, fast, slow, sig)',
+    returns: 'number',
+    description: 'Гистограмма MACD: macd - macd_signal.',
+  },
+  {
+    signature: 'stoch_k(n)',
+    returns: 'number',
+    description: 'Стохастический осциллятор %K(n) в диапазоне 0..100.',
+  },
+  {
+    signature: 'stoch_d(n, d)',
+    returns: 'number',
+    description: 'Сигнальная линия стохастика %D(n, d): sma(stoch_k(n), d).',
+  },
+  {
+    signature: 'stoch_rsi(n)',
+    returns: 'number',
+    description:
+      'Стохастический RSI (0..100) — положение rsi(close, n) в диапазоне последних n баров.',
+  },
+  {
+    signature: 'adx(n)',
+    returns: 'number',
+    description: 'Индекс направленного движения ADX по Уайлдеру (0..100).',
+  },
+  {
+    signature: 'plus_di(n)',
+    returns: 'number',
+    description: 'Положительный направленный индикатор +DI(n) (0..100).',
+  },
+  {
+    signature: 'minus_di(n)',
+    returns: 'number',
+    description: 'Отрицательный направленный индикатор −DI(n) (0..100).',
+  },
+  {
+    signature: 'cci(n)',
+    returns: 'number',
+    description: 'Индекс товарного канала CCI: (tp - sma(tp, n)) / (0.015 * mad).',
+  },
+  {
+    signature: 'willr(n)',
+    returns: 'number',
+    description: 'Индикатор Williams %R(n) в диапазоне −100..0.',
+  },
+  {
+    signature: 'roc(x, n)',
+    returns: 'number',
+    description: 'Скорость изменения Rate of Change в процентах: 100 * (x - x[n]) / x[n].',
+  },
+  {
+    signature: 'ult_osc(s1, s2, s3)',
+    returns: 'number',
+    description: 'Ultimate Oscillator (0..100), классические периоды: ult_osc(7, 14, 28).',
+  },
+  {
+    signature: 'bull_power(n)',
+    returns: 'number',
+    description: 'Сила быков Элдера (Elder-Ray Bull Power): high - ema(close, n).',
+  },
+  {
+    signature: 'bear_power(n)',
+    returns: 'number',
+    description: 'Сила медведей Элдера (Elder-Ray Bear Power): low - ema(close, n).',
+  },
+  {
+    signature: 'obv()',
+    returns: 'number',
+    description:
+      'Балансовый объём (On-Balance Volume) — накопленная сумма объёмов по направлению цены.',
+  },
+  {
+    signature: 'mfi(n)',
+    returns: 'number',
+    description: 'Индекс денежного потока Money Flow Index (0..100) за n баров.',
+  },
 ];
 
 export const DSL_CROSSBAR_FUNCTIONS: readonly DslGuideFunctionItem[] = [

@@ -5,6 +5,7 @@ import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
 import { formatBlindAxisTick, formatBlindCandleLabel, formatRejectReason } from './arena.format';
 import { ArenaPage } from './arena-page';
+import { TaOscillatorId } from './arena-ta';
 import { ArenaChart } from './components/arena-chart';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
@@ -22,6 +23,11 @@ class StubArenaChart {
   readonly fills = input<readonly ArenaFill[]>([]);
   readonly showSma20 = input(false);
   readonly showSma50 = input(false);
+  readonly showEma20 = input(false);
+  readonly showEma50 = input(false);
+  readonly showBollinger = input(false);
+  readonly showVwap = input(false);
+  readonly oscillator = input<TaOscillatorId>('none');
 }
 
 describe('ArenaPage', () => {
@@ -244,5 +250,34 @@ describe('ArenaPage', () => {
     await roFixture.whenStable();
     roFixture.detectChanges();
     expect((roFixture.nativeElement as HTMLElement).querySelector('.guide-banner')).toBeNull();
+  });
+
+  it('открывает и сворачивает панель «Теханализ» и позволяет выбрать осциллятор', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('app-arena-ta-summary')).toBeNull();
+
+    const taButton = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Теханализ',
+    );
+    expect(taButton).toBeDefined();
+    taButton!.click();
+    fixture.detectChanges();
+
+    expect(root.querySelector('app-arena-ta-summary')).not.toBeNull();
+    expect(root.textContent).toContain('Сводка теханализа');
+    expect(root.textContent).not.toContain('₽');
+
+    const oscSelect = root.querySelector('#arena-oscillator-select') as HTMLSelectElement | null;
+    expect(oscSelect).not.toBeNull();
+    oscSelect!.value = 'rsi';
+    oscSelect!.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(fixture.componentInstance['oscillator']()).toBe('rsi');
   });
 });

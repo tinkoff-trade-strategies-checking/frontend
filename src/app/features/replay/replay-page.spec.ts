@@ -4,6 +4,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { provideTaiga } from '@taiga-ui/core';
 import { BehaviorSubject } from 'rxjs';
 import { ArenaPage } from '../arena/arena-page';
+import { TaOscillatorId } from '../arena/arena-ta';
 import { ArenaChart } from '../arena/components/arena-chart';
 import { ArenaCandle, ArenaFill, ArenaOrder } from '../arena/data/arena.models';
 import { ReplayPage } from './replay-page';
@@ -20,6 +21,11 @@ class StubArenaChart {
   readonly fills = input<readonly ArenaFill[]>([]);
   readonly showSma20 = input(false);
   readonly showSma50 = input(false);
+  readonly showEma20 = input(false);
+  readonly showEma50 = input(false);
+  readonly showBollinger = input(false);
+  readonly showVwap = input(false);
+  readonly oscillator = input<TaOscillatorId>('none');
 }
 
 describe('ReplayPage', () => {
