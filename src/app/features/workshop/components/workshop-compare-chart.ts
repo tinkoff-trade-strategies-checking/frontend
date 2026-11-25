@@ -197,7 +197,11 @@ export class WorkshopCompareChart {
     try {
       this.chart = createChart(el, {
         autoSize: true,
-        layout: { background: { color: 'transparent' }, textColor },
+        layout: {
+          attributionLogo: false,
+          background: { color: 'transparent' },
+          textColor,
+        },
         grid: { vertLines: { color: borderColor }, horzLines: { color: borderColor } },
         rightPriceScale: { borderColor },
         timeScale: {
