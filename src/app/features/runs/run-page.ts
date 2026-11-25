@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiProgressBar } from '@taiga-ui/kit';
 import { RUNS_API_IMPL } from '../../api-impls';
+import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
 import { CheckLevel } from '../workshop/data/workshop.models';
 import { RUNS_API, RunStatus } from './data/runs.models';
 import { RunStore } from './run.store';
@@ -25,7 +26,7 @@ export const CHECK_LEVEL_LABELS: Readonly<Record<CheckLevel, string>> = {
 
 @Component({
   selector: 'app-run-page',
-  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiProgressBar],
+  imports: [RouterLink, TuiButton, TuiBadge, TuiNotification, TuiProgressBar, PapersReveal],
   providers: [{ provide: RUNS_API, useClass: RUNS_API_IMPL }, RunStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './run-page.html',

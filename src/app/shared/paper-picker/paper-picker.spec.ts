@@ -155,4 +155,69 @@ describe('PaperPicker', () => {
     expect(root.querySelectorAll('.selected-chip').length).toBe(249);
     expect(root.querySelector('.selected-chip-toggle')?.textContent?.trim()).toBe('Свернуть');
   });
+
+  it('фильтрует бумаги по категориям/секторам (включая «Выбранные» и «Без сектора») и позволяет выбрать категорию', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    const host = fixture.componentInstance;
+    host.papers.set([
+      ...makePapers(12),
+      { id: 'UNSEC1', ticker: 'UNSEC1', name: 'Без сектора 1', sector: '' },
+      { id: 'UNSEC2', ticker: 'UNSEC2', name: 'Без сектора 2', sector: '—' },
+    ]);
+    host.selectedIds.set(['SBER']);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const catChips = Array.from(root.querySelectorAll<HTMLButtonElement>('.category-chip'));
+    const labels = catChips.map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
+    expect(labels.some((l) => l?.startsWith('Все'))).toBe(true);
+    expect(labels.some((l) => l?.startsWith('Выбранные'))).toBe(true);
+    expect(labels.some((l) => l?.startsWith('Без сектора'))).toBe(true);
+
+    // Фильтр «Выбранные» показывает только выбранные бумаги.
+    root.querySelector<HTMLButtonElement>('.category-chip[data-category="__selected__"]')!.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.picker-row').length).toBe(1);
+    expect(root.querySelector('.picker-row')?.textContent).toContain('SBER');
+
+    // Фильтр «Без сектора» показывает 2 бумаги без сектора и кнопку «Выбрать в категории».
+    root.querySelector<HTMLButtonElement>('.category-chip[data-category="__no_sector__"]')!.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.picker-row').length).toBe(2);
+    findButton(root, 'Выбрать в категории').click();
+    fixture.detectChanges();
+    expect(host.selectedIds()).toContain('UNSEC1');
+    expect(host.selectedIds()).toContain('UNSEC2');
+    expect(host.selectedIds()).toContain('SBER');
+  });
+
+  it('группирует бумаги по секторам со сворачиванием и массовым выбором сектора', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    const host = fixture.componentInstance;
+    host.selectedIds.set([]);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const groups = root.querySelectorAll('.picker-group');
+    expect(groups.length).toBe(5);
+
+    // Кнопка «Выбрать» на заголовке сектора выбирает все бумаги этого сектора.
+    const financeGroup = root.querySelector('.picker-group[data-sector-group="Финансы"]')!;
+    const financeRowsCount = financeGroup.querySelectorAll('.picker-row').length;
+    expect(financeRowsCount).toBeGreaterThan(1);
+    financeGroup.querySelector<HTMLButtonElement>('.picker-group-select')!.click();
+    fixture.detectChanges();
+    expect(host.selectedIds().length).toBe(financeRowsCount);
+
+    // Сворачивание сектора скрывает его строки.
+    financeGroup.querySelector<HTMLButtonElement>('.picker-group-toggle')!.click();
+    fixture.detectChanges();
+    expect(financeGroup.querySelectorAll('.picker-row').length).toBe(0);
+
+    // Переключение «По секторам» переводит список в плоский вид.
+    findButton(root, 'По секторам').click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.picker-group').length).toBe(0);
+    expect(root.querySelectorAll('.picker-row').length).toBe(60);
+  });
 });

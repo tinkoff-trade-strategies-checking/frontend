@@ -156,7 +156,14 @@ export class WorkshopComparePage implements OnInit {
   }
 
   protected paperList(item: Extract<ComparedWorkshopItem, { status: 'ready' }>): string {
-    return item.report.papers.map((p) => p.ticker).join(', ') || '—';
+    const tickers = item.report.papers.map((p) => p.ticker);
+    if (tickers.length === 0) {
+      return '—';
+    }
+    if (tickers.length <= 5) {
+      return tickers.join(', ');
+    }
+    return `${tickers.slice(0, 5).join(', ')} и ещё ${tickers.length - 5}`;
   }
 
   protected shortRunId(runId: string): string {

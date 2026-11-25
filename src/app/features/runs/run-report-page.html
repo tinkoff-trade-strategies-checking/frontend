@@ -170,28 +170,12 @@
             {{ rep.blind ? 'Период и бумаги раскрыты' : 'Период и бумаги' }}
           </h2>
         </div>
-        <div class="reveal-grid">
-          <div class="reveal-card">
-            <span class="tui-text_body-xs muted">Период</span>
-            <strong class="tui-text_body-l">{{ rep.period.label }}</strong>
-            <span class="tui-text_body-xs muted">
-              {{ rep.playedDays }} из {{ rep.totalDays }} дн.
-            </span>
-          </div>
-          @for (paper of rep.papers; track paper.id) {
-            <div class="reveal-card">
-              <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
-              @if (rep.blind) {
-                <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
-              }
-              <strong class="tui-text_body-l">{{ paper.ticker }}</strong>
-              <span class="tui-text_body-xs muted">
-                {{ paper.name }} · старт {{ formatRub(paper.startPriceRub) }} · лот
-                {{ paper.lotSize }}
-              </span>
-            </div>
-          }
-        </div>
+        <app-papers-reveal
+          [papers]="rep.papers"
+          [periodLabel]="rep.period.label"
+          [daysNote]="rep.playedDays + ' из ' + rep.totalDays + ' дн.'"
+          [blind]="rep.blind"
+        />
       </section>
 
       @if (rep.metrics; as m) {

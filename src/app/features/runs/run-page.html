@@ -127,28 +127,11 @@
             {{ run.blind ? 'Период и бумаги раскрыты' : 'Период и бумаги' }}
           </h2>
         </div>
-        <div class="reveal-grid">
-          @if (run.period; as period) {
-            <div class="reveal-card">
-              <span class="tui-text_body-xs muted">Период</span>
-              <strong class="tui-text_body-l">{{ period.label }}</strong>
-            </div>
-          }
-          @if (run.papers; as papers) {
-            @for (paper of papers; track paper.id) {
-              <div class="reveal-card">
-                <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
-                @if (run.blind) {
-                  <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
-                }
-                <strong class="tui-text_body-l">{{ paper.ticker }}</strong>
-                <span class="tui-text_body-xs muted">
-                  {{ paper.name }} · лот {{ paper.lotSize }}
-                </span>
-              </div>
-            }
-          }
-        </div>
+        <app-papers-reveal
+          [papers]="run.papers ?? []"
+          [periodLabel]="run.period?.label ?? null"
+          [blind]="run.blind"
+        />
       </section>
     } @else if (run.blind) {
       <div tuiNotification appearance="info" size="s">

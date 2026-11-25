@@ -94,33 +94,12 @@
   <div class="arena-grid">
     <div class="main-col">
       <section class="panel">
-        <div class="papers-bar" role="tablist" aria-label="Бумаги сессии">
-          @for (paper of store.papers(); track paper.id) {
-            <button
-              type="button"
-              role="tab"
-              class="paper-tab"
-              [class.active]="paper.id === store.selectedPaperId()"
-              [attr.aria-selected]="paper.id === store.selectedPaperId()"
-              (click)="store.selectPaper(paper.id)"
-            >
-              <div class="paper-top">
-                <span class="paper-name">{{ paper.label }}</span>
-                <span
-                  class="tui-text_body-xs num"
-                  [class.pos]="paper.changePct > 0"
-                  [class.neg]="paper.changePct < 0"
-                >
-                  {{ formatPct(paper.changePct, true) }}
-                </span>
-              </div>
-              <div class="paper-bottom">
-                <span class="tui-text_body-xs muted">{{ paper.sector }}</span>
-                <span class="paper-price num">{{ formatPrice(paper.lastPrice) }}</span>
-              </div>
-            </button>
-          }
-        </div>
+        <app-arena-paper-switcher
+          [papers]="store.papers()"
+          [selectedPaperId]="store.selectedPaperId()"
+          [portfolio]="store.portfolio()"
+          (selectPaper)="store.selectPaper($event)"
+        />
 
         <div class="chart-toolbar">
           <span class="tui-text_body-xs muted">Индикаторы</span>
@@ -192,7 +171,12 @@
         />
       }
 
-      <app-arena-portfolio-panel [papers]="store.papers()" [portfolio]="store.portfolio()" />
+      <app-arena-portfolio-panel
+        [papers]="store.papers()"
+        [portfolio]="store.portfolio()"
+        [selectedPaperId]="store.selectedPaperId()"
+        (selectPaper)="store.selectPaper($event)"
+      />
     </aside>
   </div>
 </div>
