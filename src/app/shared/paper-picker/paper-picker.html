@@ -209,24 +209,35 @@
             @if (!collapsed) {
               @for (paper of group.papers; track paper.id) {
                 @let selected = selectedSet().has(paper.id);
-                <button
-                  type="button"
-                  role="option"
-                  class="picker-row"
-                  [class.selected]="selected"
-                  [attr.aria-selected]="selected"
-                  [attr.data-paper-id]="paper.id"
-                  (click)="toggle(paper.id)"
-                >
-                  <span class="picker-check" [class.checked]="selected" aria-hidden="true">
-                    @if (selected) {
-                      ✓
-                    }
-                  </span>
-                  <span class="picker-ticker mono">{{ paper.ticker }}</span>
-                  <span class="picker-name">{{ paper.name }}</span>
-                  <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
-                </button>
+                <div class="picker-row" [class.selected]="selected" [attr.data-paper-id]="paper.id">
+                  <button
+                    type="button"
+                    role="option"
+                    class="picker-row-select"
+                    [attr.aria-selected]="selected"
+                    (click)="toggle(paper.id)"
+                  >
+                    <span class="picker-check" [class.checked]="selected" aria-hidden="true">
+                      @if (selected) {
+                        ✓
+                      }
+                    </span>
+                    <span class="picker-ticker mono">{{ paper.ticker }}</span>
+                    <span class="picker-name">{{ paper.name }}</span>
+                    <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
+                  </button>
+                  @if (showFundamentals()) {
+                    <button
+                      type="button"
+                      class="picker-info-btn"
+                      [attr.aria-label]="'Фундаментальные показатели ' + paper.ticker"
+                      title="Фундаментальные показатели"
+                      (click)="openFundamentals(paper, $event)"
+                    >
+                      i
+                    </button>
+                  }
+                </div>
               }
             }
           </div>
@@ -234,26 +245,47 @@
       } @else {
         @for (paper of filteredPapers(); track paper.id) {
           @let selected = selectedSet().has(paper.id);
-          <button
-            type="button"
-            role="option"
-            class="picker-row"
-            [class.selected]="selected"
-            [attr.aria-selected]="selected"
-            [attr.data-paper-id]="paper.id"
-            (click)="toggle(paper.id)"
-          >
-            <span class="picker-check" [class.checked]="selected" aria-hidden="true">
-              @if (selected) {
-                ✓
-              }
-            </span>
-            <span class="picker-ticker mono">{{ paper.ticker }}</span>
-            <span class="picker-name">{{ paper.name }}</span>
-            <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
-          </button>
+          <div class="picker-row" [class.selected]="selected" [attr.data-paper-id]="paper.id">
+            <button
+              type="button"
+              role="option"
+              class="picker-row-select"
+              [attr.aria-selected]="selected"
+              (click)="toggle(paper.id)"
+            >
+              <span class="picker-check" [class.checked]="selected" aria-hidden="true">
+                @if (selected) {
+                  ✓
+                }
+              </span>
+              <span class="picker-ticker mono">{{ paper.ticker }}</span>
+              <span class="picker-name">{{ paper.name }}</span>
+              <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
+            </button>
+            @if (showFundamentals()) {
+              <button
+                type="button"
+                class="picker-info-btn"
+                [attr.aria-label]="'Фундаментальные показатели ' + paper.ticker"
+                title="Фундаментальные показатели"
+                (click)="openFundamentals(paper, $event)"
+              >
+                i
+              </button>
+            }
+          </div>
         }
       }
     </div>
+  }
+
+  @if (inspectedPaper(); as inspected) {
+    <app-paper-fundamentals-modal
+      [open]="true"
+      [ticker]="inspected.ticker"
+      [paperName]="inspected.name"
+      [sector]="paperSectorLabel(inspected)"
+      (closed)="closeFundamentals()"
+    />
   }
 </div>

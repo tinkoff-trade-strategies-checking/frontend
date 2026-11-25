@@ -1,4 +1,6 @@
 import { Type } from '@angular/core';
+import { FundamentalsApi } from './core/api/fundamentals.models';
+import { HttpFundamentalsApi } from './core/api/http-fundamentals.api';
 import { ArenaApi } from './features/arena/data/arena.models';
 import { HttpArenaApi } from './features/arena/data/http-arena.api';
 import { HistoryApi } from './features/history/data/history.models';
@@ -23,3 +25,4 @@ export const REPORT_API_IMPL: Type<ReportApi> = HttpReportApi;
 export const REPLAY_API_IMPL: Type<ReplayApi> = HttpReplayApi;
 export const WORKSHOP_API_IMPL: Type<WorkshopApi> = HttpWorkshopApi;
 export const RUNS_API_IMPL: Type<RunsApi> = HttpRunsApi;
+export const FUNDAMENTALS_API_IMPL: Type<FundamentalsApi> = HttpFundamentalsApi;

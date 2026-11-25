@@ -23,17 +23,25 @@
       }
     </div>
 
-    @if (readOnly()) {
-      @if (reportRoute(); as route) {
-        <a tuiButton size="s" appearance="outline" [routerLink]="route">Открыть отчёт</a>
+    <div class="header-actions">
+      <app-arena-fundamentals-trigger
+        [sessionId]="store.sessionId()"
+        [paper]="store.selectedPaper()"
+        [blind]="store.blind()"
+        [finished]="store.finished()"
+      />
+      @if (readOnly()) {
+        @if (reportRoute(); as route) {
+          <a tuiButton size="s" appearance="outline" [routerLink]="route">Открыть отчёт</a>
+        }
+      } @else {
+        @if (!store.finished()) {
+          <button tuiButton type="button" size="s" appearance="outline" (click)="confirmFinish()">
+            Завершить сессию
+          </button>
+        }
       }
-    } @else {
-      @if (!store.finished()) {
-        <button tuiButton type="button" size="s" appearance="outline" (click)="confirmFinish()">
-          Завершить сессию
-        </button>
-      }
-    }
+    </div>
   </header>
 
   @if (!readOnly() && !store.finished() && !guideDismissed()) {

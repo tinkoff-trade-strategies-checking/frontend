@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output, signal } f
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiInput, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge } from '@taiga-ui/kit';
+import { PaperFundamentalsModal } from '../paper-fundamentals/paper-fundamentals-modal';
 import {
   CATEGORY_ALL,
   CATEGORY_NO_SECTOR,
@@ -44,7 +45,7 @@ export interface PaperSectorGroup {
 
 @Component({
   selector: 'app-paper-picker',
-  imports: [FormsModule, TuiBadge, TuiButton, TuiInput, TuiTextfield],
+  imports: [FormsModule, TuiBadge, TuiButton, TuiInput, TuiTextfield, PaperFundamentalsModal],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './paper-picker.html',
   styleUrl: './paper-picker.less',
@@ -56,6 +57,7 @@ export class PaperPicker {
   readonly compact = input(false);
   readonly minSelected = input(1);
   readonly inputId = input('paper-picker-search');
+  readonly showFundamentals = input(true);
 
   readonly selectedIdsChange = output<readonly string[]>();
 
@@ -64,6 +66,7 @@ export class PaperPicker {
   protected readonly activeCategory = signal<string>(CATEGORY_ALL);
   protected readonly groupBySector = signal(true);
   protected readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
+  protected readonly inspectedPaper = signal<SelectablePaper | null>(null);
 
   protected readonly normalizedQuery = computed(() => this.searchQuery().trim().toLowerCase());
 
@@ -344,5 +347,14 @@ export class PaperPicker {
 
   protected paperSectorLabel(paper: SelectablePaper): string {
     return sectorDisplayLabel(normalizePaperSector(paper.sector));
+  }
+
+  protected openFundamentals(paper: SelectablePaper, event: Event): void {
+    event.stopPropagation();
+    this.inspectedPaper.set(paper);
+  }
+
+  protected closeFundamentals(): void {
+    this.inspectedPaper.set(null);
   }
 }

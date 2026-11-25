@@ -1,4 +1,6 @@
 import { Type } from '@angular/core';
+import { FundamentalsApi } from './core/api/fundamentals.models';
+import { StubFundamentalsApi } from './core/api/stub-fundamentals.api';
 import { ArenaApi } from './features/arena/data/arena.models';
 import { StubArenaApi } from './features/arena/data/stub-arena.api';
 import { HistoryApi } from './features/history/data/history.models';
@@ -22,3 +24,4 @@ export const REPORT_API_IMPL: Type<ReportApi> = StubReportApi;
 export const REPLAY_API_IMPL: Type<ReplayApi> = StubReplayApi;
 export const WORKSHOP_API_IMPL: Type<WorkshopApi> = StubWorkshopApi;
 export const RUNS_API_IMPL: Type<RunsApi> = StubRunsApi;
+export const FUNDAMENTALS_API_IMPL: Type<FundamentalsApi> = StubFundamentalsApi;

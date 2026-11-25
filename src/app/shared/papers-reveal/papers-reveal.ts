@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 import { FormsModule } from '@angular/forms';
 import { TuiInput, TuiTextfield } from '@taiga-ui/core';
 import { formatRub } from '../../features/report/report.format';
+import { PaperFundamentalsModal } from '../paper-fundamentals/paper-fundamentals-modal';
 import {
   CATEGORY_ALL,
   CATEGORY_NO_SECTOR,
@@ -29,7 +30,7 @@ interface RevealCategory {
 
 @Component({
   selector: 'app-papers-reveal',
-  imports: [FormsModule, TuiInput, TuiTextfield],
+  imports: [FormsModule, TuiInput, TuiTextfield, PaperFundamentalsModal],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (!isCompact()) {
@@ -45,7 +46,19 @@ interface RevealCategory {
         }
         @for (paper of papers(); track paper.id) {
           <div class="reveal-card">
-            <span class="tui-text_body-xs muted">{{ sectorLabel(paper.sector) }}</span>
+            <div class="reveal-card-top">
+              <span class="tui-text_body-xs muted">{{ sectorLabel(paper.sector) }}</span>
+              @if (showFundamentals()) {
+                <button
+                  type="button"
+                  class="fundamentals-link"
+                  [attr.aria-label]="'Фундаментал ' + paper.ticker"
+                  (click)="inspectedPaper.set(paper)"
+                >
+                  Фундаментал
+                </button>
+              }
+            </div>
             @if (blind() && paper.blindLabel) {
               <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
             }
@@ -118,7 +131,20 @@ interface RevealCategory {
                 <div class="reveal-card compact-card">
                   <div class="compact-card-top">
                     <strong class="tui-text_body-m">{{ paper.ticker }}</strong>
-                    <span class="tui-text_body-xs muted">{{ sectorLabel(paper.sector) }}</span>
+                    <div class="compact-card-actions">
+                      <span class="tui-text_body-xs muted">{{ sectorLabel(paper.sector) }}</span>
+                      @if (showFundamentals()) {
+                        <button
+                          type="button"
+                          class="fundamentals-icon-btn"
+                          [attr.aria-label]="'Фундаментал ' + paper.ticker"
+                          title="Фундаментальные показатели"
+                          (click)="inspectedPaper.set(paper)"
+                        >
+                          i
+                        </button>
+                      }
+                    </div>
                   </div>
                   @if (blind() && paper.blindLabel) {
                     <span class="tui-text_body-xs muted">{{ paper.blindLabel }}</span>
@@ -136,6 +162,20 @@ interface RevealCategory {
           }
         </div>
       </div>
+    }
+
+    @if (inspectedPaper(); as inspected) {
+      <app-paper-fundamentals-modal
+        [open]="true"
+        [sessionId]="sessionId()"
+        [paperId]="inspected.id"
+        [ticker]="inspected.ticker"
+        [paperName]="inspected.name"
+        [sector]="sectorLabel(inspected.sector)"
+        [blind]="false"
+        [finished]="true"
+        (closed)="inspectedPaper.set(null)"
+      />
     }
   `,
   styles: `
@@ -257,11 +297,59 @@ interface RevealCategory {
       gap: 0.15rem;
     }
 
-    .compact-card-top {
+    .compact-card-top,
+    .reveal-card-top {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 0.4rem;
+    }
+
+    .compact-card-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .fundamentals-link {
+      padding: 0.1rem 0.4rem;
+      border-radius: var(--tui-radius-s);
+      border: 1px solid var(--tui-border-normal);
+      background: transparent;
+      color: var(--ttsc-accent-text, var(--tui-text-action));
+      font: inherit;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--ttsc-accent, var(--tui-border-hover));
+        background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
+      }
+    }
+
+    .fundamentals-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.15rem;
+      height: 1.15rem;
+      padding: 0;
+      border-radius: 999px;
+      border: 1px solid var(--tui-border-normal);
+      background: transparent;
+      color: var(--tui-text-secondary);
+      font: inherit;
+      font-size: 0.68rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--ttsc-accent, var(--tui-border-hover));
+        color: var(--ttsc-accent-text, var(--tui-text-primary));
+        background: var(--ttsc-accent-soft, var(--tui-background-neutral-1));
+      }
     }
 
     .compact-card-meta {
@@ -283,9 +371,12 @@ export class PapersReveal {
   readonly periodLabel = input<string | null>(null);
   readonly daysNote = input<string | null>(null);
   readonly blind = input(false);
+  readonly sessionId = input<string | null>(null);
+  readonly showFundamentals = input(true);
 
   protected readonly searchQuery = signal('');
   protected readonly activeCategory = signal<string>(CATEGORY_ALL);
+  protected readonly inspectedPaper = signal<RevealablePaper | null>(null);
   protected readonly formatRub = formatRub;
 
   protected readonly isCompact = computed(() => this.papers().length > REVEAL_COMPACT_THRESHOLD);
