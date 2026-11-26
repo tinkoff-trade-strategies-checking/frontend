@@ -2,64 +2,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
 import { CompareChartSeries } from '../workshop-compare.store';
-import { WorkshopCompareChart } from './workshop-compare-chart';
+import {
+  COMPARE_CHART_FACTORY,
+  CompareChartFactory,
+  WorkshopCompareChart,
+} from './workshop-compare-chart';
 
 interface MockSeriesApi {
   applyOptions: ReturnType<typeof vi.fn>;
   setData: ReturnType<typeof vi.fn>;
 }
-
-const mockState = vi.hoisted(() => {
-  let visibleRange = { from: 3400, to: 3740 };
-  const createdSeries: MockSeriesApi[] = [];
-  const timeScale = {
-    fitContent: vi.fn(),
-    getVisibleLogicalRange: vi.fn(() => visibleRange),
-    setVisibleLogicalRange: vi.fn((next: { from: number; to: number }) => {
-      visibleRange = next;
-    }),
-  };
-  const chart = {
-    addSeries: vi.fn(() => {
-      const api: MockSeriesApi = {
-        applyOptions: vi.fn(),
-        setData: vi.fn(),
-      };
-      createdSeries.push(api);
-      return api;
-    }),
-    removeSeries: vi.fn(),
-    applyOptions: vi.fn(),
-    timeScale: vi.fn(() => timeScale),
-    remove: vi.fn(),
-  };
-  const createChart = vi.fn(() => chart);
-  return {
-    reset() {
-      visibleRange = { from: 3400, to: 3740 };
-      createdSeries.length = 0;
-      timeScale.fitContent.mockClear();
-      timeScale.getVisibleLogicalRange.mockClear();
-      timeScale.setVisibleLogicalRange.mockClear();
-      chart.addSeries.mockClear();
-      chart.removeSeries.mockClear();
-      chart.applyOptions.mockClear();
-      chart.timeScale.mockClear();
-      chart.remove.mockClear();
-      createChart.mockClear();
-    },
-    getVisibleRange: () => visibleRange,
-    createdSeries,
-    timeScale,
-    chart,
-    createChart,
-  };
-});
-
-vi.mock('lightweight-charts', () => ({
-  LineSeries: 'LineSeries',
-  createChart: mockState.createChart,
-}));
 
 const SAMPLE_SERIES: readonly CompareChartSeries[] = [
   {
@@ -85,11 +37,50 @@ const SAMPLE_SERIES: readonly CompareChartSeries[] = [
 ];
 
 describe('WorkshopCompareChart — стабильность оси X', () => {
+  let visibleRange: { from: number; to: number };
+  let createdSeries: MockSeriesApi[];
+  let timeScale: {
+    fitContent: ReturnType<typeof vi.fn>;
+    getVisibleLogicalRange: ReturnType<typeof vi.fn>;
+    setVisibleLogicalRange: ReturnType<typeof vi.fn>;
+  };
+  let createChartMock: ReturnType<typeof vi.fn>;
+
   beforeEach(async () => {
-    mockState.reset();
+    visibleRange = { from: 3400, to: 3740 };
+    createdSeries = [];
+    timeScale = {
+      fitContent: vi.fn(),
+      getVisibleLogicalRange: vi.fn(() => visibleRange),
+      setVisibleLogicalRange: vi.fn((next: { from: number; to: number }) => {
+        visibleRange = next;
+      }),
+    };
+    const chart = {
+      addSeries: vi.fn(() => {
+        const api: MockSeriesApi = {
+          applyOptions: vi.fn(),
+          setData: vi.fn(),
+        };
+        createdSeries.push(api);
+        return api;
+      }),
+      removeSeries: vi.fn(),
+      applyOptions: vi.fn(),
+      timeScale: vi.fn(() => timeScale),
+      remove: vi.fn(),
+    };
+    createChartMock = vi.fn(() => chart);
+
     await TestBed.configureTestingModule({
       imports: [WorkshopCompareChart],
-      providers: [provideTaiga()],
+      providers: [
+        provideTaiga(),
+        {
+          provide: COMPARE_CHART_FACTORY,
+          useValue: createChartMock as unknown as CompareChartFactory,
+        },
+      ],
     }).compileComponents();
   });
 
@@ -98,14 +89,14 @@ describe('WorkshopCompareChart — стабильность оси X', () => {
     fixture.componentRef.setInput('series', SAMPLE_SERIES);
     fixture.detectChanges();
 
-    expect(mockState.createChart).toHaveBeenCalledTimes(1);
-    expect(mockState.createdSeries).toHaveLength(2);
-    expect(mockState.timeScale.fitContent).toHaveBeenCalledTimes(1);
-    expect(mockState.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
-    const rangeAfterInit = mockState.getVisibleRange();
+    expect(createChartMock).toHaveBeenCalledTimes(1);
+    expect(createdSeries).toHaveLength(2);
+    expect(timeScale.fitContent).toHaveBeenCalledTimes(1);
+    expect(timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
+    const rangeAfterInit = visibleRange;
 
-    const firstSeries = mockState.createdSeries[0];
-    const secondSeries = mockState.createdSeries[1];
+    const firstSeries = createdSeries[0];
+    const secondSeries = createdSeries[1];
     firstSeries.setData.mockClear();
     secondSeries.setData.mockClear();
     firstSeries.applyOptions.mockClear();
@@ -122,9 +113,9 @@ describe('WorkshopCompareChart — стабильность оси X', () => {
     expect(firstSeries.applyOptions).toHaveBeenCalledWith({ visible: true });
     expect(firstSeries.setData).not.toHaveBeenCalled();
     expect(secondSeries.setData).not.toHaveBeenCalled();
-    expect(mockState.timeScale.fitContent).toHaveBeenCalledTimes(1);
-    expect(mockState.timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
-    expect(mockState.getVisibleRange()).toEqual(rangeAfterInit);
+    expect(timeScale.fitContent).toHaveBeenCalledTimes(1);
+    expect(timeScale.setVisibleLogicalRange).toHaveBeenCalledTimes(1);
+    expect(visibleRange).toEqual(rangeAfterInit);
   });
 
   it('переключение режима % / ₽ сохраняет текущий видимый диапазон без fitContent', () => {
@@ -132,9 +123,9 @@ describe('WorkshopCompareChart — стабильность оси X', () => {
     fixture.componentRef.setInput('series', SAMPLE_SERIES);
     fixture.detectChanges();
 
-    const rangeAfterInit = mockState.getVisibleRange();
-    mockState.timeScale.fitContent.mockClear();
-    mockState.timeScale.setVisibleLogicalRange.mockClear();
+    const rangeAfterInit = visibleRange;
+    timeScale.fitContent.mockClear();
+    timeScale.setVisibleLogicalRange.mockClear();
 
     const rubBtn = Array.from(
       fixture.nativeElement.querySelectorAll(
@@ -145,8 +136,8 @@ describe('WorkshopCompareChart — стабильность оси X', () => {
     rubBtn?.click();
     fixture.detectChanges();
 
-    expect(mockState.timeScale.fitContent).not.toHaveBeenCalled();
-    expect(mockState.timeScale.setVisibleLogicalRange).toHaveBeenCalledWith(rangeAfterInit);
-    expect(mockState.getVisibleRange()).toEqual(rangeAfterInit);
+    expect(timeScale.fitContent).not.toHaveBeenCalled();
+    expect(timeScale.setVisibleLogicalRange).toHaveBeenCalledWith(rangeAfterInit);
+    expect(visibleRange).toEqual(rangeAfterInit);
   });
 });

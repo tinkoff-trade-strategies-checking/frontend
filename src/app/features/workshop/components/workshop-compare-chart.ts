@@ -6,6 +6,7 @@ import {
   effect,
   ElementRef,
   inject,
+  InjectionToken,
   input,
   signal,
   untracked,
@@ -25,6 +26,13 @@ import { ThemeService } from '../../../core/theme.service';
 import { CompareChartSeries } from '../workshop-compare.store';
 
 export type CompareChartMode = 'pct' | 'rub';
+
+export type CompareChartFactory = typeof createChart;
+
+export const COMPARE_CHART_FACTORY = new InjectionToken<CompareChartFactory>(
+  'COMPARE_CHART_FACTORY',
+  { providedIn: 'root', factory: () => createChart },
+);
 
 function toChartTime(step: number): UTCTimestamp {
   return (step + 1000) as UTCTimestamp;
@@ -137,6 +145,7 @@ function resolveCssColor(el: HTMLElement, value: string): string {
 export class WorkshopCompareChart {
   private readonly destroyRef = inject(DestroyRef);
   private readonly themeService = inject(ThemeService, { optional: true });
+  private readonly chartFactory = inject(COMPARE_CHART_FACTORY);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly series = input.required<readonly CompareChartSeries[]>();
@@ -214,7 +223,7 @@ export class WorkshopCompareChart {
     const textColor = resolveCssColor(el, 'var(--tui-text-secondary)');
     const borderColor = resolveCssColor(el, 'var(--tui-border-normal)');
     try {
-      this.chart = createChart(el, {
+      this.chart = this.chartFactory(el, {
         autoSize: true,
         layout: {
           attributionLogo: false,
