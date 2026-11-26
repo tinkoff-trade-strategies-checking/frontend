@@ -170,8 +170,11 @@ test('сравнение выбранных алгоритмов (UC-22): пер
   await expect(legendBtn).toHaveAttribute('aria-pressed', 'true');
   const getTimeAxisDataUrl = () =>
     chart.locator('canvas').evaluateAll((els) => {
-      const timeAxis = els.find((el) => el.height > 0 && el.height <= 40 && el.width > 200);
-      return timeAxis ? (timeAxis as HTMLCanvasElement).toDataURL() : null;
+      const timeAxis = els.find(
+        (el): el is HTMLCanvasElement =>
+          el instanceof HTMLCanvasElement && el.height > 0 && el.height <= 40 && el.width > 200,
+      );
+      return timeAxis ? timeAxis.toDataURL() : null;
     });
   const axisBefore = await getTimeAxisDataUrl();
   expect(axisBefore).not.toBeNull();
