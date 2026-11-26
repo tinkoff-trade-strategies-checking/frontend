@@ -163,11 +163,28 @@ test('сравнение выбранных алгоритмов (UC-22): пер
   await expect(page.locator('.compare-table .best-cell').first()).toBeVisible();
   await expect(page.getByText('разных периодах, таймфреймах или наборах бумаг')).toBeVisible();
 
-  // Наложение кривых доходности (canvas), переключение режима и скрытие серии.
+  // Наложение кривых доходности (canvas), переключение режима и скрытие серии без сдвига оси X.
   const chart = page.locator('app-workshop-compare-chart');
   await expect(chart.locator('canvas').first()).toBeVisible();
   const legendBtn = chart.getByRole('button', { name: 'Momentum RSI' });
   await expect(legendBtn).toHaveAttribute('aria-pressed', 'true');
+  const getTimeAxisDataUrl = () =>
+    chart.locator('canvas').evaluateAll((els) => {
+      const timeAxis = els.find(
+        (el): el is HTMLCanvasElement =>
+          el instanceof HTMLCanvasElement && el.height > 0 && el.height <= 40 && el.width > 200,
+      );
+      return timeAxis ? timeAxis.toDataURL() : null;
+    });
+  const axisBefore = await getTimeAxisDataUrl();
+  expect(axisBefore).not.toBeNull();
+  for (let i = 0; i < 3; i++) {
+    await legendBtn.click();
+    await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
+    await legendBtn.click();
+    await expect(legendBtn).toHaveAttribute('aria-pressed', 'true');
+  }
+  expect(await getTimeAxisDataUrl()).toBe(axisBefore);
   await legendBtn.click();
   await expect(legendBtn).toHaveAttribute('aria-pressed', 'false');
   await chart.getByRole('button', { name: 'Капитал, ₽' }).click();

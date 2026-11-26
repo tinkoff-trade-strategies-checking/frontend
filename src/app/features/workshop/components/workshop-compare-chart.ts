@@ -6,8 +6,10 @@ import {
   effect,
   ElementRef,
   inject,
+  InjectionToken,
   input,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { TuiSegmented } from '@taiga-ui/kit';
@@ -24,6 +26,13 @@ import { ThemeService } from '../../../core/theme.service';
 import { CompareChartSeries } from '../workshop-compare.store';
 
 export type CompareChartMode = 'pct' | 'rub';
+
+export type CompareChartFactory = typeof createChart;
+
+export const COMPARE_CHART_FACTORY = new InjectionToken<CompareChartFactory>(
+  'COMPARE_CHART_FACTORY',
+  { providedIn: 'root', factory: () => createChart },
+);
 
 function toChartTime(step: number): UTCTimestamp {
   return (step + 1000) as UTCTimestamp;
@@ -136,6 +145,7 @@ function resolveCssColor(el: HTMLElement, value: string): string {
 export class WorkshopCompareChart {
   private readonly destroyRef = inject(DestroyRef);
   private readonly themeService = inject(ThemeService, { optional: true });
+  private readonly chartFactory = inject(COMPARE_CHART_FACTORY);
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly series = input.required<readonly CompareChartSeries[]>();
@@ -144,26 +154,44 @@ export class WorkshopCompareChart {
 
   private chart: IChartApi | null = null;
   private lineSeries = new Map<string, ISeriesApi<'Line'>>();
+  private lastFittedSeries: readonly CompareChartSeries[] | null = null;
 
   constructor() {
     afterNextRender(() => {
       this.initChart();
-      this.syncData();
+      this.applyThemeOptions();
+      this.syncSeriesData(true);
+      if (this.chart) {
+        this.lastFittedSeries = this.series();
+      }
     });
 
     effect(() => {
       this.themeService?.theme();
-      this.series();
-      this.mode();
-      this.hiddenIds();
       this.applyThemeOptions();
-      this.syncData();
+      this.syncSeriesColors();
+    });
+
+    effect(() => {
+      const currentSeries = this.series();
+      this.mode();
+      const shouldFit = currentSeries !== this.lastFittedSeries;
+      this.syncSeriesData(shouldFit);
+      if (this.chart && shouldFit) {
+        this.lastFittedSeries = currentSeries;
+      }
+    });
+
+    effect(() => {
+      this.hiddenIds();
+      this.syncVisibility();
     });
 
     this.destroyRef.onDestroy(() => {
       this.chart?.remove();
       this.chart = null;
       this.lineSeries.clear();
+      this.lastFittedSeries = null;
     });
   }
 
@@ -195,7 +223,7 @@ export class WorkshopCompareChart {
     const textColor = resolveCssColor(el, 'var(--tui-text-secondary)');
     const borderColor = resolveCssColor(el, 'var(--tui-border-normal)');
     try {
-      this.chart = createChart(el, {
+      this.chart = this.chartFactory(el, {
         autoSize: true,
         layout: {
           attributionLogo: false,
@@ -224,13 +252,14 @@ export class WorkshopCompareChart {
     }
   }
 
-  private syncData(): void {
+  private syncSeriesData(fitRange: boolean): void {
     const chart = this.chart;
     if (!chart) {
       return;
     }
+    const prevRange = fitRange ? null : chart.timeScale().getVisibleLogicalRange();
     const el = this.container().nativeElement;
-    const currentSeries = this.series();
+    const currentSeries = untracked(() => this.series());
     const activeIds = new Set(currentSeries.map((s) => s.id));
     for (const [id, api] of this.lineSeries) {
       if (!activeIds.has(id)) {
@@ -239,8 +268,8 @@ export class WorkshopCompareChart {
       }
     }
 
-    const mode = this.mode();
-    const hidden = this.hiddenIds();
+    const mode = untracked(() => this.mode());
+    const hidden = untracked(() => this.hiddenIds());
     for (const item of currentSeries) {
       let api = this.lineSeries.get(item.id);
       const color = resolveCssColor(el, item.colorVar);
@@ -250,10 +279,12 @@ export class WorkshopCompareChart {
           lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
+          visible: !hidden.has(item.id),
         });
         this.lineSeries.set(item.id, api);
+      } else {
+        api.applyOptions({ color, visible: !hidden.has(item.id) });
       }
-      api.applyOptions({ color, visible: !hidden.has(item.id) });
       const base = item.initialCapitalRub > 0 ? item.initialCapitalRub : 1;
       const data: LineData<Time>[] = item.points.map((p) => ({
         time: toChartTime(p.step),
@@ -261,10 +292,38 @@ export class WorkshopCompareChart {
       }));
       api.setData(data);
     }
-    chart.timeScale().fitContent();
-    const range = chart.timeScale().getVisibleLogicalRange();
-    if (range) {
-      chart.timeScale().setVisibleLogicalRange(computeCompareLogicalRange(range.from, range.to));
+    if (fitRange) {
+      chart.timeScale().fitContent();
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (range) {
+        chart.timeScale().setVisibleLogicalRange(computeCompareLogicalRange(range.from, range.to));
+      }
+    } else if (prevRange) {
+      chart.timeScale().setVisibleLogicalRange(prevRange);
+    }
+  }
+
+  private syncVisibility(): void {
+    if (!this.chart) {
+      return;
+    }
+    const hidden = this.hiddenIds();
+    for (const [id, api] of this.lineSeries) {
+      api.applyOptions({ visible: !hidden.has(id) });
+    }
+  }
+
+  private syncSeriesColors(): void {
+    if (!this.chart) {
+      return;
+    }
+    const el = this.container().nativeElement;
+    const currentSeries = untracked(() => this.series());
+    for (const item of currentSeries) {
+      const api = this.lineSeries.get(item.id);
+      if (api) {
+        api.applyOptions({ color: resolveCssColor(el, item.colorVar) });
+      }
     }
   }
 
