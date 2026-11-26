@@ -20,6 +20,49 @@
   }
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.shared-context-content,
+.diff-context-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.progress-list {
+  padding: 0.75rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.progress-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .muted {
   color: var(--tui-text-secondary);
 }

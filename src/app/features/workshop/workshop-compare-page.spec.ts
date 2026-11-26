@@ -6,6 +6,8 @@ import { BehaviorSubject } from 'rxjs';
 import { vi } from 'vitest';
 import { HISTORY_API } from '../history/data/history.models';
 import { StubHistoryApi } from '../history/data/stub-history.api';
+import { LAUNCH_API } from '../launch/data/launch.models';
+import { StubLaunchApi } from '../launch/data/stub-launch.api';
 import { RUNS_API } from '../runs/data/runs.models';
 import { StubRunsApi } from '../runs/data/stub-runs.api';
 import {
@@ -15,7 +17,7 @@ import {
 import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API } from './data/workshop.models';
 import { WorkshopComparePage } from './workshop-compare-page';
-import { CompareChartSeries } from './workshop-compare.store';
+import { COMPARE_POLL_INTERVAL_MS, CompareChartSeries } from './workshop-compare.store';
 
 @Component({
   selector: 'app-workshop-compare-chart',
@@ -29,11 +31,13 @@ class StubCompareChart {
 describe('WorkshopComparePage', () => {
   let queryParamMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
   let stubWorkshop: StubWorkshopApi;
+  let stubRuns: StubRunsApi;
   let getByIdSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     queryParamMap$ = new BehaviorSubject(convertToParamMap({ ids: 'A-0002,A-0003,A-0001' }));
     stubWorkshop = new StubWorkshopApi();
+    stubRuns = new StubRunsApi();
     getByIdSpy = vi.spyOn(stubWorkshop, 'getById');
 
     await TestBed.configureTestingModule({
@@ -42,6 +46,7 @@ describe('WorkshopComparePage', () => {
         provideTaiga(),
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { queryParamMap: queryParamMap$.asObservable() } },
+        { provide: COMPARE_POLL_INTERVAL_MS, useValue: 0 },
       ],
     })
       .overrideComponent(WorkshopComparePage, {
@@ -51,6 +56,7 @@ describe('WorkshopComparePage', () => {
             { provide: WORKSHOP_API, useClass: StubWorkshopApi },
             { provide: HISTORY_API, useClass: StubHistoryApi },
             { provide: RUNS_API, useClass: StubRunsApi },
+            { provide: LAUNCH_API, useClass: StubLaunchApi },
           ],
         },
         add: {
@@ -58,7 +64,8 @@ describe('WorkshopComparePage', () => {
           providers: [
             { provide: WORKSHOP_API, useValue: stubWorkshop },
             { provide: HISTORY_API, useClass: StubHistoryApi },
-            { provide: RUNS_API, useClass: StubRunsApi },
+            { provide: RUNS_API, useValue: stubRuns },
+            { provide: LAUNCH_API, useClass: StubLaunchApi },
           ],
         },
       })
@@ -170,6 +177,59 @@ describe('WorkshopComparePage', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Нет выбранных алгоритмов для сравнения.');
     expect(el.querySelector('a[href="/workshop"]')).not.toBeNull();
+  });
+
+  it('открывает панель «Запустить на одном отрезке», запускает пакет, показывает баннер «Единый отрезок» и сохраняет runIds в URL', async () => {
+    const router = TestBed.inject(Router);
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    const fixture = TestBed.createComponent(WorkshopComparePage);
+    fixture.detectChanges();
+    await flushAsync();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const toggleBtn = Array.from(el.querySelectorAll('button')).find((b) =>
+      (b.textContent ?? '').includes('Запустить на одном отрезке'),
+    ) as HTMLButtonElement | undefined;
+    expect(toggleBtn).toBeDefined();
+    toggleBtn?.click();
+    fixture.detectChanges();
+    await flushAsync();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.querySelector('app-workshop-compare-launch')).not.toBeNull();
+
+    const submitBtn = Array.from(el.querySelectorAll('app-workshop-compare-launch button')).find(
+      (b) => (b.textContent ?? '').includes('на одном отрезке'),
+    ) as HTMLButtonElement | undefined;
+    expect(submitBtn).toBeDefined();
+    expect(submitBtn?.disabled).toBe(false);
+    submitBtn?.click();
+
+    // Ждём завершения опроса и загрузки отчётов
+    await new Promise((r) => setTimeout(r, 30));
+    await flushAsync();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = (el.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(text).toContain('Единый отрезок');
+    expect(text).toContain('SBER, LKOH');
+    expect(text).not.toContain('разных периодах, таймфреймах или наборах бумаг');
+    expect(el.querySelector('.stub-compare-chart')?.textContent).toBe('3');
+    expect(navSpy).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: expect.objectContaining({
+          ids: 'A-0002,A-0003,A-0001',
+          runIds: expect.stringMatching(/^R-\d+,R-\d+,R-\d+$/),
+        }),
+        replaceUrl: true,
+      }),
+    );
   });
 });
 

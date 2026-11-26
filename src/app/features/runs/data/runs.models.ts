@@ -54,6 +54,60 @@ export type CreateRunResult =
       readonly detail: string | null;
     };
 
+export interface CreateCompareRunsCommand {
+  readonly algorithmIds: readonly string[];
+  readonly blind: boolean;
+  readonly durationDays: SessionDurationDays;
+  readonly timeframe: CandleTimeframe;
+  readonly regime: MarketRegime;
+  readonly startMode: StartMode;
+  readonly customStartDate: string | null;
+  readonly paperCount: number | null;
+  readonly paperIds: readonly string[] | null;
+  /** Money из контракта (INV-6): десятичная строка рублей, до 2 знаков. */
+  readonly initialCapital: string;
+}
+
+export interface CompareRunPaper {
+  readonly id: string | null;
+  readonly ticker: string;
+  readonly name: string;
+}
+
+export interface CompareRunItem {
+  readonly algorithmId: string;
+  readonly algorithmName: string;
+  readonly versionId: string;
+  readonly runId: string;
+  readonly status: RunStatus;
+}
+
+export interface CompareRunsWindow {
+  readonly startDate: string | null;
+  readonly endDate: string | null;
+  readonly periodLabel: string | null;
+  readonly timeframe: CandleTimeframe;
+  readonly durationDays: number;
+  readonly initialCapitalRub: number;
+  readonly blind: boolean;
+  readonly papers: readonly CompareRunPaper[];
+}
+
+export type CreateCompareRunsResult =
+  | {
+      readonly accepted: true;
+      readonly window: CompareRunsWindow;
+      readonly runs: readonly CompareRunItem[];
+    }
+  | {
+      readonly accepted: false;
+      readonly reason: CreateRunRejectReason;
+      readonly field: string | null;
+      readonly barsCount: number | null;
+      readonly maxBars: number | null;
+      readonly detail: string | null;
+    };
+
 export interface RunInfo {
   readonly runId: string;
   readonly strategyVersionId: string;
@@ -145,6 +199,7 @@ export type RunReportResult =
 
 export interface RunsApi {
   createRun(command: CreateRunCommand): Promise<CreateRunResult>;
+  createCompareRuns(command: CreateCompareRunsCommand): Promise<CreateCompareRunsResult>;
   getRun(runId: string): Promise<RunInfo>;
   events(runId: string, lastEventId: string | null): Observable<RunStreamEvent>;
   repeatRun(runId: string): Promise<{ readonly runId: string }>;

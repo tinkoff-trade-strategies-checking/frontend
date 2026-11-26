@@ -1,0 +1,225 @@
+<section class="panel compare-launch-panel" aria-label="Запуск сравнения на одном отрезке">
+  <div class="launch-head">
+    <div>
+      <h2 class="tui-text_h6">Запустить на одном отрезке</h2>
+      <span class="tui-text_body-xs muted">
+        Все выбранные алгоритмы ({{ algorithmCount() }}) пройдут один и тот же исторический период с
+        одинаковыми бумагами и капиталом.
+      </span>
+    </div>
+    <button tuiButton type="button" size="xs" appearance="flat" (click)="closed.emit()">
+      Свернуть
+    </button>
+  </div>
+
+  <div class="launch-body">
+    @if (skippedDraftNames().length > 0) {
+      <div tuiNotification appearance="info" size="s">
+        Черновики без опубликованной версии не участвуют в совместном прогоне:
+        {{ skippedDraftNames().join(', ') }}.
+      </div>
+    }
+
+    @if (optionsError(); as err) {
+      <div tuiNotification appearance="negative" size="s" role="alert" class="error-row">
+        <span>{{ err }}</span>
+        @if (!options()) {
+          <button tuiButton type="button" size="xs" appearance="outline" (click)="loadOptions()">
+            Повторить
+          </button>
+        }
+      </div>
+    }
+
+    @if (error(); as err) {
+      <div tuiNotification appearance="negative" size="s" role="alert">{{ err }}</div>
+    }
+
+    @if (rejection(); as rej) {
+      <div tuiNotification appearance="negative" size="s" role="alert">
+        <strong>{{ rej.title }}</strong>
+        <div class="tui-text_body-s">{{ rej.suggestion }}</div>
+      </div>
+    }
+
+    @if (loading() && !options()) {
+      <div class="tui-text_body-s muted">Загрузка параметров запуска…</div>
+    } @else if (options(); as opts) {
+      <div class="launch-grid">
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Режим отрезка</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="startMode() === 'custom' ? 1 : 0"
+            (activeItemIndexChange)="onStartModeIndexChange($event)"
+          >
+            <button type="button">Случайный отрезок</button>
+            <button type="button">Свой отрезок</button>
+          </tui-segmented>
+        </div>
+
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Длительность</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="optionIndex(opts.durations, durationDays())"
+            (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
+          >
+            @for (days of opts.durations; track days) {
+              <button type="button" [disabled]="isPairDisabled(days, timeframe())">
+                {{ days }} дн.
+              </button>
+            }
+          </tui-segmented>
+        </div>
+
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Шаг свечей</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="optionIndex(opts.availableTimeframes, timeframe())"
+            (activeItemIndexChange)="onTimeframeIndexChange(opts.availableTimeframes, $event)"
+          >
+            @for (tf of opts.availableTimeframes; track tf) {
+              <button type="button" [disabled]="isPairDisabled(durationDays(), tf)">
+                {{ timeframeLabels[tf] }}
+              </button>
+            }
+          </tui-segmented>
+        </div>
+
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Тип периода</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="optionIndex(opts.regimes, regime())"
+            (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
+          >
+            @for (item of opts.regimes; track item) {
+              <button type="button">{{ regimeLabels[item] }}</button>
+            }
+          </tui-segmented>
+        </div>
+      </div>
+
+      @if (startMode() === 'random') {
+        <div class="launch-row">
+          <div class="field-block">
+            <span class="tui-text_body-xs muted">Количество бумаг (одинаковый набор для всех)</span>
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="paperCountIndex(paperCountOptions(), paperCount())"
+              (activeItemIndexChange)="onPaperCountIndexChange(paperCountOptions(), $event)"
+            >
+              @for (count of paperCountOptions(); track count) {
+                <button type="button">{{ count }}</button>
+              }
+            </tui-segmented>
+          </div>
+          @if (opts.maxPapers > 5) {
+            <label tuiLabel for="compare-paper-count" class="field-block compact-input">
+              Своё количество (до {{ opts.maxPapers }})
+              <tui-textfield tuiTextfieldSize="s">
+                <input
+                  id="compare-paper-count"
+                  tuiInputNumber
+                  [min]="opts.minPapers"
+                  [max]="opts.maxPapers"
+                  [ngModel]="paperCount()"
+                  (ngModelChange)="onCustomPaperCountChange($event)"
+                />
+              </tui-textfield>
+            </label>
+          }
+        </div>
+      } @else {
+        <div class="custom-grid">
+          <label tuiLabel for="compare-custom-date" class="field-block compact-input">
+            Дата начала
+            <tui-textfield tuiTextfieldSize="s">
+              <input
+                id="compare-custom-date"
+                tuiInputDate
+                [ngModel]="customStartDay()"
+                (ngModelChange)="onCustomStartDayChange($event)"
+              />
+              <tui-calendar *tuiDropdown />
+            </tui-textfield>
+          </label>
+
+          <div class="field-block papers-field">
+            <span class="tui-text_body-xs muted">Бумаги</span>
+            <app-paper-picker
+              [papers]="availablePapers()"
+              [selectedIds]="selectedPaperIds()"
+              [loading]="loadingPapers()"
+              [compact]="true"
+              [minSelected]="opts.minPapers"
+              inputId="compare-papers-search"
+              (selectedIdsChange)="onSelectedPaperIdsChange($event)"
+            />
+          </div>
+        </div>
+      }
+
+      <div class="launch-row capital-row">
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Начальный капитал</span>
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="capitalIndex(opts.capitalPresetsRub, initialCapitalRub())"
+            (activeItemIndexChange)="onCapitalIndexChange(opts.capitalPresetsRub, $event)"
+          >
+            @for (preset of opts.capitalPresetsRub; track preset) {
+              <button type="button">{{ formatRub(preset) }}</button>
+            }
+          </tui-segmented>
+        </div>
+
+        <label tuiLabel for="compare-capital-input" class="field-block compact-input">
+          Своё значение, ₽
+          <tui-textfield tuiTextfieldSize="s">
+            <input
+              id="compare-capital-input"
+              tuiInputNumber
+              [min]="minCapital"
+              [max]="maxCapital"
+              [ngModel]="initialCapitalRub()"
+              (ngModelChange)="onCapitalInput($event)"
+            />
+          </tui-textfield>
+        </label>
+      </div>
+      @if (capitalError(); as capErr) {
+        <span class="tui-text_body-xs field-error" role="alert">{{ capErr }}</span>
+      }
+
+      <div class="launch-footer">
+        <label class="checkbox-row">
+          <input
+            id="compare-blind-checkbox"
+            type="checkbox"
+            tuiCheckbox
+            [ngModel]="blind()"
+            (ngModelChange)="onBlindChange($event)"
+          />
+          <span class="tui-text_body-s">Слепой прогон</span>
+          @if (blind()) {
+            <span tuiBadge size="s" appearance="warning">Слепой</span>
+          }
+        </label>
+
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          appearance="primary"
+          [disabled]="!canSubmit()"
+          (click)="submit()"
+        >
+          {{ submitLabel() }}
+        </button>
+      </div>
+    }
+  </div>
+</section>

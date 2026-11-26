@@ -1,0 +1,94 @@
+.compare-launch-panel {
+  background: var(--tui-background-base);
+  border: 1px solid var(--tui-border-normal);
+  border-radius: var(--tui-radius-l);
+  overflow: hidden;
+}
+
+.launch-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--tui-border-normal);
+  background: var(--tui-background-neutral-1);
+
+  h2 {
+    margin: 0 0 0.2rem;
+  }
+}
+
+.launch-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.muted {
+  color: var(--tui-text-secondary);
+}
+
+.error-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.launch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.75rem 1rem;
+}
+
+.launch-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.custom-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.compact-input {
+  min-width: 11rem;
+  max-width: 14rem;
+}
+
+.papers-field {
+  width: 100%;
+}
+
+.field-error {
+  color: var(--tui-text-negative);
+}
+
+.launch-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--tui-border-normal);
+}
+
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}

@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { Api } from '../../../api/api';
 import { ApiConfiguration } from '../../../api/api-configuration';
 import { getRunReport } from '../../../api/fn/analysis/get-run-report';
+import { createCompareRuns } from '../../../api/fn/simulation/create-compare-runs';
 import { createRun } from '../../../api/fn/simulation/create-run';
 import { getRun } from '../../../api/fn/simulation/get-run';
 import { repeatRun } from '../../../api/fn/simulation/repeat-run';
@@ -19,6 +20,8 @@ import { mapMetrics } from '../../report/data/http-report.api';
 import { ReportFill, ReportPaperReveal } from '../../report/data/report.models';
 import {
   AlgoRunReport,
+  CreateCompareRunsCommand,
+  CreateCompareRunsResult,
   CreateRunCommand,
   CreateRunRejectReason,
   CreateRunResult,
@@ -201,6 +204,66 @@ export class HttpRunsApi implements RunsApi {
         },
       });
       return { accepted: true, runId: created.runId };
+    } catch (error) {
+      const problem = toProblem(error);
+      if (problem.status === 422 && isCreateRunRejectReason(problem.code)) {
+        return {
+          accepted: false,
+          reason: problem.code,
+          field: problem.field,
+          barsCount: problem.barsCount,
+          maxBars: problem.maxBars,
+          detail: problem.detail,
+        };
+      }
+      throw error;
+    }
+  }
+
+  async createCompareRuns(command: CreateCompareRunsCommand): Promise<CreateCompareRunsResult> {
+    try {
+      const created = await this.api.invoke(createCompareRuns, {
+        body: {
+          algorithmIds: [...command.algorithmIds],
+          blind: command.blind,
+          durationDays: command.durationDays,
+          timeframe: command.timeframe,
+          regime: command.regime,
+          startMode: command.startMode,
+          customStartDate: command.customStartDate,
+          paperCount: command.paperCount,
+          paperIds: command.paperIds === null ? null : [...command.paperIds],
+          initialCapital: command.initialCapital,
+        },
+      });
+      const periodLabel =
+        created.startDate !== null && created.endDate !== null
+          ? formatPeriod({ startDate: created.startDate, endDate: created.endDate })
+          : null;
+      return {
+        accepted: true,
+        window: {
+          startDate: created.startDate,
+          endDate: created.endDate,
+          periodLabel,
+          timeframe: created.timeframe,
+          durationDays: created.durationDays,
+          initialCapitalRub: num(created.initialCapital),
+          blind: created.blind,
+          papers: created.papers.map((p) => ({
+            id: p.id,
+            ticker: p.ticker,
+            name: p.name,
+          })),
+        },
+        runs: created.runs.map((r) => ({
+          algorithmId: r.algorithmId,
+          algorithmName: r.algorithmName,
+          versionId: r.versionId,
+          runId: r.runId,
+          status: r.status,
+        })),
+      };
     } catch (error) {
       const problem = toProblem(error);
       if (problem.status === 422 && isCreateRunRejectReason(problem.code)) {

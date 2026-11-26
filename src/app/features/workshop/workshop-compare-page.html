@@ -6,15 +6,28 @@
         Сводка по последнему завершённому прогону каждого выбранного алгоритма из Мастерской.
       </p>
     </div>
-    <a
-      tuiButton
-      size="m"
-      appearance="outline"
-      routerLink="/workshop"
-      [queryParams]="backQueryParams()"
-    >
-      Назад в Мастерскую
-    </a>
+    <div class="header-actions">
+      @if (store.launchableIds().length >= 2) {
+        <button
+          tuiButton
+          type="button"
+          size="m"
+          [appearance]="launchPanelOpen() ? 'secondary' : 'primary'"
+          (click)="toggleLaunchPanel()"
+        >
+          Запустить на одном отрезке
+        </button>
+      }
+      <a
+        tuiButton
+        size="m"
+        appearance="outline"
+        routerLink="/workshop"
+        [queryParams]="backQueryParams()"
+      >
+        Назад в Мастерскую
+      </a>
+    </div>
   </header>
 
   @if (store.error(); as msg) {
@@ -61,10 +74,89 @@
       </div>
     }
 
-    @if (store.hasDifferentContexts()) {
-      <div tuiNotification appearance="warning" size="s">
-        Последние прогоны алгоритмов выполнялись на разных периодах, таймфреймах или наборах бумаг —
-        учитывайте это при сопоставлении метрик и кривых.
+    @if (launchPanelOpen() && store.launchableIds().length >= 2) {
+      <app-workshop-compare-launch
+        [algorithmCount]="store.launchableIds().length"
+        [skippedDraftNames]="store.skippedDraftNames()"
+        [busy]="store.batchRunning()"
+        [rejection]="store.batchRejection()"
+        [error]="store.batchError()"
+        (launch)="onBatchLaunch($event)"
+        (closed)="launchPanelOpen.set(false)"
+      />
+    }
+
+    @if (store.batchRunning() || store.hasFailedBatchRuns()) {
+      <section class="panel progress-panel" aria-label="Ход выполнения прогонов">
+        <div class="panel-head">
+          <h2 class="tui-text_h6">
+            {{
+              store.batchRunning()
+                ? 'Выполнение алгоритмов на одном отрезке…'
+                : 'Результаты запуска на одном отрезке'
+            }}
+          </h2>
+          <span class="tui-text_body-xs muted">
+            После завершения отчёты автоматически отобразятся на графике и в таблице
+          </span>
+        </div>
+        <div class="progress-list">
+          @for (run of store.batchProgress(); track run.runId) {
+            <div class="progress-row">
+              <div class="progress-meta">
+                <strong class="tui-text_body-s">{{ run.algorithmName }}</strong>
+                <div class="progress-status">
+                  <span tuiBadge size="s" [appearance]="statusAppearance(run.status)">
+                    {{ batchProgressLabel(run) }}
+                  </span>
+                  <a class="tui-text_body-xs" [routerLink]="['/runs', run.runId]">
+                    #{{ shortRunId(run.runId) }}
+                  </a>
+                </div>
+              </div>
+              @if (run.status === 'queued' || run.status === 'running') {
+                <progress
+                  tuiProgressBar
+                  size="s"
+                  [max]="100"
+                  [value]="batchProgressPercent(run)"
+                ></progress>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @if (store.sharedContext(); as ctx) {
+      <div tuiNotification appearance="positive" size="s" class="shared-context-banner">
+        <div class="shared-context-content">
+          <span tuiBadge size="s" appearance="positive">Единый отрезок</span>
+          <span class="tui-text_body-s">
+            <strong>{{ ctx.periodLabel }}</strong> · {{ timeframeLabels[ctx.timeframe] }} ·
+            {{ regimeLabels[ctx.regime] }} · {{ formatTickers(ctx.papers) }}
+          </span>
+        </div>
+      </div>
+    } @else if (store.hasDifferentContexts()) {
+      <div tuiNotification appearance="warning" size="s" class="diff-context-banner">
+        <div class="diff-context-content">
+          <span>
+            Последние прогоны алгоритмов выполнялись на разных периодах, таймфреймах или наборах
+            бумаг — учитывайте это при сопоставлении метрик и кривых.
+          </span>
+          @if (store.launchableIds().length >= 2 && !launchPanelOpen()) {
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="openLaunchPanel()"
+            >
+              Запустить на одном отрезке
+            </button>
+          }
+        </div>
       </div>
     }
 

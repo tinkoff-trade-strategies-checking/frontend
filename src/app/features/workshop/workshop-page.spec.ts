@@ -561,6 +561,9 @@ describe('WorkshopPage', () => {
         }
         return { accepted: true, runId: 'R-9999' };
       },
+      async createCompareRuns() {
+        throw new Error('not used');
+      },
       async getRun() {
         throw new Error('not used');
       },
