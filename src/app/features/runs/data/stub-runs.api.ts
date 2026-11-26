@@ -1,8 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ReportMetrics } from '../../report/data/report.models';
+import { ReportMetrics, ReportPaperReveal, ReportPeriod } from '../../report/data/report.models';
 import {
   AlgoRunReport,
+  CompareRunItem,
+  CreateCompareRunsCommand,
+  CreateCompareRunsResult,
   CreateRunCommand,
   CreateRunResult,
   RunInfo,
@@ -16,6 +19,13 @@ interface StubRunRecord {
   info: RunInfo;
   readonly repeatOfRunId: string | null;
   readonly blind: boolean;
+  readonly autoAdvance?: boolean;
+  readonly timeframe?: AlgoRunReport['timeframe'];
+  readonly regime?: AlgoRunReport['regime'];
+  readonly initialCapitalRub?: number;
+  readonly finalCapitalRub?: number;
+  readonly revealPeriod?: ReportPeriod;
+  readonly revealPapers?: readonly ReportPaperReveal[];
 }
 
 interface SeedReportOverrides {
@@ -164,6 +174,18 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
   const { info } = record;
   const isInvalidOrFailed = info.status === 'invalid' || info.status === 'failed';
   const overrides = SEED_REPORT_OVERRIDES[info.runId];
+  const initialRub = record.initialCapitalRub ?? 1_000_000;
+  const finalRub = overrides?.finalRub ?? record.finalCapitalRub ?? 1_081_500;
+  const period = overrides?.period ??
+    info.period ??
+    record.revealPeriod ?? {
+      startDate: '2023-04-10',
+      endDate: '2023-07-05',
+      label: '10.04.2023 — 05.07.2023',
+    };
+  const midRub = Math.round((initialRub + finalRub) / 2);
+  const totalSteps = overrides?.totalDays ?? info.totalSteps ?? 60;
+  const [startLabel, endLabel] = period.label.split(' — ');
   return {
     runId: info.runId,
     strategyVersionId: info.strategyVersionId,
@@ -171,9 +193,9 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
     blind: info.blind,
     status: info.status,
     playedDays: info.doneSteps,
-    totalDays: overrides?.totalDays ?? info.totalSteps ?? 60,
-    timeframe: overrides?.timeframe ?? '1d',
-    regime: overrides?.regime ?? 'calm',
+    totalDays: totalSteps,
+    timeframe: overrides?.timeframe ?? record.timeframe ?? '1d',
+    regime: overrides?.regime ?? record.regime ?? 'calm',
     createdAt: info.createdAt,
     repeatOfRunId: info.repeatOfRunId,
     repeatMatch: info.repeatMatch,
@@ -196,44 +218,50 @@ function buildStubReport(record: StubRunRecord): AlgoRunReport {
           },
         ],
     diagnostics: info.diagnostics,
-    period: overrides?.period ??
-      info.period ?? {
-        startDate: '2023-04-10',
-        endDate: '2023-07-05',
-        label: '10.04.2023 — 05.07.2023',
-      },
-    papers: info.papers ?? [
-      {
-        id: 'SBER',
-        blindLabel: 'A',
-        ticker: 'SBER',
-        name: 'Сбербанк',
-        sector: 'Финансы',
-        startPriceRub: 245,
-        lotSize: 10,
-      },
-      {
-        id: 'LKOH',
-        blindLabel: 'B',
-        ticker: 'LKOH',
-        name: 'ЛУКОЙЛ',
-        sector: 'Нефть и газ',
-        startPriceRub: 5120,
-        lotSize: 1,
-      },
-    ],
+    period,
+    papers: info.papers ??
+      record.revealPapers ?? [
+        {
+          id: 'SBER',
+          blindLabel: 'A',
+          ticker: 'SBER',
+          name: 'Сбербанк',
+          sector: 'Финансы',
+          startPriceRub: 245,
+          lotSize: 10,
+        },
+        {
+          id: 'LKOH',
+          blindLabel: 'B',
+          ticker: 'LKOH',
+          name: 'ЛУКОЙЛ',
+          sector: 'Нефть и газ',
+          startPriceRub: 5120,
+          lotSize: 1,
+        },
+      ],
     metrics: isInvalidOrFailed
       ? null
-      : defaultMetrics(
-          1_000_000,
-          overrides?.finalRub ?? 1_081_500,
-          info.status === 'bankrupt',
-          overrides,
-        ),
+      : defaultMetrics(initialRub, finalRub, info.status === 'bankrupt', overrides),
     equityCurve: overrides?.equityCurve ?? [
-      { step: 0, dateLabel: '10.04.2023', capitalRub: 1_000_000, benchmarkCapitalRub: 1_000_000 },
-      { step: 30, dateLabel: '24.05.2023', capitalRub: 1_038_000, benchmarkCapitalRub: 1_015_000 },
-      { step: 60, dateLabel: '05.07.2023', capitalRub: 1_081_500, benchmarkCapitalRub: 1_031_000 },
+      {
+        step: 0,
+        dateLabel: startLabel ?? '10.04.2023',
+        capitalRub: initialRub,
+        benchmarkCapitalRub: initialRub,
+      },
+      {
+        step: Math.max(1, Math.floor(totalSteps / 2)),
+        dateLabel: startLabel ?? '24.05.2023',
+        capitalRub: midRub,
+        benchmarkCapitalRub: Math.round(initialRub * 1.015),
+      },
+      {
+        step: totalSteps,
+        dateLabel: endLabel ?? '05.07.2023',
+        capitalRub: finalRub,
+        benchmarkCapitalRub: Math.round(initialRub * 1.031),
+      },
     ],
     underwaterCurve: [
       { step: 0, dateLabel: '10.04.2023', drawdownPct: 0 },
@@ -295,6 +323,20 @@ const SEED_PERIOD = {
   endDate: '2023-07-05',
   label: '10.04.2023 — 05.07.2023',
 };
+
+function formatIsoDateRu(iso: string): string {
+  const parts = iso.split('-');
+  return parts.length === 3 ? `${parts[2]}.${parts[1]}.${parts[0]}` : iso;
+}
+
+function addCalendarDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) {
+    return SEED_PERIOD.endDate;
+  }
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 const SEED_PAPERS = [
   {
@@ -404,10 +446,154 @@ export class StubRunsApi implements RunsApi {
     return { accepted: true, runId };
   }
 
+  async createCompareRuns(command: CreateCompareRunsCommand): Promise<CreateCompareRunsResult> {
+    if (command.algorithmIds.length < 2 || command.algorithmIds.length > 5) {
+      return {
+        accepted: false,
+        reason: 'INVALID_PARAMS',
+        field: 'algorithmIds',
+        barsCount: null,
+        maxBars: null,
+        detail: 'Для сравнения выберите от 2 до 5 алгоритмов.',
+      };
+    }
+
+    const startDate =
+      command.startMode === 'custom' && command.customStartDate
+        ? command.customStartDate
+        : SEED_PERIOD.startDate;
+    const endDate =
+      command.startMode === 'custom' && command.customStartDate
+        ? addCalendarDays(command.customStartDate, Math.round(command.durationDays * 1.4))
+        : SEED_PERIOD.endDate;
+    const period: ReportPeriod = {
+      startDate,
+      endDate,
+      label: `${formatIsoDateRu(startDate)} — ${formatIsoDateRu(endDate)}`,
+    };
+
+    const papers: readonly ReportPaperReveal[] =
+      command.startMode === 'custom' && command.paperIds && command.paperIds.length > 0
+        ? command.paperIds.map((id, idx) => ({
+            id,
+            blindLabel: String.fromCharCode(65 + (idx % 26)),
+            ticker: id,
+            name: id,
+            sector: 'MOEX',
+            startPriceRub: 250 + idx * 50,
+            lotSize: 10,
+          }))
+        : [
+            {
+              id: 'SBER',
+              blindLabel: 'A',
+              ticker: 'SBER',
+              name: 'Сбербанк',
+              sector: 'Финансы',
+              startPriceRub: 245,
+              lotSize: 10,
+            },
+            {
+              id: 'LKOH',
+              blindLabel: 'B',
+              ticker: 'LKOH',
+              name: 'ЛУКОЙЛ',
+              sector: 'Нефть и газ',
+              startPriceRub: 5120,
+              lotSize: 1,
+            },
+          ];
+
+    const initialCapitalRub = Number(command.initialCapital) || 1_000_000;
+    const totalSteps = command.durationDays;
+    const runs: CompareRunItem[] = [];
+    const returnOffsets = [0.064, 0.031, -0.018, 0.092, 0.012];
+
+    command.algorithmIds.forEach((algorithmId, index) => {
+      const runId = `R-${String(this.store.seq++).padStart(4, '0')}`;
+      const versionId = `${algorithmId}-v1`;
+      const finalCapitalRub = Math.round(
+        initialCapitalRub * (1 + returnOffsets[index % returnOffsets.length]),
+      );
+      this.store.records.set(runId, {
+        repeatOfRunId: null,
+        blind: command.blind,
+        autoAdvance: true,
+        timeframe: command.timeframe,
+        regime: command.regime,
+        initialCapitalRub,
+        finalCapitalRub,
+        revealPeriod: period,
+        revealPapers: papers,
+        info: {
+          runId,
+          strategyVersionId: versionId,
+          algoName: `Алгоритм ${algorithmId}`,
+          blind: command.blind,
+          status: 'queued',
+          doneSteps: 0,
+          totalSteps,
+          repeatOfRunId: null,
+          repeatMatch: null,
+          lastEventId: null,
+          createdAt: new Date().toISOString(),
+          finishedAt: null,
+          errorCode: null,
+          diagnostics: [],
+          period: command.blind ? null : period,
+          papers: command.blind ? null : papers,
+        },
+      });
+      runs.push({
+        algorithmId,
+        algorithmName: `Алгоритм ${algorithmId}`,
+        versionId,
+        runId,
+        status: 'queued',
+      });
+    });
+
+    return {
+      accepted: true,
+      window: {
+        startDate: command.blind ? null : period.startDate,
+        endDate: command.blind ? null : period.endDate,
+        periodLabel: command.blind ? null : period.label,
+        timeframe: command.timeframe,
+        durationDays: command.durationDays,
+        initialCapitalRub,
+        blind: command.blind,
+        papers: command.blind
+          ? papers.map((p) => ({ id: null, ticker: '', name: `Бумага ${p.blindLabel}` }))
+          : papers.map((p) => ({ id: p.id, ticker: p.ticker, name: p.name })),
+      },
+      runs,
+    };
+  }
+
   async getRun(runId: string): Promise<RunInfo> {
     const rec = this.store.records.get(runId);
     if (!rec) {
       throw new Error(`Прогон ${runId} не найден.`);
+    }
+    if (rec.autoAdvance) {
+      const totalSteps = rec.info.totalSteps ?? 60;
+      if (rec.info.status === 'queued') {
+        rec.info = {
+          ...rec.info,
+          status: 'running',
+          doneSteps: Math.max(1, Math.floor(totalSteps / 2)),
+        };
+      } else if (rec.info.status === 'running') {
+        rec.info = {
+          ...rec.info,
+          status: 'completed',
+          doneSteps: totalSteps,
+          finishedAt: new Date().toISOString(),
+          period: rec.revealPeriod ?? SEED_PERIOD,
+          papers: rec.revealPapers ?? SEED_PAPERS,
+        };
+      }
     }
     return rec.info;
   }

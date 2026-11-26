@@ -851,6 +851,47 @@ paths:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
         '503': { $ref: '#/components/responses/WorkerUnavailable' }
+  /runs/compare:
+    post:
+      tags: [simulation]
+      operationId: createCompareRuns
+      summary: Запустить несколько алгоритмов в сравнение на одном отрезке
+      description: |
+        Подбирает исторический отрезок ровно один раз через `LaunchPlanner` и ставит в фоновую очередь 2–5 прогонов
+        на этом же отрезке (одинаковые снапшот, даты окна, список и порядок бумаг, таймфрейм, длительность и капитал).
+        В слепом режиме даты и тикеры в ответе скрываются до завершения прогонов (INV-7).
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateCompareRunsRequest' }
+      responses:
+        '201':
+          description: Пакет прогонов поставлен в очередь
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CompareRunsResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '422':
+          description: Параметры запуска отклонены или одна из стратегий содержит ошибки DSL
+          content:
+            application/problem+json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/LaunchProblem'
+                  - $ref: '#/components/schemas/Problem'
+        '429':
+          description: Превышен лимит очереди прогонов пользователя (код `TOO_MANY_REQUESTS`)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '503': { $ref: '#/components/responses/WorkerUnavailable' }
   /runs/{runId}:
     get:
       tags: [simulation]
@@ -2705,6 +2746,63 @@ components:
       required: [runId]
       properties:
         runId: { $ref: '#/components/schemas/Uuid' }
+    CreateCompareRunsRequest:
+      type: object
+      required: [algorithmIds, durationDays, timeframe, regime, startMode, initialCapital]
+      properties:
+        algorithmIds:
+          type: array
+          minItems: 2
+          maxItems: 5
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/Uuid' }
+          description: Идентификаторы стратегий из каталога Мастерской (2–5 уникальных, порядок сохраняется)
+        blind: { type: boolean, default: false }
+        durationDays: { type: integer, enum: [20, 60, 120, 250] }
+        timeframe: { $ref: '#/components/schemas/Timeframe' }
+        regime: { $ref: '#/components/schemas/Regime' }
+        startMode: { type: string, enum: [random, custom] }
+        customStartDate: { type: [string, 'null'], format: date, description: Только для custom }
+        paperCount: { type: [integer, 'null'] }
+        paperIds:
+          type: [array, 'null']
+          items: { $ref: '#/components/schemas/Uuid' }
+        initialCapital: { $ref: '#/components/schemas/Money' }
+    CompareRunPaper:
+      type: object
+      required: [id, ticker, name]
+      properties:
+        id: { $ref: '#/components/schemas/UuidOrNull' }
+        ticker: { type: string }
+        name: { type: string }
+    CompareRunItem:
+      type: object
+      required: [algorithmId, algorithmName, versionId, runId, status]
+      properties:
+        algorithmId: { $ref: '#/components/schemas/Uuid' }
+        algorithmName: { type: string }
+        versionId: { $ref: '#/components/schemas/Uuid' }
+        runId: { $ref: '#/components/schemas/Uuid' }
+        status: { $ref: '#/components/schemas/RunStatus' }
+    CompareRunsResponse:
+      type: object
+      description: Результат пакетного запуска 2–5 алгоритмов на одном отрезке; в слепом режиме даты и тикеры скрыты (INV-7)
+      required: [startDate, endDate, timeframe, durationDays, initialCapital, blind, papers, runs]
+      properties:
+        startDate: { type: [string, 'null'], format: date }
+        endDate: { type: [string, 'null'], format: date }
+        timeframe: { $ref: '#/components/schemas/Timeframe' }
+        durationDays: { type: integer }
+        initialCapital: { $ref: '#/components/schemas/Money' }
+        blind: { type: boolean }
+        papers:
+          type: array
+          items: { $ref: '#/components/schemas/CompareRunPaper' }
+        runs:
+          type: array
+          minItems: 2
+          maxItems: 5
+          items: { $ref: '#/components/schemas/CompareRunItem' }
     RunInfo:
       type: object
       description: Состояние прогона; в слепом режиме период и бумаги не раскрываются до завершения (INV-7)

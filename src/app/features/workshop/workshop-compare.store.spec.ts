@@ -6,7 +6,7 @@ import { RUNS_API, RunsApi } from '../runs/data/runs.models';
 import { StubRunsApi } from '../runs/data/stub-runs.api';
 import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API } from './data/workshop.models';
-import { WorkshopCompareStore } from './workshop-compare.store';
+import { COMPARE_POLL_INTERVAL_MS, WorkshopCompareStore } from './workshop-compare.store';
 
 describe('WorkshopCompareStore', () => {
   function setup(overrides?: { historyApi?: HistoryApi; runsApi?: RunsApi }): WorkshopCompareStore {
@@ -15,6 +15,7 @@ describe('WorkshopCompareStore', () => {
         { provide: WORKSHOP_API, useClass: StubWorkshopApi },
         { provide: HISTORY_API, useValue: overrides?.historyApi ?? new StubHistoryApi() },
         { provide: RUNS_API, useValue: overrides?.runsApi ?? new StubRunsApi() },
+        { provide: COMPARE_POLL_INTERVAL_MS, useValue: 0 },
         WorkshopCompareStore,
       ],
     });
@@ -91,6 +92,7 @@ describe('WorkshopCompareStore', () => {
     const samePeriodDiffTfRuns: RunsApi = {
       ...baseRuns,
       createRun: baseRuns.createRun.bind(baseRuns),
+      createCompareRuns: baseRuns.createCompareRuns.bind(baseRuns),
       getRun: baseRuns.getRun.bind(baseRuns),
       events: baseRuns.events.bind(baseRuns),
       repeatRun: baseRuns.repeatRun.bind(baseRuns),
@@ -138,5 +140,101 @@ describe('WorkshopCompareStore', () => {
     expect(store.loading()).toBe(false);
     expect(store.entries()).toEqual([]);
     expect(store.error()).toBe('Не удалось загрузить данные для сравнения.');
+  });
+
+  it('launchBatch запускает алгоритмы на едином отрезке, опрашивает до завершения и формирует sharedContext', async () => {
+    const store = setup();
+    await store.load(['A-0002', 'A-0003']);
+    expect(store.hasDifferentContexts()).toBe(true);
+    expect(store.sharedContext()).toBeNull();
+
+    const runIds = await store.launchBatch({
+      blind: false,
+      durationDays: 60,
+      timeframe: '1d',
+      regime: 'medium',
+      startMode: 'random',
+      customStartDate: null,
+      paperCount: 2,
+      paperIds: null,
+      initialCapital: '1000000.00',
+    });
+
+    expect(runIds).not.toBeNull();
+    expect(runIds).toHaveLength(2);
+    expect(store.batchRunning()).toBe(false);
+    expect(store.activeRunIds()).toEqual(runIds);
+    expect(store.hasDifferentContexts()).toBe(false);
+
+    const shared = store.sharedContext();
+    expect(shared).not.toBeNull();
+    expect(shared?.timeframe).toBe('1d');
+    expect(shared?.papers).toEqual(['SBER', 'LKOH']);
+    expect(store.readyEntries().map((e) => e.runId)).toEqual(runIds);
+  });
+
+  it('load с явными runIds восстанавливает точное сравнение на одном отрезке после перезагрузки', async () => {
+    const stubRuns = new StubRunsApi();
+    const store = setup({ runsApi: stubRuns });
+    await store.load(['A-0002', 'A-0003']);
+
+    const runIds = await store.launchBatch({
+      blind: false,
+      durationDays: 60,
+      timeframe: '1d',
+      regime: 'calm',
+      startMode: 'custom',
+      customStartDate: '2023-06-01',
+      paperCount: null,
+      paperIds: ['SBER', 'GAZP'],
+      initialCapital: '1000000.00',
+    });
+    expect(runIds).toHaveLength(2);
+
+    // Имитируем повторную загрузку страницы с ?ids=...&runIds=...
+    await store.load(['A-0002', 'A-0003'], runIds ?? []);
+    expect(store.loading()).toBe(false);
+    expect(store.activeRunIds()).toEqual(runIds);
+    expect(store.hasDifferentContexts()).toBe(false);
+    expect(store.sharedContext()?.papers).toEqual(['SBER', 'GAZP']);
+    expect(store.readyEntries().map((e) => e.runId)).toEqual(runIds);
+  });
+
+  it('launchBatch при отказе 422 выставляет batchRejection и снимает batchRunning', async () => {
+    const baseRuns = new StubRunsApi();
+    const rejectingRuns: RunsApi = {
+      ...baseRuns,
+      createRun: baseRuns.createRun.bind(baseRuns),
+      getRun: baseRuns.getRun.bind(baseRuns),
+      events: baseRuns.events.bind(baseRuns),
+      repeatRun: baseRuns.repeatRun.bind(baseRuns),
+      getRunReport: baseRuns.getRunReport.bind(baseRuns),
+      createCompareRuns: async () => ({
+        accepted: false,
+        reason: 'NO_MATCHING_PERIOD',
+        field: 'regime',
+        barsCount: null,
+        maxBars: null,
+        detail: 'Нет подходящего окна',
+      }),
+    };
+    const store = setup({ runsApi: rejectingRuns });
+    await store.load(['A-0002', 'A-0003']);
+
+    const runIds = await store.launchBatch({
+      blind: false,
+      durationDays: 60,
+      timeframe: '1d',
+      regime: 'stress',
+      startMode: 'random',
+      customStartDate: null,
+      paperCount: 3,
+      paperIds: null,
+      initialCapital: '1000000.00',
+    });
+
+    expect(runIds).toBeNull();
+    expect(store.batchRunning()).toBe(false);
+    expect(store.batchRejection()).not.toBeNull();
   });
 });

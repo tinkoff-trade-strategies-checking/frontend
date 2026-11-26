@@ -79,4 +79,45 @@ describe('StubRunsApi', () => {
     expect(await api.getRunReport('R-0203')).toEqual({ status: 'NOT_FINISHED', runId: 'R-0203' });
     expect(await api.getRunReport('R-NONE')).toEqual({ status: 'NOT_FOUND', runId: 'R-NONE' });
   });
+
+  it('createCompareRuns создаёт пакет прогонов на едином отрезке и продвигает статус при опросе getRun', async () => {
+    const api = new StubRunsApi();
+    const res = await api.createCompareRuns({
+      algorithmIds: ['A-0002', 'A-0003'],
+      blind: false,
+      durationDays: 60,
+      timeframe: '1d',
+      regime: 'medium',
+      startMode: 'custom',
+      customStartDate: '2023-05-01',
+      paperCount: null,
+      paperIds: ['SBER', 'LKOH'],
+      initialCapital: '500000.00',
+    });
+    expect(res.accepted).toBe(true);
+    if (!res.accepted) {
+      return;
+    }
+    expect(res.runs).toHaveLength(2);
+    expect(res.window.startDate).toBe('2023-05-01');
+
+    const [first, second] = res.runs;
+    expect((await api.getRun(first.runId)).status).toBe('running');
+    expect((await api.getRun(first.runId)).status).toBe('completed');
+    expect((await api.getRun(second.runId)).status).toBe('running');
+    expect((await api.getRun(second.runId)).status).toBe('completed');
+
+    const [rep1, rep2] = await Promise.all([
+      api.getRunReport(first.runId),
+      api.getRunReport(second.runId),
+    ]);
+    expect(rep1.status).toBe('READY');
+    expect(rep2.status).toBe('READY');
+    if (rep1.status === 'READY' && rep2.status === 'READY') {
+      expect(rep1.report.period.label).toBe(rep2.report.period.label);
+      expect(rep1.report.timeframe).toBe('1d');
+      expect(rep1.report.papers.map((p) => p.ticker)).toEqual(['SBER', 'LKOH']);
+      expect(rep2.report.papers.map((p) => p.ticker)).toEqual(['SBER', 'LKOH']);
+    }
+  });
 });

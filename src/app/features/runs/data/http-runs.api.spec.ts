@@ -176,4 +176,73 @@ describe('HttpRunsApi', () => {
       expect(rep.report.orders[0].because).toBe('RSI ниже порога');
     }
   });
+
+  it('createCompareRuns отправляет POST /runs/compare, маппит окно и отказы 422', async () => {
+    const cmd = {
+      algorithmIds: ['algo-1', 'algo-2'],
+      blind: false,
+      durationDays: 60 as const,
+      timeframe: '1d' as const,
+      regime: 'medium' as const,
+      startMode: 'random' as const,
+      customStartDate: null,
+      paperCount: 3,
+      paperIds: null,
+      initialCapital: '1000000.00',
+    };
+
+    const pOk = api.createCompareRuns(cmd);
+    const reqOk = http.expectOne('/api/v1/runs/compare');
+    expect(reqOk.request.method).toBe('POST');
+    expect(reqOk.request.body).toEqual(cmd);
+    reqOk.flush(
+      {
+        startDate: '2024-01-10',
+        endDate: '2024-04-03',
+        timeframe: '1d',
+        durationDays: 60,
+        initialCapital: '1000000.00',
+        blind: false,
+        papers: [{ id: 'p-1', ticker: 'SBER', name: 'Сбербанк' }],
+        runs: [
+          {
+            algorithmId: 'algo-1',
+            algorithmName: 'Momentum',
+            versionId: 'v-1',
+            runId: 'run-1',
+            status: 'queued',
+          },
+          {
+            algorithmId: 'algo-2',
+            algorithmName: 'Breakout',
+            versionId: 'v-2',
+            runId: 'run-2',
+            status: 'queued',
+          },
+        ],
+      },
+      { status: 201, statusText: 'Created' },
+    );
+
+    const resOk = await pOk;
+    expect(resOk.accepted).toBe(true);
+    if (resOk.accepted) {
+      expect(resOk.window.periodLabel).toBe('10.01.2024 — 03.04.2024');
+      expect(resOk.window.initialCapitalRub).toBe(1000000);
+      expect(resOk.runs.map((r) => r.runId)).toEqual(['run-1', 'run-2']);
+    }
+
+    const pReject = api.createCompareRuns(cmd);
+    http
+      .expectOne('/api/v1/runs/compare')
+      .flush(
+        { code: 'NO_MATCHING_PERIOD', detail: 'Нет подходящего окна' },
+        { status: 422, statusText: 'Unprocessable Entity' },
+      );
+    expect(await pReject).toMatchObject({
+      accepted: false,
+      reason: 'NO_MATCHING_PERIOD',
+      detail: 'Нет подходящего окна',
+    });
+  });
 });
