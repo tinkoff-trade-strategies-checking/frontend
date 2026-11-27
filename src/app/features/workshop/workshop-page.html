@@ -409,7 +409,11 @@
         @if (store.editorMode() !== 'closed') {
           <app-workshop-draft-editor (openDslGuide)="openDslGuide()" />
         } @else if (store.runFormOpen() && store.selectedDetail(); as runAlgo) {
-          <app-workshop-run-form [algorithm]="runAlgo" (closed)="store.closeRunForm()" />
+          <app-workshop-run-form
+            [algorithm]="runAlgo"
+            [initialParams]="pendingRunParams()"
+            (closed)="onCloseRunForm()"
+          />
         } @else if (store.detailLoading()) {
           <div class="detail-body">
             <div class="detail-header">
@@ -588,6 +592,19 @@
                   (click)="store.requestDelete(algo.id)"
                 >
                   Удалить
+                </button>
+              }
+
+              @if (hasOptimizableParams(algo)) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  data-testid="workshop-open-optimizer"
+                  (click)="openOptimizer()"
+                >
+                  Подбор параметров
                 </button>
               }
 
@@ -789,6 +806,14 @@
       [canInsert]="store.editorMode() !== 'closed'"
       (closed)="closeDslGuide()"
       (insertCode)="onInsertDslExample($event)"
+    />
+  }
+
+  @if (optimizerOpen() && store.selectedDetail(); as optAlgo) {
+    <app-workshop-optimizer
+      [algorithm]="optAlgo"
+      (closed)="closeOptimizer()"
+      (applyParams)="onApplyOptimizedParams($event)"
     />
   }
 </section>

@@ -1,0 +1,115 @@
+.risk-panel {
+  background: var(--tui-background-base);
+  border: 1px solid var(--tui-border-normal);
+  border-radius: var(--tui-radius-l);
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 1rem 1rem 0.75rem;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.muted {
+  color: var(--tui-text-secondary);
+}
+
+.neg {
+  color: var(--tui-text-negative);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.risk-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+
+.risk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: var(--tui-background-neutral-1);
+  border-radius: var(--tui-radius-m);
+}
+
+.risk-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.corr-section {
+  border-top: 1px solid var(--tui-border-normal);
+  padding: 0.875rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.corr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.subheading {
+  margin: 0;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.corr-scroll {
+  overflow-x: auto;
+}
+
+.corr-table {
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  width: max-content;
+  min-width: 100%;
+
+  th,
+  td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--tui-border-normal);
+    text-align: center;
+  }
+
+  thead th {
+    background: var(--tui-background-neutral-1);
+    color: var(--tui-text-secondary);
+    font-weight: 600;
+  }
+
+  .row-label {
+    background: var(--tui-background-neutral-1);
+    color: var(--tui-text-secondary);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+  }
+}
+
+.corr-cell.diag {
+  color: var(--tui-text-secondary);
+  font-weight: 600;
+}

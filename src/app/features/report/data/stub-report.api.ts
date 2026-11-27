@@ -453,6 +453,29 @@ const REPORT_S0103: SessionReport = {
       note: null,
     },
   ],
+  paperCandles: [
+    {
+      paperId: 'A',
+      closes: Array.from(
+        { length: 61 },
+        (_, i) => Math.round((241.5 + Math.sin(i * 0.22) * 14 + i * 0.18) * 100) / 100,
+      ),
+    },
+    {
+      paperId: 'B',
+      closes: Array.from(
+        { length: 61 },
+        (_, i) => Math.round((214.2 + Math.sin(i * 0.22 + 0.35) * 11 - i * 0.06) * 100) / 100,
+      ),
+    },
+    {
+      paperId: 'C',
+      closes: Array.from(
+        { length: 61 },
+        (_, i) => Math.round((3120 - Math.sin(i * 0.22 + 0.9) * 180 + i * 4.5) * 100) / 100,
+      ),
+    },
+  ],
 };
 
 const REPORT_S0105_CURVES = buildEquityAndUnderwater(

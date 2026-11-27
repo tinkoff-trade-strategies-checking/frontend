@@ -389,10 +389,14 @@
             {{
               showDetailedStats()
                 ? 'Скрыть подробную статистику'
-                : 'Подробная статистика (график падений, Sharpe, Sortino, HHI…)'
+                : 'Подробная статистика (график падений, VaR/бета, Sharpe, Sortino, HHI…)'
             }}
           </button>
         </div>
+      }
+
+      @if (showDetailedStats()) {
+        <app-report-risk-panel [report]="rep" />
       }
 
       <section #detailsTabsSection class="panel">
