@@ -26,23 +26,34 @@
   }
 
   <section class="panel">
-    <app-history-filters
-      [kindFilters]="kindFilters"
-      [statusFilters]="statusFilters"
-      [regimeFilters]="regimeFilters"
-      [kind]="store.kind()"
-      [status]="store.status()"
-      [regime]="store.regime()"
-      [blindOnly]="store.blindOnly()"
-      [total]="store.total()"
-      (kindChange)="store.setKind($event)"
-      (statusChange)="store.setStatus($event)"
-      (regimeChange)="store.setRegime($event)"
-      (blindToggle)="store.toggleBlindOnly()"
-    />
+    @if (showFilters()) {
+      <app-history-filters
+        [kindFilters]="kindFilters"
+        [statusFilters]="statusFilters"
+        [regimeFilters]="regimeFilters"
+        [kind]="store.kind()"
+        [status]="store.status()"
+        [regime]="store.regime()"
+        [blindOnly]="store.blindOnly()"
+        [total]="store.total()"
+        (kindChange)="store.setKind($event)"
+        (statusChange)="store.setStatus($event)"
+        (regimeChange)="store.setRegime($event)"
+        (blindToggle)="store.toggleBlindOnly()"
+      />
+    }
 
     @if (store.loading() && store.items().length === 0) {
       <div class="empty-state tui-text_body-m muted">Загрузка истории…</div>
+    } @else if (store.items().length === 0 && !store.error() && !store.hasActiveFilters()) {
+      <div class="onboarding-card">
+        <h2 class="tui-text_h5">Здесь будет история ваших тренировок</h2>
+        <p class="tui-text_body-m muted">
+          Пройдите первую учебную сессию на реальных данных биржи — после завершения здесь появится
+          подробный разбор и возможность пересмотреть сделки.
+        </p>
+        <a tuiButton size="m" appearance="primary" routerLink="/new">Начать первую тренировку</a>
+      </div>
     } @else if (store.items().length === 0 && !store.error()) {
       <div class="empty-state">
         <span class="tui-text_body-m muted">Сессий и прогонов под выбранные фильтры нет.</span>

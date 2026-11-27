@@ -81,6 +81,32 @@
   gap: 0.5rem;
 }
 
+.winner-strip {
+  padding: 0.875rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.winner-strip-head h2 {
+  margin: 0;
+}
+
+.winner-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+}
+
+.winner-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--tui-radius-m);
+  background: var(--tui-background-neutral-1);
+}
+
 .compare-chip {
   display: inline-flex;
   align-items: center;

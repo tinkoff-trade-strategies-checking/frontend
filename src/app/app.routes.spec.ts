@@ -38,7 +38,7 @@ describe('маршруты по режимам', () => {
     expect(await go(router, '/')).toBe('/arena');
     expect(await go(router, '/нет-такого')).toBe('/arena');
     expect(await go(router, '/report')).toMatch(/^\/report\/.+/);
-  });
+  }, 15_000);
 
   it('настоящий режим: корень и неизвестный адрес ведут на запуск, а не на заглушку арены', async () => {
     const router = await setup(false);

@@ -49,7 +49,7 @@ test('фильтры, карточка алгоритма, неизменяем�
   await expect(detail).toContainText('W-LA01');
   await expect(detail).toContainText('неизменяема');
 
-  await expect(detail.getByRole('button', { name: 'Форк' })).toBeEnabled();
+  await expect(detail.getByRole('button', { name: 'Скопировать себе' })).toBeEnabled();
   await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toBeEnabled();
 
   await detail.getByRole('button', { name: 'Добавить в сравнение' }).click();
@@ -62,7 +62,7 @@ test('фильтры, карточка алгоритма, неизменяем�
   await page.getByRole('tab', { name: 'Мои алгоритмы' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(4);
 
-  await page.getByRole('button', { name: 'Без предупреждений линтера' }).click();
+  await page.getByRole('button', { name: 'Без предупреждений проверки' }).click();
   await expect(page.locator('tr[data-algo-id="A-0002"]')).toHaveCount(0);
   await expect(page.locator('tr[data-algo-id="A-0004"]')).toBeVisible();
 });
@@ -77,7 +77,7 @@ test('форк, проверка DSL с автоисправлением, пуб
   await expect(detail).toBeVisible();
 
   // Форк эталона открывает редактор черновика.
-  await detail.getByRole('button', { name: 'Форк' }).click();
+  await detail.getByRole('button', { name: 'Скопировать себе' }).click();
   await expect(detail.getByRole('heading', { name: 'Редактор черновика' })).toBeVisible();
   await expect(page.locator('#workshop-draft-name')).toHaveValue('Эталон платформы (форк)');
 

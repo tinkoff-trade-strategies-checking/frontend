@@ -44,15 +44,60 @@
     </div>
   </header>
 
-  @if (!readOnly() && !store.finished() && !guideDismissed()) {
-    <div tuiNotification appearance="info" size="s" class="guide-banner">
+  @if (showTour()) {
+    @let step = currentTourStep();
+    <div tuiNotification appearance="info" size="s" class="guide-banner" data-testid="arena-tour">
+      <div class="tour-content">
+        <div class="tour-head">
+          <span tuiBadge size="s" appearance="info">
+            Шаг {{ tourStep() + 1 }} из {{ tourSteps.length }}
+          </span>
+          <strong class="tui-text_body-s">{{ step.title }}</strong>
+        </div>
+        <span class="tui-text_body-s">{{ step.description }}</span>
+      </div>
+      <div class="tour-actions">
+        @if (tourStep() > 0) {
+          <button tuiButton type="button" size="xs" appearance="flat" (click)="prevTourStep()">
+            Назад
+          </button>
+        }
+        @if (tourStep() < tourSteps.length - 1) {
+          <button tuiButton type="button" size="xs" appearance="primary" (click)="nextTourStep()">
+            Далее
+          </button>
+          <button tuiButton type="button" size="xs" appearance="outline" (click)="dismissGuide()">
+            Пропустить
+          </button>
+        } @else {
+          <button tuiButton type="button" size="xs" appearance="primary" (click)="dismissGuide()">
+            Понятно
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (showPauseTrapCallout()) {
+    <div
+      tuiNotification
+      appearance="info"
+      size="s"
+      class="pause-trap-callout"
+      data-testid="arena-pause-callout"
+    >
       <span class="tui-text_body-s">
-        Как торговать: листайте свечи кнопкой «Следующая свеча» или «Пуск», выставляйте заявку
-        справа — она исполнится на открытии следующей свечи. Для разбора с алгоритмом нажмите
-        «Завершить сессию».
+        Заявка принята и сработает на следующей свече — нажмите «Шаг» или «Старт»
       </span>
-      <button tuiButton type="button" size="xs" appearance="outline" (click)="dismissGuide()">
-        Понятно
+      <button
+        tuiButton
+        type="button"
+        size="xs"
+        appearance="primary"
+        [disabled]="!store.canStep()"
+        (click)="store.stepOnce()"
+      >
+        Сделать шаг вперёд
       </button>
     </div>
   }
@@ -77,7 +122,7 @@
     </div>
   }
 
-  @if (store.notice()) {
+  @if (store.notice() && !showPauseTrapCallout()) {
     <div tuiNotification appearance="info" size="s">
       {{ store.notice() }}
     </div>
@@ -87,21 +132,23 @@
     <div tuiNotification appearance="info" size="s">Загрузка сессии…</div>
   }
 
-  <app-arena-player
-    [playing]="store.playing()"
-    [canStep]="store.canStep()"
-    [speed]="store.speed()"
-    [day]="store.day()"
-    [totalDays]="store.totalDays()"
-    [progressPct]="store.progressPct()"
-    (togglePlay)="store.togglePlay()"
-    (stepOnce)="store.stepOnce()"
-    (speedChange)="store.setSpeed($event)"
-  />
+  <div [class.tour-highlight]="showTour() && tourStep() === 2">
+    <app-arena-player
+      [playing]="store.playing()"
+      [canStep]="store.canStep()"
+      [speed]="store.speed()"
+      [day]="store.day()"
+      [totalDays]="store.totalDays()"
+      [progressPct]="store.progressPct()"
+      (togglePlay)="store.togglePlay()"
+      (stepOnce)="store.stepOnce()"
+      (speedChange)="store.setSpeed($event)"
+    />
+  </div>
 
   <div class="arena-grid">
     <div class="main-col">
-      <section class="panel">
+      <section class="panel" [class.tour-highlight]="showTour() && tourStep() === 0">
         <app-arena-paper-switcher
           [papers]="store.papers()"
           [selectedPaperId]="store.selectedPaperId()"
@@ -109,103 +156,122 @@
           (selectPaper)="store.selectPaper($event)"
         />
 
-        <div class="chart-toolbar">
-          <div class="toolbar-overlays">
-            <span class="tui-text_body-xs muted">Индикаторы</span>
+        @if (uiMode.isBasic()) {
+          <div class="chart-toolbar chart-toolbar-compact">
             <button
               tuiButton
               type="button"
               size="xs"
-              [appearance]="showSma20() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showSma20()"
-              [attr.aria-pressed]="showSma20()"
-              (click)="showSma20.set(!showSma20())"
+              [appearance]="taToolbarOpen() ? 'secondary' : 'outline'"
+              [class.indicator-active]="taToolbarOpen()"
+              [attr.aria-expanded]="taToolbarOpen()"
+              data-testid="arena-ta-toggle"
+              (click)="toggleTaToolbar()"
             >
-              SMA 20
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showSma50() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showSma50()"
-              [attr.aria-pressed]="showSma50()"
-              (click)="showSma50.set(!showSma50())"
-            >
-              SMA 50
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showEma20() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showEma20()"
-              [attr.aria-pressed]="showEma20()"
-              (click)="showEma20.set(!showEma20())"
-            >
-              EMA 20
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showEma50() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showEma50()"
-              [attr.aria-pressed]="showEma50()"
-              (click)="showEma50.set(!showEma50())"
-            >
-              EMA 50
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showBollinger() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showBollinger()"
-              [attr.aria-pressed]="showBollinger()"
-              (click)="showBollinger.set(!showBollinger())"
-            >
-              Bollinger
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showVwap() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showVwap()"
-              [attr.aria-pressed]="showVwap()"
-              (click)="showVwap.set(!showVwap())"
-            >
-              VWAP
+              {{ taToolbarOpen() ? 'Скрыть индикаторы и теханализ' : 'Индикаторы и теханализ' }}
             </button>
           </div>
+        }
 
-          <div class="toolbar-ta-controls">
-            <select
-              id="arena-oscillator-select"
-              class="oscillator-select"
-              aria-label="Осциллятор"
-              [value]="oscillator()"
-              (change)="onOscillatorChange($event)"
-            >
-              @for (opt of oscillatorOptions; track opt.id) {
-                <option [value]="opt.id">{{ opt.label }}</option>
-              }
-            </select>
+        @if (showTaControls()) {
+          <div class="chart-toolbar">
+            <div class="toolbar-overlays">
+              <span class="tui-text_body-xs muted">Индикаторы</span>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showSma20() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showSma20()"
+                [attr.aria-pressed]="showSma20()"
+                (click)="showSma20.set(!showSma20())"
+              >
+                SMA 20
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showSma50() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showSma50()"
+                [attr.aria-pressed]="showSma50()"
+                (click)="showSma50.set(!showSma50())"
+              >
+                SMA 50
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showEma20() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showEma20()"
+                [attr.aria-pressed]="showEma20()"
+                (click)="showEma20.set(!showEma20())"
+              >
+                EMA 20
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showEma50() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showEma50()"
+                [attr.aria-pressed]="showEma50()"
+                (click)="showEma50.set(!showEma50())"
+              >
+                EMA 50
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showBollinger() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showBollinger()"
+                [attr.aria-pressed]="showBollinger()"
+                (click)="showBollinger.set(!showBollinger())"
+              >
+                Bollinger
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showVwap() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showVwap()"
+                [attr.aria-pressed]="showVwap()"
+                (click)="showVwap.set(!showVwap())"
+              >
+                VWAP
+              </button>
+            </div>
 
-            <button
-              tuiButton
-              type="button"
-              size="xs"
-              [appearance]="showTaPanel() ? 'secondary' : 'outline'"
-              [class.indicator-active]="showTaPanel()"
-              [attr.aria-expanded]="showTaPanel()"
-              (click)="showTaPanel.set(!showTaPanel())"
-            >
-              Теханализ
-            </button>
+            <div class="toolbar-ta-controls">
+              <select
+                id="arena-oscillator-select"
+                class="oscillator-select"
+                aria-label="Осциллятор"
+                [value]="oscillator()"
+                (change)="onOscillatorChange($event)"
+              >
+                @for (opt of oscillatorOptions; track opt.id) {
+                  <option [value]="opt.id">{{ opt.label }}</option>
+                }
+              </select>
+
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                [appearance]="showTaPanel() ? 'secondary' : 'outline'"
+                [class.indicator-active]="showTaPanel()"
+                [attr.aria-expanded]="showTaPanel()"
+                (click)="showTaPanel.set(!showTaPanel())"
+              >
+                Теханализ
+              </button>
+            </div>
           </div>
-        </div>
+        }
 
         @if (store.selectedPaper(); as paper) {
           <div class="chart-box">
@@ -248,20 +314,22 @@
 
     <aside class="side-col">
       @if (!readOnly()) {
-        <app-arena-order-ticket
-          [papers]="store.papers()"
-          [selectedPaperId]="store.selectedPaperId()"
-          [step]="store.step()"
-          [portfolio]="store.portfolio()"
-          [finished]="store.finished()"
-          [editingOrder]="store.editingOrder()"
-          [estimate]="store.estimate()"
-          (paperSelect)="store.selectPaper($event)"
-          (estimateRequest)="store.estimateOrder($event)"
-          (submitOrder)="store.placeOrder($event)"
-          (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
-          (cancelEdit)="store.cancelEditOrder()"
-        />
+        <div [class.tour-highlight]="showTour() && tourStep() === 1">
+          <app-arena-order-ticket
+            [papers]="store.papers()"
+            [selectedPaperId]="store.selectedPaperId()"
+            [step]="store.step()"
+            [portfolio]="store.portfolio()"
+            [finished]="store.finished()"
+            [editingOrder]="store.editingOrder()"
+            [estimate]="store.estimate()"
+            (paperSelect)="store.selectPaper($event)"
+            (estimateRequest)="store.estimateOrder($event)"
+            (submitOrder)="store.placeOrder($event)"
+            (submitReplace)="store.replaceOrder($event.orderId, $event.draft)"
+            (cancelEdit)="store.cancelEditOrder()"
+          />
+        </div>
       }
 
       <app-arena-portfolio-panel

@@ -36,7 +36,7 @@ export const PORTFOLIO_COMPACT_THRESHOLD = 5;
             </div>
           </div>
           <div class="metric-item">
-            <span class="tui-text_body-xs muted">P&amp;L</span>
+            <span class="tui-text_body-xs muted">Прибыль / убыток</span>
             <div class="metric-values">
               @if (portfolio().pnlRub !== undefined) {
                 <span
@@ -150,15 +150,15 @@ export const PORTFOLIO_COMPACT_THRESHOLD = 5;
               <tr>
                 <th>Бумага</th>
                 <th class="num">Лоты</th>
-                <th class="num">Средняя</th>
-                <th class="num">P&amp;L</th>
+                <th class="num">Цена входа</th>
+                <th class="num">Прибыль</th>
               </tr>
             </thead>
             <tbody>
               @for (paper of visiblePapers(); track paper.id) {
                 @let pos = positionOf(paper.id);
                 <tr
-                  [class.clickable]="isCompactMode()"
+                  class="clickable"
                   [class.selected]="paper.id === selectedPaperId()"
                   (click)="onRowClick(paper.id)"
                 >
@@ -402,8 +402,6 @@ export class ArenaPortfolioPanel {
   }
 
   protected onRowClick(paperId: string): void {
-    if (this.isCompactMode()) {
-      this.selectPaper.emit(paperId);
-    }
+    this.selectPaper.emit(paperId);
   }
 }

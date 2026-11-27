@@ -10,6 +10,7 @@ import { ArenaChart } from './components/arena-chart';
 import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaCandle, ArenaFill, ArenaOrder } from './data/arena.models';
 import { StubArenaApi } from './data/stub-arena.api';
+import { UI_MODE_STORAGE_KEY, UiModeService } from '../../shared/ui-mode.service';
 
 @Component({
   selector: 'app-arena-chart',
@@ -35,6 +36,7 @@ describe('ArenaPage', () => {
 
   beforeEach(async () => {
     localStorage.removeItem('ttsc.arenaGuideDismissed');
+    localStorage.removeItem(UI_MODE_STORAGE_KEY);
     stubApi = new StubArenaApi();
     vi.spyOn(stubApi, 'estimateOrder').mockResolvedValue({ amountPct: 77.77 });
 
@@ -103,19 +105,36 @@ describe('ArenaPage', () => {
     expect(text).toContain('Бумага A');
     expect(text).toContain('Бумага B');
     expect(text).toContain('Бумага C');
-    expect(text).toContain('Выставить заявку');
+    expect(text).toContain('Купить 5 лот.');
     expect(text).toContain('Портфель');
     expect(text).toContain('Стоимость портфеля');
-    expect(text).toContain('P&L');
+    expect(text).toContain('Прибыль / убыток');
+    expect(text).toContain('Цена входа');
     expect(text).toContain('Снятые');
     expect(text).toContain('77,77 %');
 
+    // В Базовом режиме без позиции доступны только Рыночная и Лимитная, а срок действия (На день / До отмены) скрыт на рыночной.
     const typeSelect = root.querySelector('#arena-order-type') as HTMLSelectElement | null;
     expect(typeSelect).not.toBeNull();
-    const optionTexts = Array.from(typeSelect!.options).map((o) => o.textContent?.trim());
-    expect(optionTexts).toContain('Рыночная');
-    expect(optionTexts).toContain('OCO: стоп + тейк');
-    expect(optionTexts).not.toContain('market');
+    const basicOptions = Array.from(typeSelect!.options).map((o) => o.textContent?.trim());
+    expect(basicOptions).toEqual(['Рыночная', 'Лимитная']);
+    expect(basicOptions).not.toContain('market');
+    expect(root.querySelector('app-arena-order-ticket')?.textContent).not.toContain('На день');
+
+    // В режиме Профи с открытой позицией доступны все 7 типов заявок, включая OCO.
+    TestBed.inject(UiModeService).setMode('pro');
+    fixture.componentInstance['store'].portfolio.update((p) => ({
+      ...p,
+      positions: {
+        ...p.positions,
+        A: { paperId: 'A', lots: 10, avgPrice: 100, pnlPct: 0, valuePct: 10 },
+      },
+    }));
+    fixture.detectChanges();
+    const proOptions = Array.from(typeSelect!.options).map((o) => o.textContent?.trim());
+    expect(proOptions).toContain('Рыночная');
+    expect(proOptions).toContain('OCO: стоп + тейк');
+    expect(proOptions.length).toBe(7);
 
     // Подписи полей формы заявки расположены снаружи tui-textfield (не обрезаются у size="s").
     const ticketLabels = Array.from(
@@ -220,7 +239,7 @@ describe('ArenaPage', () => {
     expect(root.querySelectorAll('.equity-row .metric-item .metric-values').length).toBe(2);
   });
 
-  it('показывает сворачиваемый гид на активной арене, скрывает его по кнопке «Понятно» и не показывает в режиме только чтения', async () => {
+  it('показывает 3-шаговый микро-тур на активной арене, скрывает его по завершении и не показывает в режиме только чтения', async () => {
     const fixture = TestBed.createComponent(ArenaPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -228,21 +247,34 @@ describe('ArenaPage', () => {
     fixture.detectChanges();
 
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelector('.guide-banner')?.textContent).toContain('Как торговать:');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Шаг 1 из 3');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('График цены');
     expect(root.querySelector('app-arena-order-ticket')?.textContent).toContain(
       'Исполнение по цене открытия следующей свечи',
     );
 
-    const okBtn = Array.from(root.querySelectorAll('.guide-banner button')).find(
-      (b) => b.textContent?.trim() === 'Понятно',
-    ) as HTMLButtonElement | undefined;
-    okBtn?.click();
-    fixture.detectChanges();
+    const clickTourBtn = (label: string) => {
+      const btn = Array.from(root.querySelectorAll('.guide-banner button')).find(
+        (b) => b.textContent?.trim() === label,
+      ) as HTMLButtonElement | undefined;
+      expect(btn).toBeDefined();
+      btn!.click();
+      fixture.detectChanges();
+    };
 
+    clickTourBtn('Далее');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Шаг 2 из 3');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Панель покупки и продажи');
+
+    clickTourBtn('Далее');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Шаг 3 из 3');
+    expect(root.querySelector('.guide-banner')?.textContent).toContain('Кнопки «Шаг» и «Старт»');
+
+    clickTourBtn('Понятно');
     expect(root.querySelector('.guide-banner')).toBeNull();
     expect(localStorage.getItem('ttsc.arenaGuideDismissed')).toBe('1');
 
-    // В режиме только чтения (воспроизведение) гид не показывается даже с пустым localStorage.
+    // В режиме только чтения (воспроизведение) тур не показывается даже с пустым localStorage.
     localStorage.removeItem('ttsc.arenaGuideDismissed');
     const roFixture = TestBed.createComponent(ArenaPage);
     roFixture.componentRef.setInput('readOnly', true);
@@ -252,7 +284,49 @@ describe('ArenaPage', () => {
     expect((roFixture.nativeElement as HTMLElement).querySelector('.guide-banner')).toBeNull();
   });
 
-  it('открывает и сворачивает панель «Теханализ» и позволяет выбрать осциллятор', async () => {
+  it('INV-2: при отправке заявки на паузе показывает подсказку с кнопкой «Сделать шаг вперёд» и переключает бумагу по клику в портфеле', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const buyBtn = Array.from(root.querySelectorAll('app-arena-order-ticket button')).find((b) =>
+      b.textContent?.includes('Купить 5 лот.'),
+    ) as HTMLButtonElement | undefined;
+    expect(buyBtn).toBeDefined();
+    buyBtn!.click();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const callout = root.querySelector('[data-testid="arena-pause-callout"]');
+    expect(callout).not.toBeNull();
+    expect(callout?.textContent).toContain('Заявка принята и сработает на следующей свече');
+
+    const stepBtn = Array.from(callout!.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Сделать шаг вперёд'),
+    ) as HTMLButtonElement | undefined;
+    expect(stepBtn).toBeDefined();
+    stepBtn!.click();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    expect(root.querySelector('[data-testid="arena-pause-callout"]')).toBeNull();
+    expect(fixture.componentInstance['store'].day()).toBe(2);
+
+    // Клик по строке «Бумага B» в таблице портфеля переключает активную бумагу.
+    const rows = Array.from(root.querySelectorAll('app-arena-portfolio-panel tbody tr'));
+    const rowB = rows.find((r) => r.textContent?.includes('Бумага B')) as HTMLElement | undefined;
+    expect(rowB).toBeDefined();
+    rowB!.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['store'].selectedPaperId()).toBe('B');
+  });
+
+  it('в Базовом режиме скрывает панель ТА за переключателем, а при раскрытии открывает «Теханализ» и осциллятор', async () => {
     const fixture = TestBed.createComponent(ArenaPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -261,6 +335,12 @@ describe('ArenaPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('app-arena-ta-summary')).toBeNull();
+    expect(root.querySelector('#arena-oscillator-select')).toBeNull();
+
+    const toggleBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-ta-toggle"]');
+    expect(toggleBtn).not.toBeNull();
+    toggleBtn!.click();
+    fixture.detectChanges();
 
     const taButton = Array.from(root.querySelectorAll('button')).find(
       (b) => b.textContent?.trim() === 'Теханализ',

@@ -34,7 +34,7 @@ export const LAUNCH_PRESETS: readonly LaunchPreset[] = [
     id: 'quick',
     title: 'Быстрая тренировка',
     badge: 'Рекомендуем',
-    specs: '20 дн. · 1д · 3 случайные бумаги · средний рынок',
+    specs: '20 дн. · 1 свеча = 1 день · 3 случайные бумаги · средний рынок',
     description: 'Короткий слепой заход, чтобы быстро освоить арену и увидеть разбор ошибок',
     durationDays: 20,
     timeframe: '1d',
@@ -45,7 +45,7 @@ export const LAUNCH_PRESETS: readonly LaunchPreset[] = [
   {
     id: 'quarter',
     title: 'Полноценный квартал',
-    specs: '60 дн. · 1д · 3 случайные бумаги · средний рынок',
+    specs: '60 дн. · 1 свеча = 1 день · 3 случайные бумаги · средний рынок',
     description: 'Основной учебный горизонт: проверка дисциплины на разных фазах рынка',
     durationDays: 60,
     timeframe: '1d',
@@ -56,7 +56,7 @@ export const LAUNCH_PRESETS: readonly LaunchPreset[] = [
   {
     id: 'stress',
     title: 'Стресс-тест рынка',
-    specs: '60 дн. · 1д · 3 случайные бумаги · стрессовый период',
+    specs: '60 дн. · 1 свеча = 1 день · 3 случайные бумаги · стрессовый период',
     description: 'Период повышенной волатильности: испытание на просадку и стопы',
     durationDays: 60,
     timeframe: '1d',
@@ -148,10 +148,25 @@ export const TIMEFRAME_LABELS: Readonly<Record<CandleTimeframe, string>> = {
   '1d': '1 д',
 };
 
+export const TIMEFRAME_HUMAN_HINTS: Readonly<Record<CandleTimeframe, string>> = {
+  '1m': '1 свеча = 1 минута',
+  '5m': '1 свеча = 5 минут',
+  '10m': '1 свеча = 10 минут',
+  '15m': '1 свеча = 15 минут',
+  '1h': '1 свеча = 1 час',
+  '1d': '1 свеча = 1 день',
+};
+
 export const REGIME_LABELS: Readonly<Record<MarketRegime, string>> = {
   calm: 'Спокойный',
   medium: 'Средний',
   stress: 'Стрессовый',
+};
+
+export const REGIME_HINTS_BASIC: Readonly<Record<MarketRegime, string>> = {
+  calm: 'Спокойный рынок без резких скачков и глубоких падений',
+  medium: 'Умеренные колебания рынка между спокойным и стрессовым',
+  stress: 'Резкие колебания и сильные падения — испытание на выдержку',
 };
 
 export const REGIME_HINTS: Readonly<Record<MarketRegime, string>> = {

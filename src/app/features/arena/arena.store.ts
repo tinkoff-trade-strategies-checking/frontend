@@ -93,6 +93,8 @@ export class ArenaStore {
   readonly speed = signal<ArenaSpeed>(1);
   readonly error = signal<string | null>(null);
   readonly notice = signal<string | null>(null);
+  /** Заявка принята, пока плеер на паузе (INV-2): подсказываем сделать шаг или нажать «Пуск». */
+  readonly pendingOrderWhilePaused = signal(false);
   /** Отчёт готов (событие `report_ready`). */
   readonly reportReady = signal(false);
   readonly editingOrder = signal<ArenaOrder | null>(null);
@@ -135,6 +137,7 @@ export class ArenaStore {
       this.loading.set(true);
       this.error.set(null);
       this.notice.set(null);
+      this.pendingOrderWhilePaused.set(false);
       this.reportReady.set(false);
       this.stopLocal();
       this.closeEvents();
@@ -233,6 +236,7 @@ export class ArenaStore {
     if (this.playing()) {
       this.pause();
     } else if (this.canStep()) {
+      this.pendingOrderWhilePaused.set(false);
       if (this.serverDriven) {
         void this.command('play');
         return;
@@ -282,6 +286,7 @@ export class ArenaStore {
       this.stepping = true;
       this.error.set(null);
       this.notice.set(null);
+      this.pendingOrderWhilePaused.set(false);
 
       try {
         const res = await this.api.step(this.stepsPerTick());
@@ -321,6 +326,9 @@ export class ArenaStore {
           trailingPct: draft.trailingPct,
         });
         this.applyCommandResult(result, 'Заявка выставлена.');
+        if (result.accepted && !this.playing() && !this.finished()) {
+          this.pendingOrderWhilePaused.set(true);
+        }
         return result;
       } catch (err) {
         this.error.set(messageOf(err, 'Не удалось выставить заявку.'));
@@ -404,6 +412,7 @@ export class ArenaStore {
       try {
         const res = await this.api.finishSession();
         this.finished.set(true);
+        this.pendingOrderWhilePaused.set(false);
         this.portfolio.set(res.portfolio);
         if (res.orders) {
           this.orders.set(res.partial ? mergeById(this.orders(), res.orders) : res.orders);
@@ -603,6 +612,7 @@ export class ArenaStore {
     }
     switch (event.type) {
       case 'step':
+        this.pendingOrderWhilePaused.set(false);
         if (this.finished()) {
           this.stopLocal();
         }

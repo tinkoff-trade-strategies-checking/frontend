@@ -160,6 +160,23 @@
       </div>
     }
 
+    @if (winnerSummary().length > 0) {
+      <section class="panel winner-strip" aria-label="Кто выиграл" data-testid="compare-winners">
+        <div class="winner-strip-head">
+          <h2 class="tui-text_h6">Кто выиграл</h2>
+        </div>
+        <div class="winner-cards">
+          @for (item of winnerSummary(); track item.category) {
+            <div class="winner-card">
+              <span class="tui-text_body-xs muted">{{ item.category }}</span>
+              <strong class="tui-text_body-m">{{ item.algorithmName }}</strong>
+              <span class="tui-text_body-s pos-val num">{{ item.value }}</span>
+            </div>
+          }
+        </div>
+      </section>
+    }
+
     @if (store.chartSeries().length > 0) {
       <section class="panel chart-panel">
         <div class="panel-head">
@@ -175,6 +192,23 @@
     }
 
     <section class="panel table-panel">
+      <div class="panel-head">
+        <h2 class="tui-text_h6">
+          {{ displayAllMetrics() ? 'Все 11 метрик' : 'Главные 4 метрики' }}
+        </h2>
+        @if (uiMode.isBasic()) {
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="outline"
+            data-testid="compare-metrics-toggle"
+            (click)="toggleShowAllMetrics()"
+          >
+            {{ displayAllMetrics() ? 'Показать главные 4' : 'Показать все 11' }}
+          </button>
+        }
+      </div>
       <div class="table-scroll">
         <table class="compare-table">
           <thead>
@@ -282,7 +316,7 @@
                 </td>
               }
             </tr>
-            @for (row of metricRows; track row.key) {
+            @for (row of visibleMetricRows(); track row.key) {
               <tr>
                 <td>{{ row.label }}</td>
                 @for (item of store.entries(); track item.id) {

@@ -18,6 +18,7 @@ export class HistoryStore {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly pageData = signal<HistoryPageData | null>(null);
+  readonly unfilteredTotal = signal<number | null>(null);
 
   readonly kind = signal<HistoryKindFilter>('all');
   readonly blindOnly = signal(false);
@@ -31,11 +32,24 @@ export class HistoryStore {
   readonly totalPages = computed(() => this.pageData()?.totalPages ?? 1);
   readonly hasPrevPage = computed(() => this.currentPage() > 1);
   readonly hasNextPage = computed(() => this.currentPage() < this.totalPages());
+  readonly hasActiveFilters = computed(
+    () =>
+      this.kind() !== 'all' ||
+      this.status() !== 'all' ||
+      this.regime() !== 'all' ||
+      this.blindOnly(),
+  );
 
   async load(): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
+
+    const isUnfiltered =
+      this.kind() === 'all' &&
+      this.status() === 'all' &&
+      this.regime() === 'all' &&
+      !this.blindOnly();
 
     try {
       const data = await this.api.list({
@@ -50,6 +64,9 @@ export class HistoryStore {
         return;
       }
       this.pageData.set({ ...data, items: data.items.map(maskHistoryEntry) });
+      if (isUnfiltered) {
+        this.unfilteredTotal.set(data.total);
+      }
       this.page.set(data.page);
     } catch (error) {
       if (seq !== this.loadSeq) {

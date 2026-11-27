@@ -159,6 +159,9 @@ describe('HistoryPage', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
+    // Даём NgModel внутри смонтированного по @if(showFilters()) HistoryFilters завершить инициализацию.
+    await fixture.whenStable();
+    fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     const statusSelect = el.querySelector(
@@ -573,5 +576,69 @@ describe('HistoryPage: ошибка и утечки', () => {
     expect(negTinyCell?.classList.contains('neg')).toBe(false);
 
     expect(posRealCell?.classList.contains('pos')).toBe(true);
+  });
+
+  it('при пустой истории без фильтров показывает онбординг-карточку и скрывает фильтры', async () => {
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          { provide: HISTORY_API, useValue: { list: async () => emptyPage() } },
+          { provide: RUNS_API, useValue: new StubRunsApi() },
+          HistoryStore,
+        ],
+      },
+    });
+
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-history-filters')).toBeNull();
+    expect(el.textContent).toContain('Здесь будет история ваших тренировок');
+    const cta = el.querySelector<HTMLAnchorElement>('.onboarding-card a[href="/new"]');
+    expect(cta?.textContent?.trim()).toBe('Начать первую тренировку');
+  });
+
+  it('скрывает фильтры при total < 5 без активных фильтров и добавляет подсказку к «Только слепые» при >= 5', async () => {
+    const stub = new StubHistoryApi();
+    const threeItems = (await stub.list({ page: 1 })).items.slice(0, 3);
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          {
+            provide: HISTORY_API,
+            useValue: { list: async () => ({ ...emptyPage(), items: threeItems, total: 3 }) },
+          },
+          { provide: RUNS_API, useValue: new StubRunsApi() },
+          HistoryStore,
+        ],
+      },
+    });
+
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-history-filters')).toBeNull();
+    expect(el.querySelectorAll('tbody tr').length).toBe(3);
+
+    // С полной заглушкой (>= 5 записей) фильтры и подсказка у «Только слепые» отображаются.
+    TestBed.resetTestingModule();
+    await TestBed.configureTestingModule({
+      imports: [HistoryPage],
+      providers: [provideRouter([]), provideTaiga()],
+    }).compileComponents();
+    const fullFixture = TestBed.createComponent(HistoryPage);
+    fullFixture.detectChanges();
+    await fullFixture.whenStable();
+    fullFixture.detectChanges();
+
+    const fullEl = fullFixture.nativeElement as HTMLElement;
+    expect(fullEl.querySelector('app-history-filters')).not.toBeNull();
+    expect(fullEl.querySelector('app-history-filters app-term-hint')).not.toBeNull();
   });
 });

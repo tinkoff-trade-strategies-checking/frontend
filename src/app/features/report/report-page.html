@@ -159,10 +159,16 @@
         </div>
       }
 
-      <section class="panel verdict-hero" aria-label="Итог сессии">
+      <section class="panel verdict-hero" aria-label="Главный итог сессии">
         <div class="verdict-main">
           <div class="verdict-metric">
-            <span class="tui-text_body-xs muted">Ваш итог после издержек</span>
+            <span class="tui-text_body-xs muted verdict-eyebrow">
+              Главный итог
+              <app-term-hint
+                term="Чистая доходность"
+                text="Итоговый результат в процентах уже после вычета всех комиссий, спреда и проскальзывания."
+              />
+            </span>
             <strong
               class="tui-text_h2 num"
               [class.pos]="pctSign(rep.humanMetrics.netReturnPct) > 0"
@@ -170,9 +176,22 @@
             >
               {{ formatPct(rep.humanMetrics.netReturnPct, true) }}
             </strong>
+            <span class="tui-text_body-xs muted num">
+              До комиссий {{ formatPct(rep.humanMetrics.grossReturnPct, true) }} → Чистыми
+              {{ formatPct(rep.humanMetrics.netReturnPct, true) }}
+            </span>
           </div>
           <div class="verdict-copy">
             <p class="tui-text_body-l verdict-sentence">{{ verdictText(rep) }}</p>
+            @if (benchmarkVerdictText(rep); as benchVerdict) {
+              <p class="tui-text_body-s muted verdict-benchmark">
+                {{ benchVerdict }}
+                <app-term-hint
+                  term="IMOEX"
+                  text="Индекс Московской биржи — показывает, как в среднем двигался весь российский рынок акций за этот период."
+                />
+              </p>
+            }
             @if (rep.playedDays <= 5) {
               <p class="tui-text_body-xs muted verdict-note">
                 Короткий отрезок — для надёжной оценки пройдите больше дней.
@@ -184,6 +203,16 @@
           <button tuiButton type="button" size="s" appearance="primary" (click)="goToDivergences()">
             Разобрать расхождения
           </button>
+          <a
+            tuiButton
+            size="s"
+            appearance="outline"
+            routerLink="/new"
+            [queryParams]="repeatPeriodQueryParams(rep)"
+            data-testid="repeat-period-link"
+          >
+            Пройти этот же период ещё раз
+          </a>
           <a tuiButton size="s" appearance="outline" routerLink="/new">Новая сессия</a>
         </div>
       </section>
@@ -312,7 +341,7 @@
         }
       </section>
 
-      <div class="charts-grid">
+      <div class="charts-grid" [class.charts-grid-single]="!showDetailedStats()">
         <section class="panel">
           <div class="panel-header">
             <h2 class="tui-text_h6">Кривая капитала</h2>
@@ -323,20 +352,48 @@
           </div>
         </section>
 
-        <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Underwater-просадка</h2>
-            <span class="tui-text_body-xs muted">Отставание от пика, %</span>
-          </div>
-          <div class="chart-pad">
-            @if (rep.underwaterCurve; as underwater) {
-              <app-report-underwater-chart [points]="underwater" />
-            } @else {
-              <div class="empty-state tui-text_body-s muted">Нет данных</div>
-            }
-          </div>
-        </section>
+        @if (showDetailedStats()) {
+          <section class="panel">
+            <div class="panel-header">
+              <h2 class="tui-text_h6">
+                Глубина падений от максимума
+                <app-term-hint
+                  term="Глубина падений от максимума"
+                  text="Показывает, на сколько процентов портфель временно падал от своего прошлого рекорда."
+                />
+              </h2>
+              <span class="tui-text_body-xs muted">Отставание от пика, %</span>
+            </div>
+            <div class="chart-pad">
+              @if (rep.underwaterCurve; as underwater) {
+                <app-report-underwater-chart [points]="underwater" />
+              } @else {
+                <div class="empty-state tui-text_body-s muted">Нет данных</div>
+              }
+            </div>
+          </section>
+        }
       </div>
+
+      @if (uiMode.isBasic()) {
+        <div class="details-accordion-bar">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            data-testid="report-details-toggle"
+            [attr.aria-expanded]="showDetailedStats()"
+            (click)="toggleDetailedStats()"
+          >
+            {{
+              showDetailedStats()
+                ? 'Скрыть подробную статистику'
+                : 'Подробная статистика (график падений, Sharpe, Sortino, HHI…)'
+            }}
+          </button>
+        </div>
+      }
 
       <section #detailsTabsSection class="panel">
         <div class="panel-header">
@@ -369,35 +426,33 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Total (итоговая доходность)</td>
-                    <td class="num">{{ formatPct(hm.totalReturnPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>CAGR (годовая)</td>
-                    <td class="num">{{ formatPct(hm.cagrPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Gross (до комиссий и сбора)</td>
-                    <td class="num">{{ formatPct(hm.grossReturnPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Net (после издержек)</td>
+                    <td>
+                      Доходность чистыми (Net)
+                      <app-term-hint
+                        term="Чистая доходность"
+                        text="Сколько процентов вы заработали или потеряли после вычета комиссий и спреда."
+                      />
+                    </td>
                     <td class="num">{{ formatPct(hm.netReturnPct, true) }}</td>
                     @if (am) {
                       <td class="num">{{ formatPct(am.netReturnPct, true) }}</td>
                     }
                   </tr>
                   <tr>
-                    <td>Макс. просадка</td>
+                    <td>До комиссий (Gross)</td>
+                    <td class="num">{{ formatPct(hm.grossReturnPct, true) }}</td>
+                    @if (am) {
+                      <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
+                    }
+                  </tr>
+                  <tr>
+                    <td>
+                      Макс. просадка
+                      <app-term-hint
+                        term="Максимальная просадка"
+                        text="Самое глубокое падение стоимости портфеля от пика до дна за всю сессию."
+                      />
+                    </td>
                     <td class="num" [class.neg]="pctSign(hm.maxDrawdownPct) !== 0">
                       {{ formatDrawdown(hm.maxDrawdownPct) }}
                     </td>
@@ -407,58 +462,88 @@
                       </td>
                     }
                   </tr>
-                  <tr>
-                    <td>Длительность просадки</td>
-                    <td class="num">
-                      {{
-                        formatDrawdownDuration(
-                          hm.maxDrawdownDurationDays,
-                          hm.maxDrawdownDurationSteps
-                        )
-                      }}
-                    </td>
-                    @if (am) {
+                  @if (showDetailedStats()) {
+                    <tr>
+                      <td>Total (итоговая доходность)</td>
+                      <td class="num">{{ formatPct(hm.totalReturnPct, true) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>
+                        CAGR (годовая)
+                        <app-term-hint
+                          term="CAGR"
+                          text="Среднегодовая доходность — сколько бы получилось за целый год при таком же темпе."
+                        />
+                      </td>
+                      <td class="num">{{ formatPct(hm.cagrPct, true) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Длительность просадки</td>
                       <td class="num">
                         {{
                           formatDrawdownDuration(
-                            am.maxDrawdownDurationDays,
-                            am.maxDrawdownDurationSteps
+                            hm.maxDrawdownDurationDays,
+                            hm.maxDrawdownDurationSteps
                           )
                         }}
                       </td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Волатильность (год.)</td>
-                    <td class="num">{{ formatPct(hm.volatilityPct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.volatilityPct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>
-                      Sharpe (rf = RUONIA)
-                      @if (rep.playedDays < 10) {
-                        <span class="tui-text_body-xs muted">(малая выборка)</span>
+                      @if (am) {
+                        <td class="num">
+                          {{
+                            formatDrawdownDuration(
+                              am.maxDrawdownDurationDays,
+                              am.maxDrawdownDurationSteps
+                            )
+                          }}
+                        </td>
                       }
-                    </td>
-                    <td class="num">{{ formatRatio(hm.sharpe) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.sharpe) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>
-                      Sortino (rf = RUONIA)
-                      @if (rep.playedDays < 10) {
-                        <span class="tui-text_body-xs muted">(малая выборка)</span>
+                    </tr>
+                    <tr>
+                      <td>Волатильность (год.)</td>
+                      <td class="num">{{ formatPct(hm.volatilityPct) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatPct(am.volatilityPct) }}</td>
                       }
-                    </td>
-                    <td class="num">{{ formatRatio(hm.sortino) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.sortino) }}</td>
-                    }
-                  </tr>
+                    </tr>
+                    <tr>
+                      <td>
+                        Sharpe (rf = RUONIA)
+                        <app-term-hint
+                          term="Коэффициент Шарпа"
+                          text="Отношение доходности к риску. Чем выше значение, тем стабильнее результат."
+                        />
+                        @if (rep.playedDays < 10) {
+                          <span class="tui-text_body-xs muted">(малая выборка)</span>
+                        }
+                      </td>
+                      <td class="num">{{ formatRatio(hm.sharpe) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRatio(am.sharpe) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>
+                        Sortino (rf = RUONIA)
+                        <app-term-hint
+                          term="Коэффициент Сортино"
+                          text="Как Шарп, но наказывает только за падения, а не за резкий рост."
+                        />
+                        @if (rep.playedDays < 10) {
+                          <span class="tui-text_body-xs muted">(малая выборка)</span>
+                        }
+                      </td>
+                      <td class="num">{{ formatRatio(hm.sortino) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRatio(am.sortino) }}</td>
+                      }
+                    </tr>
+                  }
                 </tbody>
               </table>
               <div class="benchmark-note tui-text_body-s">
@@ -480,78 +565,102 @@
                   </tr>
                 </thead>
                 <tbody>
+                  @if (showDetailedStats()) {
+                    <tr>
+                      <td>Оборот</td>
+                      <td class="num">{{ formatRatio(hm.turnover) }}×</td>
+                      @if (am) {
+                        <td class="num">{{ formatRatio(am.turnover) }}×</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Закрытых сделок (пары FIFO)</td>
+                      <td class="num">{{ hm.tradesCount }}</td>
+                      @if (am) {
+                        <td class="num">{{ am.tradesCount }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Win rate</td>
+                      <td class="num">{{ formatPct(hm.winRatePct) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatPct(am.winRatePct) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Отказов / частичных исполнений</td>
+                      <td class="num">{{ hm.rejectedOrdersCount }} / {{ hm.partialFillsCount }}</td>
+                      @if (am) {
+                        <td class="num">
+                          {{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}
+                        </td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>
+                        HHI (концентрация)
+                        <app-term-hint
+                          term="HHI"
+                          text="Показатель концентрации портфеля: чем ближе к 1, тем сильнее капитал сосредоточен в одной бумаге."
+                        />
+                      </td>
+                      <td class="num">{{ formatRatio(hm.hhi) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRatio(am.hhi) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Крупнейшая позиция</td>
+                      <td class="num">{{ formatPct(hm.largestPositionPct) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Издержки: комиссия брокера</td>
+                      <td class="num">{{ formatRub(hm.costsRub.commissionRub) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Издержки: биржевой сбор</td>
+                      <td class="num">{{ formatRub(hm.costsRub.exchangeFeeRub) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Издержки: спред</td>
+                      <td class="num">{{ formatRub(hm.costsRub.spreadRub) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
+                      }
+                    </tr>
+                    <tr>
+                      <td>Издержки: проскальзывание</td>
+                      <td class="num">{{ formatRub(hm.costsRub.slippageRub) }}</td>
+                      @if (am) {
+                        <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
+                      }
+                    </tr>
+                  } @else {
+                    <tr>
+                      <td>Закрытых сделок</td>
+                      <td class="num">{{ hm.tradesCount }}</td>
+                      @if (am) {
+                        <td class="num">{{ am.tradesCount }}</td>
+                      }
+                    </tr>
+                  }
                   <tr>
-                    <td>Оборот</td>
-                    <td class="num">{{ formatRatio(hm.turnover) }}×</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.turnover) }}×</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Закрытых сделок (пары FIFO)</td>
-                    <td class="num">{{ hm.tradesCount }}</td>
-                    @if (am) {
-                      <td class="num">{{ am.tradesCount }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Win rate</td>
-                    <td class="num">{{ formatPct(hm.winRatePct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.winRatePct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Отказов / частичных исполнений</td>
-                    <td class="num">{{ hm.rejectedOrdersCount }} / {{ hm.partialFillsCount }}</td>
-                    @if (am) {
-                      <td class="num">{{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>HHI (концентрация)</td>
-                    <td class="num">{{ formatRatio(hm.hhi) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.hhi) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Крупнейшая позиция</td>
-                    <td class="num">{{ formatPct(hm.largestPositionPct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: комиссия брокера</td>
-                    <td class="num">{{ formatRub(hm.costsRub.commissionRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: биржевой сбор</td>
-                    <td class="num">{{ formatRub(hm.costsRub.exchangeFeeRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: спред</td>
-                    <td class="num">{{ formatRub(hm.costsRub.spreadRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: проскальзывание</td>
-                    <td class="num">{{ formatRub(hm.costsRub.slippageRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td><strong>Издержки всего</strong></td>
+                    <td>
+                      <strong>Издержки всего</strong>
+                      <app-term-hint
+                        term="Издержки"
+                        text="Сумма комиссий брокера, биржевого сбора, спреда и проскальзывания за все сделки."
+                      />
+                    </td>
                     <td class="num">
                       <strong>{{ formatRub(hm.costsRub.totalRub) }}</strong>
                     </td>

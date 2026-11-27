@@ -92,7 +92,7 @@ describe('WorkshopPage', () => {
     expect(el.querySelector('tr[data-algo-id="A-0004"]')).not.toBeNull();
 
     const cleanBtn = Array.from(el.querySelectorAll('button')).find(
-      (b) => b.textContent?.trim() === 'Без предупреждений линтера',
+      (b) => b.textContent?.trim() === 'Без предупреждений проверки',
     );
     cleanBtn?.click();
     await fixture.whenStable();
@@ -145,7 +145,7 @@ describe('WorkshopPage', () => {
     expect(detailText).toContain('v1');
 
     const buttons = Array.from(detail?.querySelectorAll('button') ?? []);
-    const forkBtn = buttons.find((b) => b.textContent?.trim() === 'Форк') as
+    const forkBtn = buttons.find((b) => b.textContent?.trim() === 'Скопировать себе') as
       HTMLButtonElement | undefined;
     const runBtn = buttons.find((b) => b.textContent?.trim() === 'Запустить прогон') as
       HTMLButtonElement | undefined;
@@ -532,7 +532,7 @@ describe('WorkshopPage', () => {
     expect(el.querySelector('tr[data-algo-id="A-0002"]')?.textContent).toContain('Приватный');
 
     const forkBtn = Array.from(el.querySelectorAll<HTMLButtonElement>('.detail-panel button')).find(
-      (b) => b.textContent?.trim() === 'Форк',
+      (b) => b.textContent?.trim() === 'Скопировать себе',
     );
     forkBtn?.click();
     await fixture.whenStable();

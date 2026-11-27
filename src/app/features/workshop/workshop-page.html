@@ -173,7 +173,7 @@
             [attr.aria-pressed]="store.cleanOnly()"
             (click)="store.toggleCleanOnly()"
           >
-            Без предупреждений линтера
+            Без предупреждений проверки
           </button>
           <span class="tui-text_body-s muted count-label">Всего: {{ store.total() }}</span>
         </div>
@@ -239,7 +239,7 @@
                 <th>Автор</th>
                 <th>Версия</th>
                 <th>Публикация</th>
-                <th>Линтер</th>
+                <th>Проверка</th>
                 <th class="actions-col">Карточка</th>
               </tr>
             </thead>
@@ -258,9 +258,22 @@
                           <span tuiBadge size="s" appearance="warning">Черновик</span>
                         }
                         @if (item.visibility === 'public') {
-                          <span tuiBadge size="s" appearance="neutral">Публичный</span>
+                          <span
+                            tuiBadge
+                            size="s"
+                            appearance="neutral"
+                            [attr.title]="visibilityDescription('public')"
+                          >
+                            Публичный
+                          </span>
                         } @else if (item.visibility === 'closed') {
-                          <span tuiBadge size="s" appearance="info" class="closed-code-badge">
+                          <span
+                            tuiBadge
+                            size="s"
+                            appearance="info"
+                            class="closed-code-badge"
+                            [attr.title]="visibilityDescription('closed')"
+                          >
                             <svg
                               class="lock-icon"
                               viewBox="0 0 16 16"
@@ -286,7 +299,14 @@
                             Закрытый код
                           </span>
                         } @else {
-                          <span tuiBadge size="s" appearance="warning">Приватный</span>
+                          <span
+                            tuiBadge
+                            size="s"
+                            appearance="warning"
+                            [attr.title]="visibilityDescription('hidden')"
+                          >
+                            Приватный
+                          </span>
                         }
                       </div>
                       <p class="tui-text_body-xs muted desc-preview">{{ item.description }}</p>
@@ -435,9 +455,22 @@
                     <span tuiBadge size="s" appearance="warning">Черновик</span>
                   }
                   @if (algo.visibility === 'public') {
-                    <span tuiBadge size="s" appearance="neutral">Публичный</span>
+                    <span
+                      tuiBadge
+                      size="s"
+                      appearance="neutral"
+                      [attr.title]="visibilityDescription('public')"
+                    >
+                      Публичный
+                    </span>
                   } @else if (algo.visibility === 'closed') {
-                    <span tuiBadge size="s" appearance="info" class="closed-code-badge">
+                    <span
+                      tuiBadge
+                      size="s"
+                      appearance="info"
+                      class="closed-code-badge"
+                      [attr.title]="visibilityDescription('closed')"
+                    >
                       <svg class="lock-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                         <rect
                           x="3"
@@ -458,7 +491,14 @@
                       Закрытый код
                     </span>
                   } @else {
-                    <span tuiBadge size="s" appearance="warning">Приватный</span>
+                    <span
+                      tuiBadge
+                      size="s"
+                      appearance="warning"
+                      [attr.title]="visibilityDescription('hidden')"
+                    >
+                      Приватный
+                    </span>
                   }
                 </div>
               </div>
@@ -519,12 +559,12 @@
                   [disabled]="algo.latestVersion === 0 || store.forking()"
                   [title]="
                     algo.latestVersion === 0
-                      ? 'Нельзя сделать форк неопубликованного черновика'
-                      : ''
+                      ? 'Нельзя скопировать неопубликованный черновик'
+                      : 'Создать свою копию алгоритма для редактирования'
                   "
                   (click)="store.forkAlgorithm(algo.id, algo.latestVersion)"
                 >
-                  Форк
+                  Скопировать себе
                 </button>
               }
 
@@ -629,7 +669,7 @@
 
             @if (algo.latestVersion === 0) {
               <p class="tui-text_body-xs muted">
-                Черновик без опубликованной версии — для запуска прогона или форка сначала
+                Черновик без опубликованной версии — для запуска прогона или копирования сначала
                 опубликуйте версию.
               </p>
             }
@@ -680,7 +720,7 @@
 
             <section class="detail-section">
               <div class="section-head">
-                <h3 class="tui-text_h6">Предупреждения линтера</h3>
+                <h3 class="tui-text_h6">Результаты проверки</h3>
                 @if (algo.linterWarnings.length === 0) {
                   <span tuiBadge size="s" appearance="positive">Чисто</span>
                 } @else {
@@ -691,10 +731,10 @@
               </div>
 
               @if (algo.linterWarnings.length === 0) {
-                <p class="tui-text_body-s muted">Предупреждений линтера нет.</p>
+                <p class="tui-text_body-s muted">Предупреждений проверки нет.</p>
               } @else {
                 <p class="tui-text_body-xs muted">
-                  Предупреждения линтера приведены как ознакомительный пример.
+                  Предупреждения проверки приведены как ознакомительный пример.
                 </p>
                 <ul class="warnings-list">
                   @for (warn of algo.linterWarnings; track warn.code + '-' + warn.line) {

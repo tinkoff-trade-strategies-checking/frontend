@@ -168,8 +168,9 @@ test('рыночная заявка → после следующей свечи
   await expect(activeBadge).toHaveText('0');
   await expect(fillsBadge).toHaveText('0');
 
-  await page.getByRole('button', { name: 'Выставить заявку' }).click();
+  await page.getByRole('button', { name: /Купить \d+ лот\./ }).click();
   await expect(activeBadge).toHaveText('1');
+  await expect(page.getByTestId('arena-pause-callout')).toBeVisible();
 
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
 

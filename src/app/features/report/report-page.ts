@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   inject,
@@ -15,6 +16,8 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
+import { TermHint } from '../../shared/term-hint/term-hint';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { DivergenceType, EquityCurvePoint, REPORT_API, SessionReport } from './data/report.models';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
@@ -68,6 +71,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
     ReportEquityChart,
     ReportUnderwaterChart,
     PapersReveal,
+    TermHint,
   ],
   providers: [{ provide: REPORT_API, useClass: REPORT_API_IMPL }, ReportStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -76,6 +80,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
 })
 export class ReportPage implements OnInit {
   protected readonly store = inject(ReportStore);
+  protected readonly uiMode = inject(UiModeService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -85,6 +90,14 @@ export class ReportPage implements OnInit {
   protected readonly stubMode = inject(STUB_MODE);
   protected readonly exporting = signal(false);
   protected readonly exportError = signal<string | null>(null);
+  protected readonly detailsExpanded = signal(false);
+  protected readonly showDetailedStats = computed(
+    () => this.uiMode.isPro() || this.detailsExpanded(),
+  );
+
+  protected toggleDetailedStats(): void {
+    this.detailsExpanded.update((open) => !open);
+  }
 
   protected readonly tabs = REPORT_TABS;
   protected readonly divergenceFilters = DIVERGENCE_FILTERS;
@@ -199,6 +212,37 @@ export class ReportPage implements OnInit {
       return `Вы обогнали алгоритм${algoName} на ${diffPp}.`;
     }
     return `Алгоритм${algoName} оказался впереди на ${diffPp}.`;
+  }
+
+  /** INV-6: сравнение с IMOEX использует только готовые поля ответа API без клиентской арифметики. */
+  protected benchmarkVerdictText(rep: SessionReport): string | null {
+    const bench = rep.humanMetrics.benchmarkImoexPct;
+    if (bench === null) {
+      return null;
+    }
+    const net = rep.humanMetrics.netReturnPct;
+    const benchStr = formatPct(bench, true);
+    if (Math.abs(net - bench) < 0.005) {
+      return `Рынок (IMOEX): ${benchStr} — результат на уровне рынка.`;
+    }
+    if (net > bench) {
+      return `Рынок (IMOEX): ${benchStr} — вы обогнали рынок.`;
+    }
+    return `Рынок (IMOEX): ${benchStr} — рынок вырос сильнее.`;
+  }
+
+  protected repeatPeriodQueryParams(rep: SessionReport): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      startDate: rep.period.startDate,
+      duration: rep.totalDays,
+      timeframe: rep.timeframe,
+      regime: rep.regime,
+    };
+    const tickers = rep.papers.map((p) => p.ticker).filter(Boolean);
+    if (tickers.length > 0) {
+      params['papers'] = tickers.join(',');
+    }
+    return params;
   }
 
   protected goToDivergences(): void {

@@ -117,7 +117,7 @@ describe('LoginPage', () => {
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/new'));
   });
 
-  it('отображает бренд-шапку «Честная проверка стратегий» без сторонних названий и с тремя преимуществами', async () => {
+  it('отображает бренд-шапку, плашку учебного счёта, понятный подзаголовок и три преимущества', async () => {
     await setup(false);
     const fixture = TestBed.createComponent(LoginPage);
     fixture.detectChanges();
@@ -125,9 +125,12 @@ describe('LoginPage', () => {
     await fixture.whenStable();
 
     const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.login-safe-badge')?.textContent?.trim()).toBe(
+      'Учебный счёт · Виртуальные деньги, без риска',
+    );
     expect(root.querySelector('h1')?.textContent).toContain('Честная проверка стратегий');
     expect(root.querySelector('.login-subtitle')?.textContent).toContain(
-      'Тренажёр ручной торговли и лаборатория алгоритмов на данных MOEX',
+      'Учитесь покупать и продавать акции на реальной истории российского рынка',
     );
     expect(root.querySelector('.login-logo rect')?.getAttribute('fill')).toBe('#2563EB');
     expect(root.textContent).not.toMatch(/т-инвестиц|янтарн/i);
@@ -136,8 +139,8 @@ describe('LoginPage', () => {
     );
     expect(chips).toEqual([
       'Без заглядывания в будущее',
-      'Реальные комиссии и ликвидность MOEX',
-      'Разбор ошибок по шагам',
+      'Реальные правила и комиссии биржи',
+      'Понятный разбор решений по шагам',
     ]);
   });
 });
