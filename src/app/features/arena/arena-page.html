@@ -170,6 +170,68 @@
             >
               {{ taToolbarOpen() ? 'Скрыть индикаторы и теханализ' : 'Индикаторы и теханализ' }}
             </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              [appearance]="
+                drawingToolbarOpen() || drawingTool() !== 'none' ? 'secondary' : 'outline'
+              "
+              [class.indicator-active]="drawingToolbarOpen() || drawingTool() !== 'none'"
+              [attr.aria-expanded]="drawingToolbarOpen()"
+              data-testid="arena-drawing-toggle"
+              (click)="toggleDrawingToolbar()"
+            >
+              {{ drawingToolbarOpen() ? 'Скрыть рисование' : 'Рисование' }}
+            </button>
+          </div>
+        }
+
+        @if (showDrawingControls()) {
+          <div class="chart-toolbar drawing-toolbar" data-testid="arena-drawing-toolbar">
+            <div class="toolbar-overlays">
+              <span class="tui-text_body-xs muted">Рисование</span>
+              @for (tool of drawingTools; track tool.id) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="xs"
+                  [appearance]="drawingTool() === tool.id ? 'secondary' : 'outline'"
+                  [class.indicator-active]="drawingTool() === tool.id"
+                  [attr.aria-pressed]="drawingTool() === tool.id"
+                  [attr.data-testid]="'arena-draw-' + tool.id"
+                  [title]="tool.hint"
+                  (click)="selectDrawingTool(tool.id)"
+                >
+                  {{ tool.label }}
+                </button>
+              }
+            </div>
+
+            <div class="toolbar-ta-controls">
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="outline"
+                data-testid="arena-draw-undo"
+                [disabled]="activePaperDrawingsCount() === 0"
+                (click)="undoDrawing()"
+              >
+                Отменить
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="outline"
+                data-testid="arena-draw-clear"
+                [disabled]="activePaperDrawingsCount() === 0"
+                (click)="clearDrawings()"
+              >
+                Очистить
+              </button>
+            </div>
           </div>
         }
 
@@ -277,6 +339,8 @@
           <div class="chart-box">
             <app-arena-chart
               [paperId]="paper.id"
+              [paperKey]="drawingPaperKey()"
+              [blind]="store.blind() && !store.finished()"
               [candles]="paper.candles"
               [orders]="selectedPaperOrders()"
               [fills]="selectedPaperFills()"
@@ -287,6 +351,11 @@
               [showBollinger]="showBollinger()"
               [showVwap]="showVwap()"
               [oscillator]="oscillator()"
+              [drawingTool]="drawingTool()"
+              [undoNonce]="drawingUndoNonce()"
+              [clearNonce]="drawingClearNonce()"
+              (drawingsCountChange)="activePaperDrawingsCount.set($event)"
+              (drawingToolChange)="drawingTool.set($event)"
             />
           </div>
 

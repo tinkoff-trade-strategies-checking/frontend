@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { BehaviorSubject } from 'rxjs';
+import { ArenaDrawingTool } from '../arena/arena-drawing';
 import { ArenaPage } from '../arena/arena-page';
 import { TaOscillatorId } from '../arena/arena-ta';
 import { ArenaChart } from '../arena/components/arena-chart';
@@ -16,6 +17,8 @@ import { ReplayPage } from './replay-page';
 })
 class StubArenaChart {
   readonly paperId = input<string>('');
+  readonly paperKey = input<string>('');
+  readonly blind = input(true);
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -26,6 +29,11 @@ class StubArenaChart {
   readonly showBollinger = input(false);
   readonly showVwap = input(false);
   readonly oscillator = input<TaOscillatorId>('none');
+  readonly drawingTool = input<ArenaDrawingTool>('none');
+  readonly undoNonce = input(0);
+  readonly clearNonce = input(0);
+  readonly drawingsCountChange = output<number>();
+  readonly drawingToolChange = output<ArenaDrawingTool>();
 }
 
 describe('ReplayPage', () => {
