@@ -15,6 +15,8 @@ import { RunsApi } from './features/runs/data/runs.models';
 import { StubRunsApi } from './features/runs/data/stub-runs.api';
 import { StubWorkshopApi } from './features/workshop/data/stub-workshop.api';
 import { WorkshopApi } from './features/workshop/data/workshop.models';
+import { StubInstrumentsApi } from './features/instruments/data/stub-instruments.api';
+import { InstrumentsApi } from './features/instruments/data/instruments.models';
 
 // Реализации портов данных на заглушках: подставляется вместо `api-impls.ts` в сборках `stub` и `development-stub`.
 export const LAUNCH_API_IMPL: Type<LaunchApi> = StubLaunchApi;
@@ -25,3 +27,4 @@ export const REPLAY_API_IMPL: Type<ReplayApi> = StubReplayApi;
 export const WORKSHOP_API_IMPL: Type<WorkshopApi> = StubWorkshopApi;
 export const RUNS_API_IMPL: Type<RunsApi> = StubRunsApi;
 export const FUNDAMENTALS_API_IMPL: Type<FundamentalsApi> = StubFundamentalsApi;
+export const INSTRUMENTS_API_IMPL: Type<InstrumentsApi> = StubInstrumentsApi;

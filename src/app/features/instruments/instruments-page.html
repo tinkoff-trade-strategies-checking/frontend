@@ -1,0 +1,319 @@
+<section class="instruments-page">
+  <header class="instruments-header">
+    <div>
+      <h1 class="tui-text_h3">Инструменты</h1>
+      <p class="tui-text_body-m muted">
+        Справочник облигаций и биржевых фондов (БПИФ / ETF) с понятными пояснениями и серверным
+        калькулятором доходности.
+      </p>
+    </div>
+
+    <tui-segmented
+      size="m"
+      aria-label="Разделы каталога инструментов"
+      [activeItemIndex]="store.activeTab() === 'etfs' ? 1 : 0"
+      (activeItemIndexChange)="onTabIndexChange($event)"
+    >
+      <button id="tab-bonds" type="button">Облигации ({{ store.bonds().length }})</button>
+      <button id="tab-etfs" type="button">
+        БПИФ / ETF, валюта и металлы ({{ store.etfs().length }})
+      </button>
+    </tui-segmented>
+  </header>
+
+  @if (store.error(); as error) {
+    <div tuiNotification appearance="negative" size="s" class="error-row">
+      <span>{{ error }}</span>
+      <button tuiButton type="button" size="xs" appearance="outline" (click)="retry()">
+        Повторить
+      </button>
+    </div>
+  }
+
+  @if (store.loading()) {
+    <section class="panel loading-panel">
+      <p class="tui-text_body-m muted">Загружаем каталог инструментов…</p>
+    </section>
+  } @else if (store.activeTab() === 'bonds') {
+    <div class="bonds-layout">
+      <section class="panel bonds-catalog" aria-label="Каталог облигаций">
+        <div class="catalog-toolbar">
+          <div class="toolbar-top">
+            <h2 class="tui-text_h6 toolbar-title">
+              Облигации (ОФЗ и корпоративные)
+              <app-term-hint
+                term="ОФЗ (Облигации федерального займа)"
+                text="Государственные облигации Минфина РФ. Корпоративные облигации выпускают компании — доходность выше, но и риск эмитента выше."
+              />
+            </h2>
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ store.filteredBonds().length }} из {{ store.bonds().length }}
+            </span>
+          </div>
+
+          <div class="toolbar-controls">
+            <div class="filter-pills" role="group" aria-label="Фильтр облигаций">
+              @for (f of bondFilters; track f.id) {
+                <button
+                  type="button"
+                  class="filter-pill"
+                  [class.active]="store.bondFilter() === f.id"
+                  [attr.aria-pressed]="store.bondFilter() === f.id"
+                  [attr.data-bond-filter]="f.id"
+                  (click)="store.bondFilter.set(f.id)"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+
+            <tui-textfield tuiTextfieldSize="s" class="search-field">
+              <input
+                id="bonds-search"
+                tuiInput
+                type="search"
+                placeholder="Поиск по тикеру, названию или эмитенту…"
+                aria-label="Поиск облигаций"
+                [ngModel]="store.bondQuery()"
+                (ngModelChange)="store.bondQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+        </div>
+
+        @if (store.filteredBonds().length === 0) {
+          <div class="empty-state">
+            <p class="tui-text_body-m muted">По выбранным фильтрам облигации не найдены.</p>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.bondFilter.set('all'); store.bondQuery.set('')"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="bonds-table">
+              <thead>
+                <tr>
+                  <th>Облигация</th>
+                  <th class="num">Цена (% ном.)</th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>Купон</span>
+                      <app-term-hint
+                        term="Купон"
+                        text="Регулярный процентный платёж по облигации в рублях и процентах годовых от номинала."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>НКД</span>
+                      <app-term-hint
+                        term="НКД (Накопленный купонный доход)"
+                        text="Часть ближайшего купона, накопленная с даты прошлой выплаты. Оплачивается сверх чистой цены при покупке."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>YTM</span>
+                      <app-term-hint
+                        term="YTM (Доходность к погашению)"
+                        text="Эффективная годовая доходность, если купить бумагу по текущей цене и держать до погашения."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">Погашение</th>
+                  <th class="num">Дюрация</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (bond of store.filteredBonds(); track bond.ticker) {
+                  @let selected = store.selectedBondTicker() === bond.ticker;
+                  <tr
+                    class="bond-row"
+                    [class.selected]="selected"
+                    [attr.data-ticker]="bond.ticker"
+                    tabindex="0"
+                    (click)="onSelectBond(bond)"
+                    (keydown.enter)="onSelectBond(bond)"
+                    (keydown.space)="$event.preventDefault(); onSelectBond(bond)"
+                  >
+                    <td>
+                      <div class="bond-name-cell">
+                        <div class="bond-name-row">
+                          <strong class="bond-name">{{ bond.name }}</strong>
+                          <span
+                            tuiBadge
+                            size="s"
+                            [appearance]="bond.bondType === 'OFZ' ? 'info' : 'neutral'"
+                          >
+                            {{ bond.bondType === 'OFZ' ? 'ОФЗ' : 'Корп.' }}
+                          </span>
+                          @if (bond.amortized) {
+                            <span
+                              tuiBadge
+                              size="s"
+                              appearance="warning"
+                              title="Постепенный возврат номинала частями до даты погашения"
+                            >
+                              Аморт.
+                            </span>
+                          }
+                        </div>
+                        <span class="tui-text_body-xs muted">
+                          <span class="mono">{{ bond.ticker }}</span> · {{ bond.issuer }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="num">{{ formatPct(bond.pricePct) }}</td>
+                    <td class="num">
+                      <div>{{ formatRub(bond.couponValueRub) }}</div>
+                      <div class="tui-text_body-xs muted">{{ formatPct(bond.couponRatePct) }}</div>
+                    </td>
+                    <td class="num">{{ formatRub(bond.accruedInterestRub) }}</td>
+                    <td class="num ytm-cell">{{ formatPct(bond.ytmPct) }}</td>
+                    <td class="num">{{ formatDateRu(bond.maturityDate) }}</td>
+                    <td class="num">{{ formatDurationYears(bond.durationYears) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <aside class="calculator-col">
+        <app-bond-ytm-calculator
+          [bond]="store.selectedBond()"
+          [pricePct]="store.calcPricePct()"
+          [result]="store.calcResult()"
+          [loading]="store.calcLoading()"
+          [error]="store.calcError()"
+          (pricePctChange)="onCalcPriceChange($event)"
+          (resetPrice)="onResetCalcPrice()"
+        />
+      </aside>
+    </div>
+  } @else {
+    <section class="panel etfs-catalog" aria-label="Каталог БПИФ и ETF">
+      <div class="catalog-toolbar">
+        <div class="toolbar-top">
+          <h2 class="tui-text_h6 toolbar-title">
+            БПИФ / ETF, валюта и металлы
+            <app-term-hint
+              term="БПИФ / ETF"
+              text="Биржевой фонд, один пай которого даёт доступ сразу к корзине акций, облигаций, золота или инструментов денежного рынка."
+            />
+          </h2>
+          <span class="tui-text_body-xs muted num">
+            Показано: {{ store.filteredEtfs().length }} из {{ store.etfs().length }}
+          </span>
+        </div>
+
+        <div class="toolbar-controls">
+          <div class="filter-pills" role="group" aria-label="Фильтр фондов">
+            @for (f of etfFilters; track f.id) {
+              <button
+                type="button"
+                class="filter-pill"
+                [class.active]="store.etfFilter() === f.id"
+                [attr.aria-pressed]="store.etfFilter() === f.id"
+                [attr.data-etf-filter]="f.id"
+                (click)="store.etfFilter.set(f.id)"
+              >
+                {{ f.label }}
+              </button>
+            }
+          </div>
+
+          <tui-textfield tuiTextfieldSize="s" class="search-field">
+            <input
+              id="etfs-search"
+              tuiInput
+              type="search"
+              placeholder="Поиск по тикеру, фонду или индексу…"
+              aria-label="Поиск фондов"
+              [ngModel]="store.etfQuery()"
+              (ngModelChange)="store.etfQuery.set($event ?? '')"
+            />
+          </tui-textfield>
+        </div>
+      </div>
+
+      @if (store.filteredEtfs().length === 0) {
+        <div class="empty-state">
+          <p class="tui-text_body-m muted">По выбранным фильтрам фонды не найдены.</p>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            (click)="store.etfFilter.set('all'); store.etfQuery.set('')"
+          >
+            Сбросить фильтры
+          </button>
+        </div>
+      } @else {
+        <div class="etfs-grid">
+          @for (etf of store.filteredEtfs(); track etf.ticker) {
+            <article class="etf-card" [attr.data-etf-ticker]="etf.ticker">
+              <div class="etf-card-top">
+                <div class="etf-title-group">
+                  <span class="etf-ticker mono">{{ etf.ticker }}</span>
+                  <h3 class="etf-name">{{ etf.name }}</h3>
+                </div>
+                <div class="etf-badges">
+                  @if (etf.tracksRuonia) {
+                    <span class="ruonia-badge">
+                      Следует за RUONIA
+                      <app-term-hint
+                        term="RUONIA"
+                        text="Индикативная ставка однодневных межбанковских кредитов в рублях, близкая к ключевой ставке ЦБ РФ."
+                      />
+                    </span>
+                  }
+                  <span tuiBadge size="s" appearance="neutral">
+                    {{ etfCategoryLabels[etf.category] }}
+                  </span>
+                </div>
+              </div>
+
+              <p class="etf-desc tui-text_body-s">{{ etf.description }}</p>
+
+              <div class="etf-metrics">
+                <div class="etf-metric">
+                  <span class="tui-text_body-xs muted">Базовый индекс</span>
+                  <span class="tui-text_body-s etf-metric-val">{{ etf.underlyingIndex }}</span>
+                </div>
+                <div class="etf-metrics-row">
+                  <div class="etf-metric">
+                    <span class="tui-text_body-xs muted label-with-hint">
+                      <span>Комиссия фонда (TER)</span>
+                      <app-term-hint
+                        term="TER (Комиссия фонда)"
+                        text="Совокупные годовые расходы управляющей компании в процентах от активов. Уже учтены в цене пая."
+                      />
+                    </span>
+                    <span class="num etf-metric-val">{{ formatPct(etf.expenseRatioPct) }}</span>
+                  </div>
+                  @if (etf.navPriceRub > 0) {
+                    <div class="etf-metric">
+                      <span class="tui-text_body-xs muted">Цена пая (СЧА)</span>
+                      <span class="num etf-metric-val">{{ formatRub(etf.navPriceRub) }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  }
+</section>

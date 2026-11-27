@@ -31,6 +31,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/arena/arena-page').then((m) => m.ArenaPage),
   },
   {
+    path: 'instruments',
+    title: 'Инструменты',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/instruments/instruments-page').then((m) => m.InstrumentsPage),
+  },
+  {
     path: 'workshop',
     title: 'Мастерская',
     canActivate: [authGuard],

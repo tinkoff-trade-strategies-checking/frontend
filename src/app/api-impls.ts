@@ -15,6 +15,8 @@ import { HttpRunsApi } from './features/runs/data/http-runs.api';
 import { RunsApi } from './features/runs/data/runs.models';
 import { HttpWorkshopApi } from './features/workshop/data/http-workshop.api';
 import { WorkshopApi } from './features/workshop/data/workshop.models';
+import { HttpInstrumentsApi } from './features/instruments/data/http-instruments.api';
+import { InstrumentsApi } from './features/instruments/data/instruments.models';
 
 // Реализации портов данных для настоящей сборки. В сборках `stub` и `development-stub` файл заменяется
 // на `api-impls.stub.ts` (angular.json), поэтому заглушки запуска и истории в боевой бандл не попадают.
@@ -26,3 +28,4 @@ export const REPLAY_API_IMPL: Type<ReplayApi> = HttpReplayApi;
 export const WORKSHOP_API_IMPL: Type<WorkshopApi> = HttpWorkshopApi;
 export const RUNS_API_IMPL: Type<RunsApi> = HttpRunsApi;
 export const FUNDAMENTALS_API_IMPL: Type<FundamentalsApi> = HttpFundamentalsApi;
+export const INSTRUMENTS_API_IMPL: Type<InstrumentsApi> = HttpInstrumentsApi;
