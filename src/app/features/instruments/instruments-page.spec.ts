@@ -137,4 +137,62 @@ describe('InstrumentsPage', () => {
     fixture.detectChanges();
     expect(calc.textContent).toContain('Put (пут)');
   });
+
+  it('переключается на вкладку Дивиденды (T+1), ищет эмитента и считает чистую выплату в калькуляторе', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-dividends')?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('tbody tr.dividend-row').length).toBeGreaterThanOrEqual(8);
+    const calc = root.querySelector('app-dividend-calculator')!;
+    expect(calc.querySelector('[data-div-metric="net"]')).not.toBeNull();
+    expect(calc.querySelector('[data-div-metric="lastBuyDate"]')).not.toBeNull();
+
+    root.querySelector<HTMLButtonElement>('[data-div-tax="15"]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(
+      root.querySelector<HTMLButtonElement>('[data-div-tax="15"]')?.getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(calc.textContent).toContain('НДФЛ (15%)');
+  });
+
+  it('переключается на вкладку Налоги (ИИС) и DCA, меняет тип счёта и добавляет пополнение DCA', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-tax-dca')?.click();
+    fixture.detectChanges();
+
+    const taxCalc = root.querySelector('app-tax-iis-calculator')!;
+    expect(taxCalc.querySelector('[data-tax-metric="net"]')).not.toBeNull();
+    expect(taxCalc.querySelector('[data-tax-metric="effectiveRate"]')).not.toBeNull();
+
+    root.querySelector<HTMLButtonElement>('[data-tax-account="IIS_A"]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(
+      root
+        .querySelector<HTMLButtonElement>('[data-tax-account="IIS_A"]')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('true');
+
+    const dcaCalc = root.querySelector('app-dca-xirr-calculator')!;
+    expect(dcaCalc.querySelectorAll('[data-dca-row]').length).toBe(4);
+    expect(dcaCalc.querySelector('[data-dca-metric="xirr"]')).not.toBeNull();
+    expect(dcaCalc.querySelector('[data-dca-metric="twr"]')).not.toBeNull();
+
+    dcaCalc.querySelector<HTMLButtonElement>('[data-dca-add-row]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(dcaCalc.querySelectorAll('[data-dca-row]').length).toBe(5);
+  });
 });

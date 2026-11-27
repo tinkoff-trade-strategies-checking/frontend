@@ -122,4 +122,45 @@ describe('InstrumentsStore', () => {
     );
     expect(store.optionCalcResult()?.impliedVolPct).toBe(40);
   });
+
+  it('загружает дивиденды, фильтрует по тикеру/компании и пересчитывает выплату при смене НДФЛ', async () => {
+    const calcSpy = vi.spyOn(api, 'calculateDividendPayout');
+    await store.init();
+
+    expect(store.dividends().length).toBeGreaterThan(0);
+    expect(store.selectedDividend()?.ticker).toBe(store.dividends()[0].ticker);
+
+    store.dividendQuery.set('лукойл');
+    expect(store.filteredDividends().some((d) => d.ticker === 'LKOH')).toBe(true);
+
+    await store.updateDividendShares(250);
+    await store.updateDividendTaxRate(15);
+    expect(calcSpy).toHaveBeenLastCalledWith(
+      store.dividends()[0].ticker,
+      expect.objectContaining({ shares: 250, taxRatePct: 15 }),
+    );
+    expect(store.dividendCalcResult()?.taxRatePct).toBe(15);
+  });
+
+  it('пересчитывает налоги ИИС и DCA / XIRR при изменении параметров и добавлении строк', async () => {
+    const taxSpy = vi.spyOn(api, 'calculateTax');
+    const dcaSpy = vi.spyOn(api, 'calculateDca');
+    await store.init();
+
+    expect(store.taxCalcResult()).not.toBeNull();
+    expect(store.dcaCalcResult()).not.toBeNull();
+
+    await store.updateTaxAccountType('IIS_3');
+    expect(taxSpy).toHaveBeenLastCalledWith(expect.objectContaining({ accountType: 'IIS_3' }));
+    expect(store.taxCalcResult()?.tradingTaxRub).toBe(0);
+    expect(store.taxCalcResult()?.iisDeductionRefundRub).toBeGreaterThan(0);
+
+    const initialLen = store.dcaCashflows().length;
+    await store.addDcaCashflow();
+    expect(store.dcaCashflows().length).toBe(initialLen + 1);
+    expect(dcaSpy).toHaveBeenCalled();
+
+    await store.removeDcaCashflow(0);
+    expect(store.dcaCashflows().length).toBe(initialLen);
+  });
 });

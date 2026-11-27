@@ -3,6 +3,11 @@ import { ArenaRejectReason } from './data/arena.models';
 const REJECT_REASON_LABELS: Readonly<Record<ArenaRejectReason, string>> = {
   INVALID_PARAMS: 'Некорректные параметры заявки',
   INSUFFICIENT_CASH: 'Недостаточно свободных средств',
+  INSUFFICIENT_MARGIN: 'Недостаточно маржинального обеспечения',
+  MARGIN_CALL_LIQUIDATION: 'Принудительное закрытие по маржин-коллу',
+  IMMEDIATE_OR_CANCEL: 'Неисполненный остаток снят (IOC)',
+  FILL_OR_KILL: 'Заявка снята — нет полного объёма (FOK)',
+  PRICE_OUT_OF_BAND: 'Цена вне допустимого коридора биржи',
   INSUFFICIENT_POSITION: 'Недостаточно лотов в позиции',
   SESSION_NOT_ACTIVE: 'Сессия завершена',
   ORDER_NOT_ACTIVE: 'Заявка уже неактивна',

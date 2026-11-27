@@ -14,6 +14,92 @@ export type FuturesDirection = 'LONG' | 'SHORT';
 
 export type OptionType = 'CALL' | 'PUT';
 
+export type DividendTaxRate = 13 | 15;
+
+export type TaxAccountType = 'BROKERAGE' | 'IIS_A' | 'IIS_B' | 'IIS_3';
+
+export interface DividendEventSummary {
+  readonly id: number;
+  readonly ticker: string;
+  readonly issuerName: string;
+  readonly recordDate: string;
+  readonly exDividendDate: string;
+  readonly lastBuyDate: string;
+  readonly paymentDate: string;
+  readonly dividendPerShareRub: number;
+  readonly yieldPct: number;
+  readonly estimatedGapPct: number;
+  readonly currency: string;
+}
+
+export interface DividendPayoutParams {
+  readonly shares: number;
+  readonly taxRatePct: DividendTaxRate;
+}
+
+export interface DividendPayoutCalculation {
+  readonly ticker: string;
+  readonly issuerName: string;
+  readonly shares: number;
+  readonly taxRatePct: number;
+  readonly dividendPerShareRub: number;
+  readonly grossPayoutRub: number;
+  readonly taxWithheldRub: number;
+  readonly netPayoutRub: number;
+  readonly lastBuyDate: string;
+  readonly exDividendDate: string;
+  readonly recordDate: string;
+  readonly paymentDate: string;
+  readonly yieldPct: number;
+  readonly estimatedGapPct: number;
+  readonly currency: string;
+}
+
+export interface TaxCalcParams {
+  readonly accountType: TaxAccountType;
+  readonly grossProfitRub: number;
+  readonly priorLossesRub: number;
+  readonly dividendsRub: number;
+  readonly annualContributionsRub: number;
+}
+
+export interface TaxCalculation {
+  readonly accountType: TaxAccountType;
+  readonly taxableProfitRub: number;
+  readonly lossOffsetUsedRub: number;
+  readonly tradingTaxRub: number;
+  readonly dividendTaxRub: number;
+  readonly totalTaxRub: number;
+  readonly iisDeductionRefundRub: number;
+  readonly netAfterTaxRub: number;
+  readonly effectiveTaxRatePct: number;
+}
+
+export interface DcaCashflowItem {
+  readonly date: string;
+  readonly amountRub: number;
+  readonly portfolioValueBeforeRub?: number | null;
+}
+
+export interface DcaCalcParams {
+  readonly cashflows: readonly DcaCashflowItem[];
+  readonly finalValueRub: number;
+  readonly finalDate: string;
+}
+
+export interface DcaCalculation {
+  readonly totalContributedRub: number;
+  readonly totalWithdrawnRub: number;
+  readonly netInvestedRub: number;
+  readonly finalValueRub: number;
+  readonly netProfitRub: number;
+  readonly simpleReturnPct: number;
+  readonly xirrPct: number;
+  readonly twrPct: number;
+  readonly holdingDays: number;
+  readonly cashflowsCount: number;
+}
+
 export interface BondSummary {
   readonly ticker: string;
   readonly name: string;
@@ -148,9 +234,23 @@ export interface InstrumentsApi {
   calculateFutures(ticker: string, params: FuturesCalcParams): Promise<FuturesCalculation>;
   listOptions(): Promise<readonly OptionSummary[]>;
   calculateOptionGreeks(ticker: string, params: OptionCalcParams): Promise<OptionGreeksCalculation>;
+  listDividends(ticker?: string): Promise<readonly DividendEventSummary[]>;
+  calculateDividendPayout(
+    ticker: string,
+    params: DividendPayoutParams,
+  ): Promise<DividendPayoutCalculation>;
+  calculateTax(params: TaxCalcParams): Promise<TaxCalculation>;
+  calculateDca(params: DcaCalcParams): Promise<DcaCalculation>;
 }
 
 export const INSTRUMENTS_API = new InjectionToken<InstrumentsApi>('INSTRUMENTS_API');
+
+export const TAX_ACCOUNT_TYPE_LABELS: Readonly<Record<TaxAccountType, string>> = {
+  BROKERAGE: 'Брокерский счёт',
+  IIS_A: 'ИИС тип А',
+  IIS_B: 'ИИС тип Б',
+  IIS_3: 'ИИС-3',
+};
 
 export const ETF_CATEGORY_LABELS: Readonly<Record<EtfCategory, string>> = {
   LIQUIDITY: 'Фонд ликвидности',
