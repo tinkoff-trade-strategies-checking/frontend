@@ -61,7 +61,7 @@ describe('http-interceptors', () => {
   it('401 вне /me и входа: забывает профиль и уводит на /login с адресом возврата', () => {
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const auth = TestBed.inject(AuthService);
-    auth.user.set({ id: 'u', email: 'a@b.c', role: 'USER' });
+    auth.user.set({ id: 'u', email: 'a@b.c', role: 'USER', guest: false, uiMode: 'beginner' });
 
     http.get('/api/v1/history').subscribe({ error: () => undefined });
     controller

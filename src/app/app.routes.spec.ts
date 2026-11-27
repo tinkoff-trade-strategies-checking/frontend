@@ -24,7 +24,13 @@ describe('маршруты по режимам', () => {
         { provide: STUB_MODE, useValue: stubMode },
       ],
     });
-    TestBed.inject(AuthService).user.set({ id: 'u', email: 'a@b.c', role: 'USER' });
+    TestBed.inject(AuthService).user.set({
+      id: 'u',
+      email: 'a@b.c',
+      role: 'USER',
+      guest: false,
+      uiMode: 'beginner',
+    });
     return TestBed.inject(Router);
   }
 
@@ -83,6 +89,8 @@ describe('маршруты по режимам', () => {
       id: 'u',
       email: 'a@b.c',
       role: 'USER',
+      guest: false,
+      uiMode: 'beginner',
     });
     expect(await go(router, '/login')).toMatch(/^\/(login|new)$/);
   });
