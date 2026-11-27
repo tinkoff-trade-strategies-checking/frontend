@@ -410,8 +410,12 @@ export function computeStochSeries(
   };
 }
 
-function stochRsiArray(candles: readonly ArenaCandle[], period = 14): (number | null)[] {
-  const rsi = rsiArray(candles, period);
+function stochRsiArray(
+  candles: readonly ArenaCandle[],
+  period = 14,
+  precomputedRsi?: readonly (number | null)[],
+): (number | null)[] {
+  const rsi = precomputedRsi ?? rsiArray(candles, period);
   const out: (number | null)[] = new Array(candles.length).fill(null);
   const window: number[] = [];
 
@@ -443,12 +447,13 @@ function macdArrays(
   fast = 12,
   slow = 26,
   signalPeriod = 9,
+  precomputedCloses?: readonly number[],
 ): {
   macd: (number | null)[];
   signal: (number | null)[];
   histogram: (number | null)[];
 } {
-  const closes = candles.map((c) => c.close);
+  const closes = precomputedCloses ?? candles.map((c) => c.close);
   const emaFast = emaValues(closes, fast);
   const emaSlow = emaValues(closes, slow);
   const macd: (number | null)[] = new Array(candles.length).fill(null);
@@ -718,11 +723,12 @@ function rocArray(candles: readonly ArenaCandle[], period = 12): (number | null)
   return out;
 }
 
-function bullBearPowerArray(candles: readonly ArenaCandle[], period = 13): (number | null)[] {
-  const ema = emaValues(
-    candles.map((c) => c.close),
-    period,
-  );
+function bullBearPowerArray(
+  candles: readonly ArenaCandle[],
+  period = 13,
+  precomputedCloses?: readonly number[],
+): (number | null)[] {
+  const ema = emaValues(precomputedCloses ?? candles.map((c) => c.close), period);
   const out: (number | null)[] = new Array(candles.length).fill(null);
   for (let i = 0; i < candles.length; i++) {
     const e = ema[i];
@@ -1036,10 +1042,11 @@ export function computeTaSummary(candles: readonly ArenaCandle[]): TaSummarySnap
   const closes = candles.map((c) => c.close);
 
   // 12 технических индикаторов Investing.com
-  const rsiVal = lastOf(rsiArray(candles, 14));
+  const rsiArr = rsiArray(candles, 14);
+  const rsiVal = lastOf(rsiArr);
   const stochVal = lastOf(stochArrays(candles, 9, 6, 3).k);
-  const stochRsiVal = lastOf(stochRsiArray(candles, 14));
-  const macdRes = macdArrays(candles, 12, 26, 9);
+  const stochRsiVal = lastOf(stochRsiArray(candles, 14, rsiArr));
+  const macdRes = macdArrays(candles, 12, 26, 9, closes);
   const macdVal = lastOf(macdRes.macd);
   const adxRes = adxArrays(candles, 14);
   const adxVal = lastOf(adxRes.adx);
@@ -1052,7 +1059,7 @@ export function computeTaSummary(candles: readonly ArenaCandle[]): TaSummarySnap
   const highsLowsVal = lastOf(highsLowsArray(candles, 14));
   const uoVal = lastOf(ultimateOscillatorArray(candles, 7, 14, 28));
   const rocVal = lastOf(rocArray(candles, 12));
-  const bullBearVal = lastOf(bullBearPowerArray(candles, 13));
+  const bullBearVal = lastOf(bullBearPowerArray(candles, 13, closes));
 
   const adxSignal = (): { action: TaIndicatorAction | null; vote: TaVote | null } => {
     if (adxVal === null || plusDiVal === null || minusDiVal === null) {

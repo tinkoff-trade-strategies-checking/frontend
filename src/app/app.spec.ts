@@ -197,7 +197,13 @@ describe('App', () => {
         { provide: STUB_MODE, useValue: false },
       ],
     }).compileComponents();
-    TestBed.inject(AuthService).user.set({ id: 'u', email: 'a@b.c', role: 'USER' });
+    TestBed.inject(AuthService).user.set({
+      id: 'u',
+      email: 'a@b.c',
+      role: 'USER',
+      guest: false,
+      uiMode: 'beginner',
+    });
 
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();

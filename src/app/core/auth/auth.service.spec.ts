@@ -7,7 +7,13 @@ import { CurrentUser } from '../../api/models/current-user';
 import { authGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
-const USER: CurrentUser = { id: 'u-1', email: 'a@b.c', role: 'USER' };
+const USER: CurrentUser = {
+  id: 'u-1',
+  email: 'a@b.c',
+  role: 'USER',
+  guest: false,
+  uiMode: 'beginner',
+};
 const UNAUTHORIZED = { status: 401, statusText: 'Unauthorized' };
 
 describe('AuthService и authGuard', () => {

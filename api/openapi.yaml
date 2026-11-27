@@ -75,6 +75,28 @@ paths:
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/guest:
+    post:
+      tags: [identity]
+      operationId: loginGuest
+      summary: Гостевой / демо-вход без регистрации (backend#88)
+      description: |
+        Создаёт временную гостевую учётную запись (срок жизни 24 часа) и cookie-сессию (`SESSION`, `XSRF-TOKEN`)
+        в один клик. Защищён от CSRF (`X-XSRF-TOKEN`) и ограничен по частоте запросов (`429`).
+      security:
+        - xsrfToken: []
+      responses:
+        '200':
+          description: Гостевая сессия создана, cookies `SESSION` и `XSRF-TOKEN` установлены
+          headers:
+            Set-Cookie:
+              description: Cookies `SESSION` и `XSRF-TOKEN`
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/logout:
     post:
       tags: [identity]
@@ -115,6 +137,28 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
+  /me/preferences:
+    patch:
+      tags: [identity]
+      operationId: updateUserPreferences
+      summary: Обновить настройки интерфейса профиля (`beginner` / `pro`, backend#88)
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateUserPreferencesRequest' }
+      responses:
+        '200':
+          description: Обновлённый профиль пользователя
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /launch/options:
     get:
       tags: [marketdata]
@@ -1666,13 +1710,24 @@ components:
       properties:
         email: { type: string, format: email, maxLength: 254, description: 'Не длиннее 254 символов (RFC 5321); длиннее — 400' }
         password: { type: string, format: password, description: 'Не длиннее 72 байт в UTF-8 (предел bcrypt, кириллица — 2 байта на символ); длиннее — 400. maxLength не задан, так как считает символы, а не байты' }
+    UiMode:
+      type: string
+      enum: [beginner, pro]
+      description: 'Режим интерфейса пользователя: базовый (`beginner`) или профи (`pro`).'
+    UpdateUserPreferencesRequest:
+      type: object
+      required: [uiMode]
+      properties:
+        uiMode: { $ref: '#/components/schemas/UiMode' }
     CurrentUser:
       type: object
-      required: [id, email, role]
+      required: [id, email, role, guest, uiMode]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         email: { type: string, format: email }
         role: { type: string, enum: [USER] }
+        guest: { type: boolean, description: 'Признак временной гостевой / демо-сессии.' }
+        uiMode: { $ref: '#/components/schemas/UiMode' }
     # ---------- запуск ----------
     ExecutionRulesSummary:
       type: object
@@ -2211,6 +2266,16 @@ components:
       oneOf:
         - $ref: '#/components/schemas/EstimateBlindOrderRequest'
         - $ref: '#/components/schemas/EstimateOpenOrderRequest'
+    OrderPresetLots:
+      type: object
+      description: 'Серверный расчёт лотов для быстрых чипов `25% / 50% / 100%` (INV-6, INV-7 — только целые лоты без ₽ и lotSize).'
+      required: [pct25, pct50, pct100]
+      properties:
+        pct25: { type: integer, minimum: 0 }
+        pct50: { type: integer, minimum: 0 }
+        pct100: { type: integer, minimum: 0 }
+    OrderPresetLotsOrNull:
+      oneOf: [{ $ref: '#/components/schemas/OrderPresetLots' }, { type: 'null' }]
     OrderEstimateBase:
       type: object
       required: [canPlace, reason, field, amountPct, commissionPct, exchangeFeePct, requiredCashPct]
@@ -2223,6 +2288,11 @@ components:
         commissionPct: { $ref: '#/components/schemas/Pct' }
         exchangeFeePct: { $ref: '#/components/schemas/Pct' }
         requiredCashPct: { $ref: '#/components/schemas/Pct' }
+        maxLots:
+          type: [integer, 'null']
+          minimum: 0
+          description: 'Максимальное доступное число лотов (для покупки — по свободному кэшу с учётом комиссий и спреда, для продажи — по длинной позиции; INV-6, INV-7).'
+        presetLots: { $ref: '#/components/schemas/OrderPresetLotsOrNull' }
     OrderEstimateLegBase:
       type: object
       description: Оценка одной ноги заявки; у OCO — отдельно стоп и тейк-профит

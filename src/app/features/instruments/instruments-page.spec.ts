@@ -233,6 +233,56 @@ describe('InstrumentsPage', () => {
     expect(root.querySelector('app-alerts-panel')).not.toBeNull();
   });
 
+  it('ограничивает DOM скринера 50 строками на страницу и переключает страницы кнопками Назад/Вперёд', async () => {
+    const manyPapers = Array.from({ length: 120 }, (_, i) => ({
+      ticker: `P${String(i + 1).padStart(3, '0')}`,
+      name: `Эмитент ${i + 1}`,
+      sector: 'Финансы',
+      marketCapRub: (120 - i) * 1_000_000_000,
+      peRatio: 5,
+      pbRatio: 1,
+      psRatio: 1,
+      evEbitda: 4,
+      roe: 22,
+      netMargin: 15,
+      debtToEquity: 0.2,
+      dividendYield: 12,
+      beta: 0.9,
+      hasFundamentals: true,
+    }));
+
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    const api = fixture.debugElement.injector.get(INSTRUMENTS_API);
+    api.listScreenerPapers = () => Promise.resolve(manyPapers);
+
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-screener')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('tbody tr.screener-row')).toHaveLength(50);
+    expect(root.textContent).not.toContain('Показать все');
+    expect(root.querySelector('[data-screener-page]')?.textContent?.trim()).toBe('Стр. 1 из 3');
+    expect(root.querySelector<HTMLButtonElement>('[data-screener-prev]')?.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[data-screener-next]')?.disabled).toBe(false);
+
+    root.querySelector<HTMLButtonElement>('[data-screener-next]')?.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('tbody tr.screener-row')).toHaveLength(50);
+    expect(root.querySelector('[data-screener-page]')?.textContent?.trim()).toBe('Стр. 2 из 3');
+    expect(root.querySelector<HTMLButtonElement>('[data-screener-prev]')?.disabled).toBe(false);
+
+    root.querySelector<HTMLButtonElement>('[data-screener-next]')?.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('tbody tr.screener-row')).toHaveLength(20);
+    expect(root.querySelector('[data-screener-page]')?.textContent?.trim()).toBe('Стр. 3 из 3');
+    expect(root.querySelector<HTMLButtonElement>('[data-screener-next]')?.disabled).toBe(true);
+  });
+
   it('переключается на вкладку События и Алерты, фильтрует события, создаёт и удаляет алерт', async () => {
     const fixture = TestBed.createComponent(InstrumentsPage);
     fixture.detectChanges();

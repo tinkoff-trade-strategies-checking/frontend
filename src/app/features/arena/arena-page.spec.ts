@@ -450,4 +450,20 @@ describe('ArenaPage', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance['chartMode']()).toBe('candles');
   });
+
+  it('не монтирует сводку теханализа при старте и шагах, пока панель ТА свёрнута', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(fixture.componentInstance['showTaPanel']()).toBe(false);
+    expect(root.querySelector('app-arena-ta-summary')).toBeNull();
+
+    await fixture.componentInstance['store'].stepOnce();
+    fixture.detectChanges();
+    expect(root.querySelector('app-arena-ta-summary')).toBeNull();
+  });
 });
