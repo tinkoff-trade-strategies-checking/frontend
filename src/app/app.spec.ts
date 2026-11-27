@@ -44,13 +44,20 @@ describe('App', () => {
     expect(header?.textContent).not.toMatch(/т-инвестиц|янтарн/i);
   });
 
-  it('показывает разделы новой сессии, арены, мастерской, отчёта и истории', () => {
+  it('показывает разделы новой сессии, инструментов, арены, мастерской, отчёта и истории', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const links = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).map(
       (a) => a.textContent?.trim(),
     );
-    expect(links).toEqual(['Новая сессия', 'Арена', 'Мастерская', 'Отчёт', 'История']);
+    expect(links).toEqual([
+      'Новая сессия',
+      'Инструменты',
+      'Арена',
+      'Мастерская',
+      'Отчёт',
+      'История',
+    ]);
 
     const navLinks = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('nav a'),
@@ -132,6 +139,10 @@ describe('App', () => {
       expect(await open('/new')).toEqual({ path: '/new', heading: 'Новая сессия' });
     });
 
+    it('/instruments открывает каталог инструментов', async () => {
+      expect(await open('/instruments')).toEqual({ path: '/instruments', heading: 'Инструменты' });
+    });
+
     it('/report/:id открывает отчёт по маршруту', async () => {
       const res = await open('/report/S-0103');
       expect(res.path).toBe('/report/S-0103');
@@ -192,7 +203,7 @@ describe('App', () => {
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
     const links = Array.from(root.querySelectorAll('nav a')).map((a) => a.textContent?.trim());
-    expect(links).toEqual(['Новая сессия', 'Мастерская', 'История']);
+    expect(links).toEqual(['Новая сессия', 'Инструменты', 'Мастерская', 'История']);
     expect(root.querySelector('.user')?.textContent).toContain('a@b.c');
     expect(root.querySelector('.user button')?.textContent).toContain('Выйти');
   });

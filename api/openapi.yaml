@@ -165,6 +165,73 @@ paths:
               schema: { $ref: '#/components/schemas/PaperFundamentalsResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
+  /instruments/bonds:
+    get:
+      tags: [marketdata]
+      operationId: listBonds
+      summary: Справочник облигаций MOEX (ОФЗ и корпоративные выпуски)
+      description: |
+        Возвращает список доступных облигаций MOEX (ОФЗ и корпоративные выпуски) с номиналом, ставкой и размером
+        купона, датами ближайшего купона, погашения и оферты, НКД, YTM, дюрацией и признаком амортизации (INV-6).
+      responses:
+        '200':
+          description: Список облигаций
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BondSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /instruments/bonds/{ticker}/calc:
+    get:
+      tags: [marketdata]
+      operationId: calculateBond
+      summary: Расчёт цены, НКД, текущей доходности и YTM облигации
+      description: |
+        Точный расчёт на `BigDecimal` (INV-4, INV-6): чистая и грязная цена в рублях, НКД, текущая доходность и
+        эффективная доходность к погашению (YTM) с учётом оставшегося графика купонов и амортизации номинала.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: Тикер / ISIN облигации MOEX (например, `SU26238RMFS4`)
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - name: pricePct
+          in: query
+          required: false
+          description: 'Цена облигации в % от номинала (например, `85.50`). Если не задана, используется справочная цена.'
+          schema: { $ref: '#/components/schemas/Pct' }
+        - name: asOfDate
+          in: query
+          required: false
+          description: 'Дата расчёта в формате `YYYY-MM-DD`. Если не задана, используется текущая дата.'
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Результат расчёта облигации
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BondCalculationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /instruments/etfs:
+    get:
+      tags: [marketdata]
+      operationId: listEtfs
+      summary: Справочник БПИФ/ETF (включая фонды ликвидности под RUONIA), валют и драгметаллов
+      description: |
+        Возвращает список БПИФ/ETF MOEX (фонды ликвидности под RUONIA, индексные фонды акций и облигаций, золото),
+        а также биржевых инструментов валютной секции и драгметаллов (INV-6).
+      responses:
+        '200':
+          description: Список БПИФ/ETF, валют и драгметаллов
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EtfSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
   /sessions:
     post:
       tags: [sessions]
@@ -1309,6 +1376,11 @@ components:
         sector: { type: string }
         ticker: { type: string }
         name: { type: string }
+        assetClass:
+          type: string
+          enum: [EQUITY, BOND, ETF, CURRENCY, METAL]
+          default: EQUITY
+          description: Класс актива бумаги (по умолчанию `EQUITY`)
     CreateSessionRequest:
       type: object
       required: [traderKind, durationDays, timeframe, regime, startMode, customStartDate, paperCount, paperIds, initialCapital]
@@ -3100,3 +3172,95 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/SessionFundamentalsItem' }
+    BondSummary:
+      type: object
+      required:
+        - ticker
+        - name
+        - issuer
+        - bondType
+        - faceValueRub
+        - couponRatePct
+        - couponValueRub
+        - couponPeriodDays
+        - nextCouponDate
+        - maturityDate
+        - offerDate
+        - accruedInterestRub
+        - ytmPct
+        - durationYears
+        - amortized
+        - pricePct
+        - currency
+      properties:
+        ticker: { type: string, examples: ['SU26238RMFS4'] }
+        name: { type: string, examples: ['ОФЗ 26238'] }
+        issuer: { type: string, examples: ['Минфин РФ'] }
+        bondType: { type: string, enum: [OFZ, CORPORATE] }
+        faceValueRub: { $ref: '#/components/schemas/Money' }
+        couponRatePct: { $ref: '#/components/schemas/Pct' }
+        couponValueRub: { $ref: '#/components/schemas/Money' }
+        couponPeriodDays: { type: integer, minimum: 1 }
+        nextCouponDate: { type: string, format: date }
+        maturityDate: { type: string, format: date }
+        offerDate: { type: [string, 'null'], format: date }
+        accruedInterestRub: { $ref: '#/components/schemas/Money' }
+        ytmPct: { $ref: '#/components/schemas/Pct' }
+        durationYears: { $ref: '#/components/schemas/Ratio' }
+        amortized: { type: boolean }
+        pricePct: { $ref: '#/components/schemas/Pct' }
+        currency: { type: string, examples: ['RUB'] }
+    BondCalculationResponse:
+      type: object
+      required:
+        - ticker
+        - pricePct
+        - asOfDate
+        - cleanPriceRub
+        - accruedInterestRub
+        - dirtyPriceRub
+        - currentYieldPct
+        - ytmPct
+        - remainingCouponsCount
+        - yearsToMaturity
+        - nextCouponDate
+        - couponValueRub
+        - amortized
+      properties:
+        ticker: { type: string }
+        pricePct: { $ref: '#/components/schemas/Pct' }
+        asOfDate: { type: string, format: date }
+        cleanPriceRub: { $ref: '#/components/schemas/Money' }
+        accruedInterestRub: { $ref: '#/components/schemas/Money' }
+        dirtyPriceRub: { $ref: '#/components/schemas/Money' }
+        currentYieldPct: { $ref: '#/components/schemas/Pct' }
+        ytmPct: { $ref: '#/components/schemas/Pct' }
+        remainingCouponsCount: { type: integer, minimum: 0 }
+        yearsToMaturity: { $ref: '#/components/schemas/Ratio' }
+        nextCouponDate: { type: string, format: date }
+        couponValueRub: { $ref: '#/components/schemas/Money' }
+        amortized: { type: boolean }
+    EtfSummary:
+      type: object
+      required:
+        - ticker
+        - name
+        - assetClass
+        - category
+        - underlyingIndex
+        - tracksRuonia
+        - expenseRatioPct
+        - navPriceRub
+        - currency
+        - description
+      properties:
+        ticker: { type: string, examples: ['LQDT'] }
+        name: { type: string, examples: ['ВИМ — Ликвидность'] }
+        assetClass: { type: string, enum: [ETF, CURRENCY, METAL] }
+        category: { type: string, enum: [LIQUIDITY, EQUITY_INDEX, BOND_INDEX, GOLD, CURRENCY] }
+        underlyingIndex: { type: string, examples: ['RUSFAR / RUONIA'] }
+        tracksRuonia: { type: boolean }
+        expenseRatioPct: { $ref: '#/components/schemas/Pct' }
+        navPriceRub: { $ref: '#/components/schemas/Price' }
+        currency: { type: string, examples: ['RUB'] }
+        description: { type: string }

@@ -47,6 +47,7 @@ export class App {
       // Арена и отчёт открываются по id сессии: из запуска, истории и ссылки на завершение.
       return [
         { path: '/new', title: 'Новая сессия', activePrefix: '/new' },
+        { path: '/instruments', title: 'Инструменты', activePrefix: '/instruments' },
         { path: '/workshop', title: 'Мастерская', activePrefix: '/workshop' },
         { path: '/history', title: 'История', activePrefix: '/history' },
       ] as const;
@@ -54,6 +55,7 @@ export class App {
     const lastReportId = this.sessionRegistry.lastFinishedSessionId();
     return [
       { path: '/new', title: 'Новая сессия', activePrefix: '/new' },
+      { path: '/instruments', title: 'Инструменты', activePrefix: '/instruments' },
       { path: '/arena', title: 'Арена', activePrefix: '/arena' },
       { path: '/workshop', title: 'Мастерская', activePrefix: '/workshop' },
       {
