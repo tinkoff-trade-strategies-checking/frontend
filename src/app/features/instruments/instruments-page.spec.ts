@@ -69,4 +69,72 @@ describe('InstrumentsPage', () => {
     expect(cards.length).toBeGreaterThanOrEqual(2);
     expect(cards.every((card) => card.textContent?.includes('Следует за RUONIA'))).toBe(true);
   });
+
+  it('переключается на вкладку Фьючерсы (ФОРТС), фильтрует расчётные/поставочные и считает маржу в калькуляторе', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-futures')?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('tbody tr.future-row').length).toBeGreaterThanOrEqual(6);
+    expect(root.querySelector('app-futures-calculator')?.textContent).toContain(
+      'Вариационная маржа',
+    );
+    expect(root.querySelector('app-futures-calculator')?.textContent).toContain('Итого ГО');
+
+    root.querySelector<HTMLButtonElement>('[data-futures-filter="delivery"]')?.click();
+    fixture.detectChanges();
+    const deliveryRows = Array.from(root.querySelectorAll('tbody tr.future-row'));
+    expect(deliveryRows.length).toBeGreaterThan(0);
+    expect(deliveryRows.every((row) => row.textContent?.includes('Постав.'))).toBe(true);
+
+    (deliveryRows[0] as HTMLElement).click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(root.querySelector('app-futures-calculator')?.textContent).toContain('Поставочный');
+
+    root.querySelector<HTMLButtonElement>('[data-futures-dir="SHORT"]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(
+      root
+        .querySelector<HTMLButtonElement>('[data-futures-dir="SHORT"]')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
+  it('переключается на вкладку Опционы (ФОРТС), фильтрует Call/Put и показывает 5 греков с TermHint', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-options')?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('tbody tr.option-row').length).toBeGreaterThanOrEqual(6);
+    const calc = root.querySelector('app-option-greeks-calculator')!;
+    expect(calc.querySelector('[data-greek="delta"]')).not.toBeNull();
+    expect(calc.querySelector('[data-greek="gamma"]')).not.toBeNull();
+    expect(calc.querySelector('[data-greek="theta"]')).not.toBeNull();
+    expect(calc.querySelector('[data-greek="vega"]')).not.toBeNull();
+    expect(calc.querySelector('[data-greek="rho"]')).not.toBeNull();
+    expect(calc.querySelectorAll('app-term-hint').length).toBeGreaterThanOrEqual(6);
+
+    root.querySelector<HTMLButtonElement>('[data-option-filter="put"]')?.click();
+    fixture.detectChanges();
+    const putRows = Array.from(root.querySelectorAll('tbody tr.option-row'));
+    expect(putRows.length).toBeGreaterThan(0);
+    expect(putRows.every((row) => row.textContent?.includes('Put'))).toBe(true);
+
+    (putRows[0] as HTMLElement).click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(calc.textContent).toContain('Put (пут)');
+  });
 });

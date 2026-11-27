@@ -72,4 +72,54 @@ describe('InstrumentsStore', () => {
     expect(calcSpy).toHaveBeenLastCalledWith(firstBond.ticker, firstBond.pricePct);
     expect(store.calcPricePct()).toBe(firstBond.pricePct);
   });
+
+  it('фильтрует фьючерсы и передаёт знак контрактов при переключении Лонг / Шорт', async () => {
+    const calcSpy = vi.spyOn(api, 'calculateFutures');
+    await store.init();
+
+    expect(store.futures().length).toBeGreaterThan(0);
+    expect(store.selectedFutureTicker()).toBe(store.futures()[0].ticker);
+
+    store.futuresFilter.set('cash');
+    expect(store.filteredFutures().every((f) => f.settlementType === 'CASH')).toBe(true);
+
+    store.futuresFilter.set('delivery');
+    expect(store.filteredFutures().length).toBeGreaterThan(0);
+    expect(store.filteredFutures().every((f) => f.settlementType === 'DELIVERY')).toBe(true);
+
+    store.futuresFilter.set('all');
+    store.futuresQuery.set('brent');
+    expect(store.filteredFutures().some((f) => f.ticker === 'BRF7')).toBe(true);
+
+    await store.updateFuturesContracts(3);
+    await store.updateFuturesDirection('SHORT');
+    expect(calcSpy).toHaveBeenLastCalledWith(
+      store.futures()[0].ticker,
+      expect.objectContaining({ contracts: -3 }),
+    );
+    expect(store.futuresCalcResult()?.contracts).toBe(-3);
+  });
+
+  it('фильтрует опционы Call / Put и пересчитывает греки при изменении параметров', async () => {
+    const calcSpy = vi.spyOn(api, 'calculateOptionGreeks');
+    await store.init();
+
+    expect(store.options().length).toBeGreaterThan(0);
+    expect(store.selectedOptionTicker()).toBe(store.options()[0].ticker);
+
+    store.optionFilter.set('call');
+    expect(store.filteredOptions().every((o) => o.optionType === 'CALL')).toBe(true);
+
+    store.optionFilter.set('put');
+    expect(store.filteredOptions().length).toBeGreaterThan(0);
+    expect(store.filteredOptions().every((o) => o.optionType === 'PUT')).toBe(true);
+
+    await store.updateOptionVolatilityPct(40);
+    await store.updateOptionRiskFreeRatePct(18);
+    expect(calcSpy).toHaveBeenLastCalledWith(
+      store.options()[0].ticker,
+      expect.objectContaining({ volatilityPct: 40, riskFreeRatePct: 18 }),
+    );
+    expect(store.optionCalcResult()?.impliedVolPct).toBe(40);
+  });
 });

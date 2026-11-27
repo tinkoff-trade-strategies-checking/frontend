@@ -232,6 +232,126 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/EtfSummary' }
         '401': { $ref: '#/components/responses/Problem' }
+  /instruments/futures:
+    get:
+      tags: [marketdata]
+      operationId: listFutures
+      summary: Справочник фьючерсов MOEX ФОРТС
+      description: |
+        Возвращает список фьючерсных контрактов срочного рынка MOEX ФОРТС с шагом цены, стоимостью шага цены,
+        гарантийным обеспечением (ГО), датой экспирации и типом исполнения (INV-6).
+      responses:
+        '200':
+          description: Список фьючерсов ФОРТС
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FuturesSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /instruments/futures/{ticker}/calc:
+    get:
+      tags: [marketdata]
+      operationId: calculateFutures
+      summary: Расчёт вариационной маржи, ГО, ROE и плеча по фьючерсу ФОРТС
+      description: |
+        Точный расчёт на `BigDecimal` (INV-4, INV-6): вариационная маржа в рублях, совокупное гарантийное обеспечение
+        (ГО), номинальная стоимость позиции, доходность на ГО (ROE, %) и эффективное плечо.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: Код фьючерса MOEX ФОРТС (например, `SiH7`, `RIH7`)
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - name: entryPrice
+          in: query
+          required: false
+          description: 'Цена входа в пунктах контракта. Если не задана, используется справочная последняя цена.'
+          schema: { $ref: '#/components/schemas/Price' }
+        - name: currentPrice
+          in: query
+          required: false
+          description: 'Текущая цена в пунктах контракта. Если не задана, используется справочная последняя цена.'
+          schema: { $ref: '#/components/schemas/Price' }
+        - name: contracts
+          in: query
+          required: false
+          description: 'Число контрактов (ненулевое целое: `> 0` — лонг, `< 0` — шорт; по умолчанию `1`).'
+          schema: { type: integer, minimum: -100000, maximum: 100000, default: 1 }
+        - name: asOfDate
+          in: query
+          required: false
+          description: 'Дата расчёта в формате `YYYY-MM-DD`. Если не задана, используется текущая дата.'
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Результат расчёта позиции по фьючерсу
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FuturesCalculationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /instruments/options:
+    get:
+      tags: [marketdata]
+      operationId: listOptions
+      summary: Справочник опционов MOEX ФОРТС
+      description: |
+        Возвращает список опционных контрактов Call/Put срочного рынка MOEX ФОРТС со страйком, датой экспирации,
+        базовым активом, подразумеваемой волатильностью (IV) и гарантийным обеспечением (INV-6).
+      responses:
+        '200':
+          description: Список опционов ФОРТС
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OptionSummary' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /instruments/options/{ticker}/calc:
+    get:
+      tags: [marketdata]
+      operationId: calculateOptionGreeks
+      summary: Расчёт теоретической цены и греков опциона по Блэку — Шоулзу
+      description: |
+        Расчёт теоретической премии, внутренней и временной стоимости, а также греков опциона (Delta, Gamma,
+        Theta в день, Vega на +1% IV, Rho на +1% ставки) по модели Black-Scholes-Merton (INV-6).
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: Код опциона MOEX ФОРТС (например, `Si96000BC7`)
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - name: spot
+          in: query
+          required: false
+          description: 'Цена базового актива. Если не задана, используется справочная цена базового актива.'
+          schema: { $ref: '#/components/schemas/Price' }
+        - name: volatilityPct
+          in: query
+          required: false
+          description: 'Подразумеваемая волатильность (IV, % годовых, в (0, 500]). Если не задана, берётся из спецификации.'
+          schema: { $ref: '#/components/schemas/Pct' }
+        - name: riskFreeRatePct
+          in: query
+          required: false
+          description: 'Безрисковая ставка (% годовых, в [0, 100]). Если не задана, берётся из спецификации.'
+          schema: { $ref: '#/components/schemas/Pct' }
+        - name: asOfDate
+          in: query
+          required: false
+          description: 'Дата расчёта в формате `YYYY-MM-DD`. Если не задана, используется текущая дата.'
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Теоретическая цена и греки опциона
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OptionGreeksResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
   /sessions:
     post:
       tags: [sessions]
@@ -3264,3 +3384,125 @@ components:
         navPriceRub: { $ref: '#/components/schemas/Price' }
         currency: { type: string, examples: ['RUB'] }
         description: { type: string }
+    FuturesSummary:
+      type: object
+      required:
+        - ticker
+        - name
+        - underlying
+        - contractSize
+        - priceStep
+        - stepPriceRub
+        - initialMarginRub
+        - lastPrice
+        - expirationDate
+        - settlementType
+        - currency
+      properties:
+        ticker: { type: string, examples: ['SiH7'] }
+        name: { type: string, examples: ['Фьючерс на курс USD/RUB (Si-3.27)'] }
+        underlying: { type: string, examples: ['USD/RUB'] }
+        contractSize: { type: integer, minimum: 1 }
+        priceStep: { $ref: '#/components/schemas/Price' }
+        stepPriceRub: { $ref: '#/components/schemas/Price' }
+        initialMarginRub: { $ref: '#/components/schemas/Money' }
+        lastPrice: { $ref: '#/components/schemas/Price' }
+        expirationDate: { type: string, format: date }
+        settlementType: { type: string, enum: [CASH, DELIVERY] }
+        currency: { type: string, examples: ['RUB'] }
+    FuturesCalculationResponse:
+      type: object
+      required:
+        - ticker
+        - entryPrice
+        - currentPrice
+        - contracts
+        - asOfDate
+        - expirationDate
+        - daysToExpiration
+        - expired
+        - variationMarginRub
+        - initialMarginTotalRub
+        - notionalRub
+        - roeOnMarginPct
+        - effectiveLeverage
+      properties:
+        ticker: { type: string }
+        entryPrice: { $ref: '#/components/schemas/Price' }
+        currentPrice: { $ref: '#/components/schemas/Price' }
+        contracts: { type: integer }
+        asOfDate: { type: string, format: date }
+        expirationDate: { type: string, format: date }
+        daysToExpiration: { type: integer, minimum: 0 }
+        expired: { type: boolean }
+        variationMarginRub: { $ref: '#/components/schemas/Money' }
+        initialMarginTotalRub: { $ref: '#/components/schemas/Money' }
+        notionalRub: { $ref: '#/components/schemas/Money' }
+        roeOnMarginPct: { $ref: '#/components/schemas/Pct' }
+        effectiveLeverage: { $ref: '#/components/schemas/Ratio' }
+    OptionSummary:
+      type: object
+      required:
+        - ticker
+        - name
+        - underlying
+        - optionType
+        - strike
+        - expirationDate
+        - underlyingPrice
+        - impliedVolPct
+        - riskFreeRatePct
+        - contractSize
+        - initialMarginRub
+      properties:
+        ticker: { type: string, examples: ['Si96000BC7'] }
+        name: { type: string, examples: ['Call Si 96000 (мар. 2027)'] }
+        underlying: { type: string, examples: ['SiH7'] }
+        optionType: { type: string, enum: [CALL, PUT] }
+        strike: { $ref: '#/components/schemas/Price' }
+        expirationDate: { type: string, format: date }
+        underlyingPrice: { $ref: '#/components/schemas/Price' }
+        impliedVolPct: { $ref: '#/components/schemas/Pct' }
+        riskFreeRatePct: { $ref: '#/components/schemas/Pct' }
+        contractSize: { type: integer, minimum: 1 }
+        initialMarginRub: { $ref: '#/components/schemas/Money' }
+    OptionGreeksResponse:
+      type: object
+      required:
+        - ticker
+        - optionType
+        - spot
+        - strike
+        - impliedVolPct
+        - riskFreeRatePct
+        - asOfDate
+        - expirationDate
+        - daysToExpiration
+        - expired
+        - premium
+        - intrinsicValue
+        - timeValue
+        - delta
+        - gamma
+        - theta
+        - vega
+        - rho
+      properties:
+        ticker: { type: string }
+        optionType: { type: string, enum: [CALL, PUT] }
+        spot: { $ref: '#/components/schemas/Price' }
+        strike: { $ref: '#/components/schemas/Price' }
+        impliedVolPct: { $ref: '#/components/schemas/Pct' }
+        riskFreeRatePct: { $ref: '#/components/schemas/Pct' }
+        asOfDate: { type: string, format: date }
+        expirationDate: { type: string, format: date }
+        daysToExpiration: { type: integer, minimum: 0 }
+        expired: { type: boolean }
+        premium: { $ref: '#/components/schemas/Price' }
+        intrinsicValue: { $ref: '#/components/schemas/Price' }
+        timeValue: { $ref: '#/components/schemas/Money' }
+        delta: { $ref: '#/components/schemas/Ratio' }
+        gamma: { $ref: '#/components/schemas/Ratio' }
+        theta: { $ref: '#/components/schemas/Ratio' }
+        vega: { $ref: '#/components/schemas/Ratio' }
+        rho: { $ref: '#/components/schemas/Ratio' }

@@ -3,21 +3,23 @@
     <div>
       <h1 class="tui-text_h3">Инструменты</h1>
       <p class="tui-text_body-m muted">
-        Справочник облигаций и биржевых фондов (БПИФ / ETF) с понятными пояснениями и серверным
-        калькулятором доходности.
+        Справочник облигаций, БПИФ / ETF и срочного рынка ФОРТС (фьючерсы и опционы) с понятными
+        пояснениями и серверными калькуляторами.
       </p>
     </div>
 
     <tui-segmented
       size="m"
       aria-label="Разделы каталога инструментов"
-      [activeItemIndex]="store.activeTab() === 'etfs' ? 1 : 0"
+      [activeItemIndex]="activeTabIndex()"
       (activeItemIndexChange)="onTabIndexChange($event)"
     >
       <button id="tab-bonds" type="button">Облигации ({{ store.bonds().length }})</button>
-      <button id="tab-etfs" type="button">
-        БПИФ / ETF, валюта и металлы ({{ store.etfs().length }})
+      <button id="tab-etfs" type="button">БПИФ / ETF ({{ store.etfs().length }})</button>
+      <button id="tab-futures" type="button">
+        Фьючерсы (ФОРТС) ({{ store.futures().length }})
       </button>
+      <button id="tab-options" type="button">Опционы (ФОРТС) ({{ store.options().length }})</button>
     </tui-segmented>
   </header>
 
@@ -200,7 +202,7 @@
         />
       </aside>
     </div>
-  } @else {
+  } @else if (store.activeTab() === 'etfs') {
     <section class="panel etfs-catalog" aria-label="Каталог БПИФ и ETF">
       <div class="catalog-toolbar">
         <div class="toolbar-top">
@@ -315,5 +317,297 @@
         </div>
       }
     </section>
+  } @else if (store.activeTab() === 'futures') {
+    <div class="bonds-layout">
+      <section class="panel bonds-catalog" aria-label="Каталог фьючерсов ФОРТС">
+        <div class="catalog-toolbar">
+          <div class="toolbar-top">
+            <h2 class="tui-text_h6 toolbar-title">
+              Фьючерсы (ФОРТС)
+              <app-term-hint
+                term="Фьючерс"
+                text="Срочный биржевой контракт на базовый актив с фиксированной датой экспирации. Для открытия сделки требуется только залог (ГО), а прибыль и убыток ежедневно пересчитываются в вариационную маржу."
+              />
+            </h2>
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ store.filteredFutures().length }} из {{ store.futures().length }}
+            </span>
+          </div>
+
+          <div class="toolbar-controls">
+            <div class="filter-pills" role="group" aria-label="Фильтр фьючерсов">
+              @for (f of futuresFilters; track f.id) {
+                <button
+                  type="button"
+                  class="filter-pill"
+                  [class.active]="store.futuresFilter() === f.id"
+                  [attr.aria-pressed]="store.futuresFilter() === f.id"
+                  [attr.data-futures-filter]="f.id"
+                  (click)="store.futuresFilter.set(f.id)"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+
+            <tui-textfield tuiTextfieldSize="s" class="search-field">
+              <input
+                id="futures-search"
+                tuiInput
+                type="search"
+                placeholder="Поиск по тикеру, названию или базовому активу…"
+                aria-label="Поиск фьючерсов"
+                [ngModel]="store.futuresQuery()"
+                (ngModelChange)="store.futuresQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+        </div>
+
+        @if (store.filteredFutures().length === 0) {
+          <div class="empty-state">
+            <p class="tui-text_body-m muted">По выбранным фильтрам фьючерсы не найдены.</p>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.futuresFilter.set('all'); store.futuresQuery.set('')"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="bonds-table">
+              <thead>
+                <tr>
+                  <th>Тикер</th>
+                  <th>Название</th>
+                  <th>Базовый актив</th>
+                  <th class="num">Цена</th>
+                  <th class="num">Шаг / цена шага</th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>ГО (₽)</span>
+                      <app-term-hint
+                        term="ГО (Гарантийное обеспечение)"
+                        text="Залоговая сумма в рублях, блокируемая на счёте для открытия 1 контракта."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>Экспирация</span>
+                      <app-term-hint
+                        term="Экспирация"
+                        text="Дата исполнения и завершения торгов по срочному контракту."
+                      />
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (future of store.filteredFutures(); track future.ticker) {
+                  @let selected = store.selectedFutureTicker() === future.ticker;
+                  <tr
+                    class="bond-row future-row"
+                    [class.selected]="selected"
+                    [attr.data-future-ticker]="future.ticker"
+                    tabindex="0"
+                    (click)="onSelectFuture(future)"
+                    (keydown.enter)="onSelectFuture(future)"
+                    (keydown.space)="$event.preventDefault(); onSelectFuture(future)"
+                  >
+                    <td>
+                      <strong class="mono">{{ future.ticker }}</strong>
+                    </td>
+                    <td>
+                      <div class="bond-name-cell">
+                        <div class="bond-name-row">
+                          <span class="bond-name">{{ future.name }}</span>
+                          <span
+                            tuiBadge
+                            size="s"
+                            [appearance]="future.settlementType === 'CASH' ? 'info' : 'warning'"
+                          >
+                            {{ future.settlementType === 'CASH' ? 'Расч.' : 'Постав.' }}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{{ future.underlying }}</td>
+                    <td class="num">{{ formatNumber(future.lastPrice) }}</td>
+                    <td class="num">
+                      {{ formatNumber(future.priceStep) }} / {{ formatRub(future.stepPriceRub) }}
+                    </td>
+                    <td class="num">{{ formatRub(future.initialMarginRub) }}</td>
+                    <td class="num">{{ formatDateRu(future.expirationDate) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <aside class="calculator-col">
+        <app-futures-calculator
+          [future]="store.selectedFuture()"
+          [direction]="store.futuresDirection()"
+          [entryPrice]="store.futuresEntryPrice()"
+          [currentPrice]="store.futuresCurrentPrice()"
+          [contracts]="store.futuresContracts()"
+          [result]="store.futuresCalcResult()"
+          [loading]="store.futuresCalcLoading()"
+          [error]="store.futuresCalcError()"
+          (directionChange)="onFuturesDirectionChange($event)"
+          (entryPriceChange)="onFuturesEntryPriceChange($event)"
+          (currentPriceChange)="onFuturesCurrentPriceChange($event)"
+          (contractsChange)="onFuturesContractsChange($event)"
+          (resetParams)="onResetFuturesParams()"
+        />
+      </aside>
+    </div>
+  } @else {
+    <div class="bonds-layout">
+      <section class="panel bonds-catalog" aria-label="Каталог опционов ФОРТС">
+        <div class="catalog-toolbar">
+          <div class="toolbar-top">
+            <h2 class="tui-text_h6 toolbar-title">
+              Опционы (ФОРТС)
+              <app-term-hint
+                term="Опцион Call / Put"
+                text="Контракт на право купить (Call) или продать (Put) базовый актив по цене страйка. Покупатель рискует только премией, а чувствительность цены оценивается через греки."
+              />
+            </h2>
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ store.filteredOptions().length }} из {{ store.options().length }}
+            </span>
+          </div>
+
+          <div class="toolbar-controls">
+            <div class="filter-pills" role="group" aria-label="Фильтр опционов">
+              @for (f of optionFilters; track f.id) {
+                <button
+                  type="button"
+                  class="filter-pill"
+                  [class.active]="store.optionFilter() === f.id"
+                  [attr.aria-pressed]="store.optionFilter() === f.id"
+                  [attr.data-option-filter]="f.id"
+                  (click)="store.optionFilter.set(f.id)"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+
+            <tui-textfield tuiTextfieldSize="s" class="search-field">
+              <input
+                id="options-search"
+                tuiInput
+                type="search"
+                placeholder="Поиск по тикеру, названию или базовому активу…"
+                aria-label="Поиск опционов"
+                [ngModel]="store.optionQuery()"
+                (ngModelChange)="store.optionQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+        </div>
+
+        @if (store.filteredOptions().length === 0) {
+          <div class="empty-state">
+            <p class="tui-text_body-m muted">По выбранным фильтрам опционы не найдены.</p>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.optionFilter.set('all'); store.optionQuery.set('')"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="bonds-table">
+              <thead>
+                <tr>
+                  <th>Тикер</th>
+                  <th>Тип</th>
+                  <th>Базовый актив</th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>Страйк</span>
+                      <app-term-hint
+                        term="Страйк"
+                        text="Цена исполнения опциона, зафиксированная в контракте."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">Спот</th>
+                  <th class="num">IV %</th>
+                  <th class="num">ГО (₽)</th>
+                  <th class="num">Экспирация</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (option of store.filteredOptions(); track option.ticker) {
+                  @let selected = store.selectedOptionTicker() === option.ticker;
+                  <tr
+                    class="bond-row option-row"
+                    [class.selected]="selected"
+                    [attr.data-option-ticker]="option.ticker"
+                    tabindex="0"
+                    (click)="onSelectOption(option)"
+                    (keydown.enter)="onSelectOption(option)"
+                    (keydown.space)="$event.preventDefault(); onSelectOption(option)"
+                  >
+                    <td>
+                      <div class="bond-name-cell">
+                        <strong class="mono">{{ option.ticker }}</strong>
+                        <span class="tui-text_body-xs muted">{{ option.name }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        tuiBadge
+                        size="s"
+                        [appearance]="option.optionType === 'CALL' ? 'positive' : 'negative'"
+                      >
+                        {{ option.optionType === 'CALL' ? 'Call' : 'Put' }}
+                      </span>
+                    </td>
+                    <td>{{ option.underlying }}</td>
+                    <td class="num">{{ formatNumber(option.strike) }}</td>
+                    <td class="num">{{ formatNumber(option.underlyingPrice) }}</td>
+                    <td class="num">{{ formatPct(option.impliedVolPct) }}</td>
+                    <td class="num">{{ formatRub(option.initialMarginRub) }}</td>
+                    <td class="num">{{ formatDateRu(option.expirationDate) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <aside class="calculator-col">
+        <app-option-greeks-calculator
+          [option]="store.selectedOption()"
+          [spot]="store.optionSpot()"
+          [volatilityPct]="store.optionVolatilityPct()"
+          [riskFreeRatePct]="store.optionRiskFreeRatePct()"
+          [result]="store.optionCalcResult()"
+          [loading]="store.optionCalcLoading()"
+          [error]="store.optionCalcError()"
+          (spotChange)="onOptionSpotChange($event)"
+          (volatilityPctChange)="onOptionVolatilityChange($event)"
+          (riskFreeRatePctChange)="onOptionRiskFreeRateChange($event)"
+          (resetParams)="onResetOptionParams()"
+        />
+      </aside>
+    </div>
   }
 </section>

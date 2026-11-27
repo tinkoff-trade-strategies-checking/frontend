@@ -36,4 +36,54 @@ describe('StubInstrumentsApi', () => {
     expect(etfs.some((e) => e.category === 'GOLD')).toBe(true);
     expect(etfs.some((e) => e.category === 'CURRENCY')).toBe(true);
   });
+
+  it('возвращает расчётные и поставочные фьючерсы и считает вариационную маржу для лонга и шорта', async () => {
+    const futures = await api.listFutures();
+    expect(futures.length).toBeGreaterThanOrEqual(6);
+    expect(futures.some((f) => f.settlementType === 'CASH')).toBe(true);
+    expect(futures.some((f) => f.settlementType === 'DELIVERY')).toBe(true);
+
+    const longCalc = await api.calculateFutures('SiH7', {
+      entryPrice: 95000,
+      currentPrice: 96000,
+      contracts: 2,
+    });
+    const shortCalc = await api.calculateFutures('SiH7', {
+      entryPrice: 95000,
+      currentPrice: 96000,
+      contracts: -2,
+    });
+
+    expect(longCalc.variationMarginRub).toBe(2000);
+    expect(shortCalc.variationMarginRub).toBe(-2000);
+    expect(longCalc.initialMarginTotalRub).toBe(29000);
+    expect(longCalc.effectiveLeverage).toBeGreaterThan(1);
+  });
+
+  it('возвращает Call и Put опционы и рассчитывает 5 греков по Блэку — Шоулзу', async () => {
+    const options = await api.listOptions();
+    expect(options.length).toBeGreaterThanOrEqual(6);
+    expect(options.some((o) => o.optionType === 'CALL')).toBe(true);
+    expect(options.some((o) => o.optionType === 'PUT')).toBe(true);
+
+    const callGreeks = await api.calculateOptionGreeks('Si96000BC7', {
+      spot: 96000,
+      volatilityPct: 25,
+      riskFreeRatePct: 16,
+    });
+    const putGreeks = await api.calculateOptionGreeks('Si95000BO7', {
+      spot: 95000,
+      volatilityPct: 25,
+      riskFreeRatePct: 16,
+    });
+
+    expect(callGreeks.delta).toBeGreaterThan(0);
+    expect(callGreeks.delta).toBeLessThan(1);
+    expect(putGreeks.delta).toBeLessThan(0);
+    expect(putGreeks.delta).toBeGreaterThan(-1);
+    expect(callGreeks.gamma).toBeGreaterThan(0);
+    expect(callGreeks.vega).toBeGreaterThan(0);
+    expect(callGreeks.theta).toBeLessThan(0);
+    expect(callGreeks.premium).toBeGreaterThan(0);
+  });
 });
