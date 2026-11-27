@@ -1141,6 +1141,7 @@ components:
         - INVALID_PARAMS
         - CORPORATE_ACTION_ON_PERIOD
         - STRATEGY_INVALID
+        - DAILY_LOSS_LIMIT_REACHED
         - CONFLICT
         - BAD_REQUEST
         - UNAUTHENTICATED
@@ -1326,6 +1327,11 @@ components:
         backgroundAlgorithmId:
           oneOf: [{ $ref: '#/components/schemas/Uuid' }, { type: 'null' }]
           description: Необязательный идентификатор алгоритма из каталога мастерской для фонового сравнения (по умолчанию — «Эталон платформы»)
+        dailyLossLimitPct:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          maximum: 100
+          description: Необязательный лимит дневного убытка в % от капитала начала торгового дня (kill-switch); null или отсутствие поля — отключён
     CreatedSession:
       type: object
       required: [sessionId]
@@ -1565,6 +1571,12 @@ components:
         speed:
           oneOf: [{ $ref: '#/components/schemas/PlayerSpeed' }, { type: 'null' }]
           description: 'null в снимке воспроизведения'
+        dailyLossLimitPct:
+          type: [number, 'null']
+          description: Заданный лимит дневного убытка в % (kill-switch) или null, если отключён
+        killSwitchTriggered:
+          type: boolean
+          description: Признак срабатывания лимита дневного убытка (kill-switch)
     BlindSnapshot:
       allOf:
         - $ref: '#/components/schemas/SnapshotBase'
@@ -2741,6 +2753,11 @@ components:
           type: [array, 'null']
           items: { $ref: '#/components/schemas/Uuid' }
         initialCapital: { $ref: '#/components/schemas/Money' }
+        dailyLossLimitPct:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          maximum: 100
+          description: Необязательный лимит дневного убытка в % от капитала начала торгового дня (kill-switch); null или отсутствие поля — отключён
     CreatedRun:
       type: object
       required: [runId]
@@ -2768,6 +2785,11 @@ components:
           type: [array, 'null']
           items: { $ref: '#/components/schemas/Uuid' }
         initialCapital: { $ref: '#/components/schemas/Money' }
+        dailyLossLimitPct:
+          type: [number, 'null']
+          exclusiveMinimum: 0
+          maximum: 100
+          description: Необязательный лимит дневного убытка в % от капитала начала торгового дня (kill-switch); null или отсутствие поля — отключён
     CompareRunPaper:
       type: object
       required: [id, ticker, name]
@@ -2821,6 +2843,12 @@ components:
         createdAt: { type: string, format: date-time }
         finishedAt: { type: [string, 'null'], format: date-time }
         errorCode: { type: [string, 'null'] }
+        dailyLossLimitPct:
+          type: [number, 'null']
+          description: Заданный лимит дневного убытка в % (kill-switch) или null, если отключён
+        killSwitchTriggered:
+          type: boolean
+          description: Признак срабатывания лимита дневного убытка (kill-switch)
         diagnostics: { type: array, items: { $ref: '#/components/schemas/StrategyDiagnostic' } }
         period:
           oneOf:

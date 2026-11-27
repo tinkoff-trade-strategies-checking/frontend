@@ -389,6 +389,7 @@ describe('ArenaPage', () => {
     expect(toolbar).not.toBeNull();
     const toolbarText = toolbar!.textContent ?? '';
     expect(toolbarText).toContain('Курсор');
+    expect(toolbarText).toContain('Карандаш');
     expect(toolbarText).toContain('Уровень');
     expect(toolbarText).toContain('Тренд');
     expect(toolbarText).toContain('Фибоначчи');
@@ -396,6 +397,17 @@ describe('ArenaPage', () => {
     expect(toolbarText).toContain('Отменить');
     expect(toolbarText).toContain('Очистить');
     expect(toolbarText).not.toContain('₽');
+
+    const cursorBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-draw-none"]');
+    expect(cursorBtn?.title).toBe('Перемещение графика');
+
+    const freehandBtn = root.querySelector<HTMLButtonElement>(
+      '[data-testid="arena-draw-freehand"]',
+    );
+    expect(freehandBtn).not.toBeNull();
+    freehandBtn!.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['drawingTool']()).toBe('freehand');
 
     const fibBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-draw-fib"]');
     expect(fibBtn).not.toBeNull();

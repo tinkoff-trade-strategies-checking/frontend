@@ -352,6 +352,55 @@ describe('ArenaStore', () => {
     expect(store.activeOrders().map((o) => o.id)).toEqual(['ORD-PART-ACTIVE']);
     expect(store.closedOrders().map((o) => o.id)).toEqual(['ORD-PART-CLOSED']);
   });
+
+  it('удерживает totalDays >= day и максимального дня свечей при торгах по выходным (MOEX)', async () => {
+    const stub = new StubArenaApi();
+    const baseSnap = await stub.getSnapshot();
+    vi.spyOn(stub, 'getSnapshot').mockResolvedValueOnce({
+      ...baseSnap,
+      day: 24,
+      totalDays: 20,
+      papers: baseSnap.papers.map((paper, idx) =>
+        idx === 0
+          ? {
+              ...paper,
+              candles: [...paper.candles, { ...paper.candles[0], step: 99, day: 25 }],
+            }
+          : paper,
+      ),
+    });
+
+    const { store } = setup(stub);
+    await store.init();
+    expect(store.day()).toBe(24);
+    expect(store.totalDays()).toBe(25);
+
+    vi.spyOn(stub, 'step').mockResolvedValueOnce({
+      step: 1,
+      day: 27,
+      finished: false,
+      bars: {
+        A: {
+          step: 1,
+          day: 28,
+          candleInDay: 1,
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100.5,
+          volume: 100,
+        },
+      },
+      paperStats: {},
+      portfolio: store.portfolio(),
+      orders: [],
+      fills: [],
+    });
+
+    await store.stepOnce();
+    expect(store.day()).toBe(27);
+    expect(store.totalDays()).toBe(28);
+  });
 });
 
 function apiReplace(store: ArenaStore, orderId: string) {
