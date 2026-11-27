@@ -258,4 +258,27 @@ describe('WorkshopDraftEditor', () => {
     expect(store.draftVisibility()).toBe('hidden');
     expect(visibilityGroup?.textContent).toContain('Видит и запускает только автор');
   });
+
+  it('показывает 3-шаговую подсказку и 3 готовых шаблона, вставляющих код по клику', async () => {
+    const fixture = TestBed.createComponent(WorkshopDraftEditor);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Выберите шаблон');
+    expect(el.textContent).toContain('Пересечение средних');
+    expect(el.textContent).toContain('Отскок по RSI');
+    expect(el.textContent).toContain('Пробой канала');
+
+    const rsiBtn = el.querySelector<HTMLButtonElement>(
+      '[data-testid="starter-template-rsi-mean-reversion"]',
+    );
+    expect(rsiBtn).not.toBeNull();
+    rsiBtn!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(store.draftName()).toBe('Отскок по RSI');
+    expect(store.draftSource()).toContain('rsi(close, rsi_n)');
+    expect(checkMock).toHaveBeenCalled();
+  });
 });

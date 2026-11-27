@@ -16,6 +16,7 @@ import {
 import { StubReportApi } from './data/stub-report.api';
 import { ReportPage } from './report-page';
 import { ReportStore } from './report.store';
+import { UI_MODE_STORAGE_KEY, UiModeService } from '../../shared/ui-mode.service';
 
 @Component({
   selector: 'app-report-equity-chart',
@@ -40,6 +41,7 @@ describe('ReportPage', () => {
   let paramMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
 
   beforeEach(async () => {
+    localStorage.removeItem(UI_MODE_STORAGE_KEY);
     stubApi = new StubReportApi();
     paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'S-0103' }));
 
@@ -99,6 +101,7 @@ describe('ReportPage', () => {
     vi.spyOn(stubApi, 'getReport').mockResolvedValueOnce(sentinel);
 
     const fixture = TestBed.createComponent(ReportPage);
+    TestBed.inject(UiModeService).setMode('pro');
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -110,6 +113,7 @@ describe('ReportPage', () => {
     expect(text).toContain('3,14');
     expect(text).toContain('4,21');
     expect(text).toContain('rf = RUONIA');
+    expect(text).toContain('Глубина падений от максимума');
     expect(text).toContain('Вы, алгоритм, бенчмарк IMOEX');
     expect(text).toContain('+7,77 %');
     expect(text).toContain('Выгрузка отчёта пока недоступна');
@@ -122,6 +126,7 @@ describe('ReportPage', () => {
   });
 
   it('период показан один раз (ДД.ММ.ГГГГ) с днями, заголовок — «бумаги · период», подпись сделок — про закрытые пары', async () => {
+    TestBed.inject(UiModeService).setMode('pro');
     const fixture = TestBed.createComponent(ReportPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -206,6 +211,7 @@ describe('ReportPage', () => {
   });
 
   it('отчёт с null в полях контракта открывается: блоки скрываются или показывают «нет данных»', async () => {
+    TestBed.inject(UiModeService).setMode('pro');
     paramMap$.next(convertToParamMap({ id: 'S-NO-ALGO' }));
 
     const fixture = TestBed.createComponent(ReportPage);
@@ -507,6 +513,7 @@ describe('ReportPage', () => {
       },
     });
 
+    TestBed.inject(UiModeService).setMode('pro');
     const fixture = TestBed.createComponent(ReportPage);
     const store = fixture.debugElement.injector.get(ReportStore);
     fixture.detectChanges();
@@ -641,11 +648,29 @@ describe('ReportPage', () => {
     const hero = root.querySelector('.verdict-hero');
     expect(hero).not.toBeNull();
     const heroText = (hero?.textContent ?? '').replace(/\u00a0/g, ' ');
+    expect(heroText).toContain('Главный итог');
+    expect(heroText).toContain('До комиссий');
+    expect(heroText).toContain('→ Чистыми');
     expect(heroText).toContain('+4,50 %');
     expect(heroText).toContain('Вы обогнали алгоритм');
     expect(heroText).toContain('3,25 п.п.');
     expect(heroText).toContain('Короткий отрезок — для надёжной оценки пройдите больше дней');
+    expect(hero?.querySelector('[data-testid="repeat-period-link"]')?.textContent?.trim()).toBe(
+      'Пройти этот же период ещё раз',
+    );
     expect(hero?.querySelector('a[href="/new"]')?.textContent?.trim()).toBe('Новая сессия');
+
+    // В Базовом режиме подробные метрики и график падений скрыты до клика по «Подробная статистика».
+    expect(root.textContent).not.toContain('Sharpe (rf = RUONIA)');
+    expect(root.querySelector('.stub-underwater')).toBeNull();
+    const detailsToggle = root.querySelector<HTMLButtonElement>(
+      '[data-testid="report-details-toggle"]',
+    );
+    expect(detailsToggle).not.toBeNull();
+    detailsToggle!.click();
+    fixture.detectChanges();
+    expect(root.textContent).toContain('Sharpe (rf = RUONIA)');
+    expect(root.querySelector('.stub-underwater')).not.toBeNull();
 
     const divBtn = Array.from(hero?.querySelectorAll('button') ?? []).find((b) =>
       b.textContent?.includes('Разобрать расхождения'),

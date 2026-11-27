@@ -18,6 +18,7 @@ import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API } from './data/workshop.models';
 import { WorkshopComparePage } from './workshop-compare-page';
 import { COMPARE_POLL_INTERVAL_MS, CompareChartSeries } from './workshop-compare.store';
+import { UI_MODE_STORAGE_KEY } from '../../shared/ui-mode.service';
 
 @Component({
   selector: 'app-workshop-compare-chart',
@@ -35,6 +36,7 @@ describe('WorkshopComparePage', () => {
   let getByIdSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
+    localStorage.removeItem(UI_MODE_STORAGE_KEY);
     queryParamMap$ = new BehaviorSubject(convertToParamMap({ ids: 'A-0002,A-0003,A-0001' }));
     stubWorkshop = new StubWorkshopApi();
     stubRuns = new StubRunsApi();
@@ -97,8 +99,19 @@ describe('WorkshopComparePage', () => {
     expect(text).toContain('Нет прогона');
     expect(text).toContain('Запустить прогон');
     expect(text).toContain('разных периодах, таймфреймах или наборах бумаг');
+    expect(text).toContain('Кто выиграл');
+    expect(text).toContain('Главные 4 метрики');
+    expect(text).not.toContain('Коэффициент Шарпа');
     expect(el.querySelector('.stub-compare-chart')?.textContent).toBe('2');
     expect(el.querySelectorAll('.best-cell').length).toBeGreaterThan(0);
+
+    // Переключение на «Все 11 метрик» раскрывает полную таблицу.
+    const toggleBtn = el.querySelector<HTMLButtonElement>('[data-testid="compare-metrics-toggle"]');
+    expect(toggleBtn).not.toBeNull();
+    toggleBtn!.click();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Все 11 метрик');
+    expect(el.textContent).toContain('Коэффициент Шарпа');
   });
 
   it('удаляет алгоритм из сравнения и при эмиссии queryParamMap не перезагружает данные и не пересоздаёт график', async () => {
@@ -210,7 +223,10 @@ describe('WorkshopComparePage', () => {
     submitBtn?.click();
 
     // Ждём завершения опроса и загрузки отчётов
-    await new Promise((r) => setTimeout(r, 30));
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect((el.textContent ?? '').replace(/\u00a0/g, ' ')).toContain('Единый отрезок');
+    });
     await flushAsync();
     await fixture.whenStable();
     fixture.detectChanges();

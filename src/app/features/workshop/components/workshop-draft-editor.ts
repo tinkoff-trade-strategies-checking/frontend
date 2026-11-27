@@ -17,7 +17,26 @@ import {
   DSL_FILE_ACCEPT,
   readAndValidateDslFile,
 } from '../data/dsl-file';
+import { DSL_GUIDE_EXAMPLES } from '../data/dsl-guide.data';
 import { WorkshopVisibility } from '../data/workshop.models';
+
+export interface StarterTemplateOption {
+  readonly id: string;
+  readonly label: string;
+  readonly summary: string;
+  readonly code: string;
+}
+
+const STARTER_TEMPLATE_DEFS: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'platform-baseline', label: 'Пересечение средних' },
+  { id: 'rsi-mean-reversion', label: 'Отскок по RSI' },
+  { id: 'donchian-atr', label: 'Пробой канала' },
+];
+
+const STARTER_TEMPLATES: readonly StarterTemplateOption[] = STARTER_TEMPLATE_DEFS.flatMap((def) => {
+  const found = DSL_GUIDE_EXAMPLES.find((ex) => ex.id === def.id);
+  return found ? [{ id: def.id, label: def.label, summary: found.summary, code: found.code }] : [];
+});
 import {
   CHECK_LEVEL_LABELS,
   formatCheckLevelAppearance,
@@ -53,6 +72,7 @@ export class WorkshopDraftEditor {
   readonly openDslGuide = output<void>();
 
   protected readonly fileAccept = DSL_FILE_ACCEPT;
+  protected readonly starterTemplates = STARTER_TEMPLATES;
   protected readonly isDraggingFile = signal(false);
   protected readonly fileError = signal<string | null>(null);
   protected readonly fileSuccess = signal<string | null>(null);
@@ -95,6 +115,19 @@ export class WorkshopDraftEditor {
     this.fileError.set(null);
     this.fileSuccess.set(null);
     this.store.setDraftSource(value);
+  }
+
+  protected applyStarterTemplate(template: StarterTemplateOption): void {
+    this.fileError.set(null);
+    this.fileSuccess.set(null);
+    if (!this.store.draftName().trim()) {
+      this.store.setDraftName(template.label);
+    }
+    if (!this.store.draftDescription().trim()) {
+      this.store.setDraftDescription(template.summary);
+    }
+    this.store.setDraftSource(template.code);
+    void this.store.checkDraft();
   }
 
   protected openFilePicker(): void {

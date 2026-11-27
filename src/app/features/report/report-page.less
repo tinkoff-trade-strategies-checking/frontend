@@ -135,6 +135,15 @@
   gap: 1rem;
 }
 
+.charts-grid-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.details-accordion-bar {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .chart-pad {
   padding: 0 0.5rem 0.75rem;
 }
@@ -259,6 +268,20 @@
 .verdict-sentence {
   margin: 0;
   font-weight: 600;
+}
+
+.verdict-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.verdict-benchmark {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
 .verdict-note {

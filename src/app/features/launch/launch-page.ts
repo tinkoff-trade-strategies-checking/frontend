@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiDay } from '@taiga-ui/cdk';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import {
@@ -83,6 +83,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
 export class LaunchPage implements OnInit {
   protected readonly store = inject(LaunchStore);
   protected readonly uiMode = inject(UiModeService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
 
   protected readonly customStartDay = computed<TuiDay | null>(() =>
     parseIsoDay(this.store.customStartDate()),
@@ -171,7 +172,50 @@ export class LaunchPage implements OnInit {
   }
 
   ngOnInit(): void {
-    void this.store.init();
+    void this.initWithQueryParams();
+  }
+
+  private async initWithQueryParams(): Promise<void> {
+    await this.store.init();
+    const params = this.route?.snapshot.queryParamMap;
+    if (!params) {
+      return;
+    }
+    const startDate = params.get('startDate');
+    if (!startDate || !ISO_DATE_RE.test(startDate)) {
+      return;
+    }
+    const opts = this.store.options();
+    const durationRaw = Number(params.get('duration'));
+    if (opts?.durations.includes(durationRaw as SessionDurationDays)) {
+      this.store.setDuration(durationRaw as SessionDurationDays);
+    }
+    const tfRaw = params.get('timeframe');
+    if (tfRaw && opts?.availableTimeframes.includes(tfRaw as CandleTimeframe)) {
+      this.store.setTimeframe(tfRaw as CandleTimeframe);
+    }
+    const regimeRaw = params.get('regime');
+    if (regimeRaw && opts?.regimes.includes(regimeRaw as 'calm' | 'medium' | 'stress')) {
+      this.store.setRegime(regimeRaw as 'calm' | 'medium' | 'stress');
+    }
+    await this.store.setStartMode('custom');
+    this.store.setCustomStartDate(startDate);
+    const papersParam = params.get('papers');
+    if (papersParam) {
+      const wanted = new Set(
+        papersParam
+          .split(',')
+          .map((t) => t.trim().toUpperCase())
+          .filter(Boolean),
+      );
+      const matchedIds = this.store
+        .customPapers()
+        .filter((paper) => wanted.has(paper.ticker.toUpperCase()))
+        .map((paper) => paper.id);
+      if (matchedIds.length > 0) {
+        this.store.setSelectedPaperIds(matchedIds);
+      }
+    }
   }
 
   protected durationIndex(durations: readonly number[], current: number): number {

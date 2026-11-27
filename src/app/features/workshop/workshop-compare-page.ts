@@ -17,6 +17,7 @@ import {
   RUNS_API_IMPL,
   WORKSHOP_API_IMPL,
 } from '../../api-impls';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { HISTORY_API } from '../history/data/history.models';
 import { LAUNCH_API } from '../launch/data/launch.models';
 import {
@@ -43,13 +44,21 @@ import {
 interface MetricRow {
   readonly key: CompareMetricKey | 'tradesCount';
   readonly label: string;
+  readonly basic?: boolean;
   readonly format: (item: Extract<ComparedWorkshopItem, { status: 'ready' }>) => string;
+}
+
+export interface CompareWinnerItem {
+  readonly category: string;
+  readonly algorithmName: string;
+  readonly value: string;
 }
 
 const METRIC_ROWS: readonly MetricRow[] = [
   {
     key: 'netReturnPct',
     label: 'Чистая доходность',
+    basic: true,
     format: (item) => formatPct(item.report.metrics?.netReturnPct ?? null, true),
   },
   {
@@ -65,6 +74,7 @@ const METRIC_ROWS: readonly MetricRow[] = [
   {
     key: 'maxDrawdownPct',
     label: 'Макс. просадка',
+    basic: true,
     format: (item) =>
       item.report.metrics ? `−${formatPct(item.report.metrics.maxDrawdownPct)}` : '—',
   },
@@ -96,11 +106,13 @@ const METRIC_ROWS: readonly MetricRow[] = [
   {
     key: 'costsTotalRub',
     label: 'Издержки всего',
+    basic: true,
     format: (item) => formatRub(item.report.metrics?.costsRub.totalRub ?? null),
   },
   {
     key: 'finalCapitalRub',
     label: 'Итоговый капитал',
+    basic: true,
     format: (item) => formatRub(item.report.metrics?.finalCapitalRub ?? null),
   },
 ];
@@ -129,13 +141,59 @@ const METRIC_ROWS: readonly MetricRow[] = [
 })
 export class WorkshopComparePage implements OnInit {
   protected readonly store = inject(WorkshopCompareStore);
+  protected readonly uiMode = inject(UiModeService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly launchPanelOpen = signal(false);
+  protected readonly showAllMetrics = signal(false);
 
   protected readonly metricRows = METRIC_ROWS;
+  protected readonly displayAllMetrics = computed(
+    () => this.uiMode.isPro() || this.showAllMetrics(),
+  );
+  protected readonly visibleMetricRows = computed<readonly MetricRow[]>(() =>
+    this.displayAllMetrics() ? METRIC_ROWS : METRIC_ROWS.filter((row) => row.basic === true),
+  );
+  protected readonly winnerSummary = computed<readonly CompareWinnerItem[]>(() => {
+    const ready = this.store.readyEntries();
+    if (ready.length < 2) {
+      return [];
+    }
+    const byId = new Map(ready.map((item) => [item.id, item]));
+    const best = this.store.bestByMetric();
+    const out: CompareWinnerItem[] = [];
+
+    const add = (
+      category: string,
+      winnerId: string | null,
+      formatVal: (item: Extract<ComparedWorkshopItem, { status: 'ready' }>) => string,
+    ) => {
+      if (!winnerId) {
+        return;
+      }
+      const found = byId.get(winnerId);
+      if (found) {
+        out.push({ category, algorithmName: found.name, value: formatVal(found) });
+      }
+    };
+
+    add('Лучшая доходность', best.netReturnPct, (item) =>
+      formatPct(item.report.metrics?.netReturnPct ?? null, true),
+    );
+    add('Меньшая просадка', best.maxDrawdownPct, (item) =>
+      item.report.metrics ? `−${formatPct(item.report.metrics.maxDrawdownPct)}` : '—',
+    );
+    add('Меньшие издержки', best.costsTotalRub, (item) =>
+      formatRub(item.report.metrics?.costsRub.totalRub ?? null),
+    );
+    return out;
+  });
+
+  protected toggleShowAllMetrics(): void {
+    this.showAllMetrics.update((v) => !v);
+  }
   protected readonly regimeLabels = REPORT_REGIME_LABELS;
   protected readonly timeframeLabels = REPORT_TIMEFRAME_LABELS;
   protected readonly statusLabels = RUN_STATUS_LABELS;

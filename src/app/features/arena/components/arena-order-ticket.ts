@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   effect,
+  inject,
   input,
   output,
   signal,
@@ -10,6 +11,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiChevron, TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import { UiModeService } from '../../../shared/ui-mode.service';
 import { formatPct, formatPrice, formatRejectReason } from '../arena.format';
 import { OrderDraft } from '../arena.store';
 import {
@@ -39,6 +41,21 @@ const ORDER_TYPES: readonly OrderType[] = [
 ];
 
 const SELL_ONLY_TYPES = new Set<OrderType>(['take_profit', 'trailing', 'oco']);
+
+const ORDER_TYPE_EXPLANATIONS: Readonly<Record<OrderType, string>> = {
+  market: 'Купит или продаст сразу по цене открытия следующей свечи.',
+  limit: 'Сработает, только если цена дойдёт до указанной вами или окажется выгоднее.',
+  stop: 'Защитная заявка: сработает автоматически, если цена дойдёт до указанного уровня.',
+  stop_limit: 'После достижения стоп-цены выставляет лимитную заявку по заданной цене.',
+  take_profit: 'Зафиксирует прибыль: продаст позицию, когда цена вырастет до цели.',
+  trailing: 'Скользящий стоп: подтягивается за ростом цены и продаёт при откате.',
+  oco: 'Две связанные заявки (стоп + тейк): исполнение одной автоматически снимает вторую.',
+};
+
+interface QuickSellChip {
+  readonly label: string;
+  readonly lots: number;
+}
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
@@ -109,13 +126,16 @@ function round2(value: number): number {
             <select
               id="arena-order-type"
               tuiSelect
-              [items]="orderTypes"
+              [items]="availableOrderTypes()"
               [disabled]="Boolean(editingOrder())"
               [ngModel]="orderType()"
               (ngModelChange)="onOrderTypeChange($event)"
             ></select>
           </tui-textfield>
         </label>
+        <p class="tui-text_body-xs muted order-type-hint">
+          {{ orderTypeHint() }}
+        </p>
 
         @if (orderType() === 'limit') {
           <label tuiLabel for="arena-limit-price">
@@ -249,6 +269,23 @@ function round2(value: number): number {
           </tui-textfield>
         </label>
 
+        @if (quickSellChips().length > 0 && !finished()) {
+          <div class="quick-sell-row" role="group" aria-label="Быстрый выбор объёма продажи">
+            @for (chip of quickSellChips(); track chip.label) {
+              <button
+                tuiButton
+                type="button"
+                size="xs"
+                appearance="outline"
+                [attr.data-testid]="'quick-sell-' + chip.label"
+                (click)="onLotsChange(chip.lots)"
+              >
+                {{ chip.label }}
+              </button>
+            }
+          </div>
+        }
+
         <div class="hint-row tui-text_body-xs">
           <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>
           <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
@@ -278,14 +315,16 @@ function round2(value: number): number {
           }
         }
 
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="tif() === 'day' ? 0 : 1"
-          (activeItemIndexChange)="tif.set($event === 0 ? 'day' : 'gtc')"
-        >
-          <button type="button">На день</button>
-          <button type="button">До отмены</button>
-        </tui-segmented>
+        @if (orderType() !== 'market') {
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="tif() === 'day' ? 0 : 1"
+            (activeItemIndexChange)="tif.set($event === 0 ? 'day' : 'gtc')"
+          >
+            <button type="button">На день</button>
+            <button type="button">До отмены</button>
+          </tui-segmented>
+        }
 
         @if (validationError()) {
           <div tuiNotification appearance="warning" size="s">
@@ -311,7 +350,7 @@ function round2(value: number): number {
             [disabled]="finished() || Boolean(validationError())"
             (click)="onSubmit()"
           >
-            {{ editingOrder() ? 'Заменить заявку' : 'Выставить заявку' }}
+            {{ submitButtonLabel() }}
           </button>
 
           @if (editingOrder()) {
@@ -374,6 +413,17 @@ function round2(value: number): number {
 
     .execution-hint {
       margin: -0.35rem 0 0;
+    }
+
+    .order-type-hint {
+      margin: -0.4rem 0 0;
+    }
+
+    .quick-sell-row {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      margin-top: -0.25rem;
     }
 
     .actions {
@@ -441,8 +491,10 @@ export class ArenaOrderTicket {
   }>();
   readonly cancelEdit = output<void>();
 
+  protected readonly uiMode = inject(UiModeService);
   protected readonly orderTypes = ORDER_TYPES;
-  protected readonly orderTypeStringify = (type: OrderType): string => ORDER_TYPE_LABELS[type];
+  protected readonly orderTypeStringify = (type: OrderType): string =>
+    this.uiMode.isBasic() && type === 'stop' ? 'Стоп-лосс' : ORDER_TYPE_LABELS[type];
   protected readonly paperStringify = (id: string): string =>
     this.papers().find((p) => p.id === id)?.label ?? `Бумага ${id}`;
   protected readonly Boolean = Boolean;
@@ -462,6 +514,45 @@ export class ArenaOrderTicket {
   private estimateRequested = false;
 
   protected readonly paperIds = computed(() => this.papers().map((p) => p.id));
+  protected readonly positionLots = computed(
+    () => this.portfolio().positions[this.selectedPaperId()]?.lots ?? 0,
+  );
+  protected readonly hasPosition = computed(() => this.positionLots() > 0);
+  protected readonly availableOrderTypes = computed<readonly OrderType[]>(() => {
+    if (this.editingOrder()) {
+      return ORDER_TYPES;
+    }
+    if (this.uiMode.isBasic()) {
+      return this.hasPosition() ? ['market', 'limit', 'stop'] : ['market', 'limit'];
+    }
+    return this.hasPosition()
+      ? ORDER_TYPES
+      : ORDER_TYPES.filter((type) => !SELL_ONLY_TYPES.has(type));
+  });
+  protected readonly orderTypeHint = computed(() => ORDER_TYPE_EXPLANATIONS[this.orderType()]);
+  /** INV-6: доли позиции считаются строго от целого числа лотов, без денежной арифметики. */
+  protected readonly quickSellChips = computed<readonly QuickSellChip[]>(() => {
+    const posLots = this.positionLots();
+    if (this.side() !== 'sell' || posLots <= 0) {
+      return [];
+    }
+    return [
+      { label: '25%', lots: Math.max(1, Math.floor(posLots / 4)) },
+      { label: '50%', lots: Math.max(1, Math.floor(posLots / 2)) },
+      { label: 'Всё', lots: posLots },
+    ];
+  });
+  protected readonly submitButtonLabel = computed(() => {
+    if (this.editingOrder()) {
+      return 'Заменить заявку';
+    }
+    const action = this.side() === 'buy' ? 'Купить' : 'Продать';
+    const lots = this.lots();
+    if (lots !== null && Number.isInteger(lots) && lots >= 1) {
+      return `${action} ${lots} лот.`;
+    }
+    return action;
+  });
   protected readonly isSellOnly = computed(() => SELL_ONLY_TYPES.has(this.orderType()));
   protected readonly lastPrice = computed<number | null>(() => {
     const found = this.papers().find((p) => p.id === this.selectedPaperId());
@@ -515,6 +606,13 @@ export class ArenaOrderTicket {
         if (edit.trailingPct !== undefined) {
           this.trailingPct.set(edit.trailingPct);
         }
+      }
+    });
+
+    effect(() => {
+      const allowed = this.availableOrderTypes();
+      if (!this.editingOrder() && !allowed.includes(this.orderType())) {
+        this.orderType.set('market');
       }
     });
 
@@ -581,7 +679,7 @@ export class ArenaOrderTicket {
 
   protected onOrderTypeChange(type: OrderType): void {
     this.orderType.set(type);
-    if (SELL_ONLY_TYPES.has(type)) {
+    if (SELL_ONLY_TYPES.has(type) || (this.uiMode.isBasic() && type === 'stop')) {
       this.side.set('sell');
     }
     if (type !== 'market' && type !== 'limit') {

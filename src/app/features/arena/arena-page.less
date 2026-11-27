@@ -42,12 +42,44 @@
   font-variant-numeric: tabular-nums;
 }
 
-.guide-banner {
+.guide-banner,
+.pause-trap-callout {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.tour-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+
+.tour-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.tour-highlight {
+  border-radius: var(--tui-radius-l);
+  box-shadow: 0 0 0 2px var(--ttsc-accent, var(--tui-background-accent-1));
+}
+
+.chart-toolbar-compact {
+  justify-content: flex-start;
 }
 
 .finish-banner {

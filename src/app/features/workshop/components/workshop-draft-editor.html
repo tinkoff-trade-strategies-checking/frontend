@@ -25,6 +25,33 @@
       <div tuiNotification appearance="positive" size="s">{{ msg }}</div>
     }
 
+    @if (store.editorMode() === 'create') {
+      <section class="starter-box" aria-label="Быстрый старт алгоритма">
+        <div class="starter-steps tui-text_body-xs muted">
+          <span><strong>1.</strong> Выберите шаблон</span>
+          <span aria-hidden="true">→</span>
+          <span><strong>2.</strong> Проверьте</span>
+          <span aria-hidden="true">→</span>
+          <span><strong>3.</strong> Запустите</span>
+        </div>
+        <div class="starter-buttons">
+          @for (tpl of starterTemplates; track tpl.id) {
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              [attr.data-testid]="'starter-template-' + tpl.id"
+              [title]="tpl.summary"
+              (click)="applyStarterTemplate(tpl)"
+            >
+              {{ tpl.label }}
+            </button>
+          }
+        </div>
+      </section>
+    }
+
     <div class="editor-fields">
       <label tuiLabel for="workshop-draft-name" class="field-block">
         Название

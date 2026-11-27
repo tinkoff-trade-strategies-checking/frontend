@@ -1,24 +1,31 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { TuiButton } from '@taiga-ui/core';
 import { ArenaPaper } from '../../features/arena/data/arena.models';
+import { TermHint } from '../term-hint/term-hint';
 import { PaperFundamentalsModal } from './paper-fundamentals-modal';
 
 @Component({
   selector: 'app-arena-fundamentals-trigger',
-  imports: [TuiButton, PaperFundamentalsModal],
+  imports: [TuiButton, TermHint, PaperFundamentalsModal],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <button
-      tuiButton
-      type="button"
-      size="s"
-      appearance="outline"
-      data-testid="arena-fundamentals-btn"
-      [attr.title]="buttonHint()"
-      (click)="open.set(true)"
-    >
-      Фундаментал
-    </button>
+    <span class="fundamentals-trigger">
+      <button
+        tuiButton
+        type="button"
+        size="s"
+        appearance="outline"
+        data-testid="arena-fundamentals-btn"
+        [disabled]="isBlindLocked()"
+        [attr.title]="buttonHint()"
+        (click)="onTriggerClick()"
+      >
+        Фундаментал
+      </button>
+      @if (isBlindLocked()) {
+        <app-term-hint term="Фундаментал" [text]="buttonHint()" />
+      }
+    </span>
 
     @defer (when open()) {
       @if (open()) {
@@ -34,6 +41,13 @@ import { PaperFundamentalsModal } from './paper-fundamentals-modal';
           (closed)="open.set(false)"
         />
       }
+    }
+  `,
+  styles: `
+    .fundamentals-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
   `,
 })
@@ -52,6 +66,13 @@ export class ArenaFundamentalsTrigger {
       ? 'В слепом режиме фундаментальные показатели скрыты до завершения сессии'
       : 'Открыть фундаментальные показатели выбранной бумаги',
   );
+
+  protected onTriggerClick(): void {
+    if (this.isBlindLocked()) {
+      return;
+    }
+    this.open.set(true);
+  }
 
   protected readonly effectiveTicker = computed(() => {
     if (this.isBlindLocked()) {

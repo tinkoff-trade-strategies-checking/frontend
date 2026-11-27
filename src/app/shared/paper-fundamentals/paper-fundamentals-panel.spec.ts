@@ -153,7 +153,7 @@ describe('ArenaFundamentalsTrigger (INV-7)', () => {
     }).compileComponents();
   });
 
-  it('INV-7: в активной слепой сессии показывает уведомление о скрытии и не запрашивает API', async () => {
+  it('INV-7: в активной слепой сессии отключает кнопку с подсказкой и не запрашивает API', async () => {
     const fixture = TestBed.createComponent(ArenaFundamentalsTrigger);
     fixture.componentRef.setInput('sessionId', 'S-BLIND');
     fixture.componentRef.setInput('paper', { ...samplePaper, id: 'A', label: 'Бумага A' });
@@ -162,15 +162,20 @@ describe('ArenaFundamentalsTrigger (INV-7)', () => {
     fixture.detectChanges();
 
     const root = fixture.nativeElement as HTMLElement;
-    root.querySelector<HTMLButtonElement>('[data-testid="arena-fundamentals-btn"]')!.click();
+    const btn = root.querySelector<HTMLButtonElement>('[data-testid="arena-fundamentals-btn"]')!;
+    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute('title')).toContain(
+      'В слепом режиме фундаментальные показатели скрыты до завершения сессии',
+    );
+    expect(root.querySelector('app-term-hint')).not.toBeNull();
+
+    btn.click();
     fixture.detectChanges();
     await fixture.whenStable();
 
     expect(mockApi.getSessionFundamentals).not.toHaveBeenCalled();
     expect(mockApi.getPaperFundamentals).not.toHaveBeenCalled();
-    expect(root.querySelector('[data-testid="fundamentals-blind-notice"]')?.textContent).toContain(
-      'В слепом режиме фундаментальные показатели скрыты до завершения сессии',
-    );
+    expect(root.querySelector('app-paper-fundamentals-modal')).toBeNull();
   });
 
   it('в открытой сессии загружает фундаментальные показатели по sessionId с датой asOfDate', async () => {
