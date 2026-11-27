@@ -1,6 +1,6 @@
 import { formatPct, formatPrice, formatRub } from './arena.format';
 
-export type ArenaDrawingTool = 'none' | 'hline' | 'trendline' | 'fib' | 'ruler';
+export type ArenaDrawingTool = 'none' | 'freehand' | 'hline' | 'trendline' | 'fib' | 'ruler';
 
 export interface ArenaDrawingToolOption {
   readonly id: ArenaDrawingTool;
@@ -9,20 +9,43 @@ export interface ArenaDrawingToolOption {
 }
 
 export const ARENA_DRAWING_TOOLS: readonly ArenaDrawingToolOption[] = [
-  { id: 'none', label: 'Курсор', hint: 'Обычное управление графиком' },
+  { id: 'none', label: 'Курсор', hint: 'Перемещение графика' },
+  {
+    id: 'freehand',
+    label: 'Карандаш',
+    hint: 'Зажмите и ведите курсор — свободное рисование на графике',
+  },
   {
     id: 'hline',
     label: 'Уровень',
     hint: '1 клик — горизонтальный уровень поддержки/сопротивления',
   },
-  { id: 'trendline', label: 'Тренд', hint: '2 клика — трендовая линия между двумя точками' },
-  { id: 'fib', label: 'Фибоначчи', hint: '2 клика — уровни коррекции Фибоначчи' },
-  { id: 'ruler', label: 'Линейка', hint: '2 клика — измерение движения цены и баров' },
+  {
+    id: 'trendline',
+    label: 'Тренд',
+    hint: 'Перетаскивание или 2 клика — трендовая линия между двумя точками',
+  },
+  {
+    id: 'fib',
+    label: 'Фибоначчи',
+    hint: 'Перетаскивание или 2 клика — уровни коррекции Фибоначчи',
+  },
+  {
+    id: 'ruler',
+    label: 'Линейка',
+    hint: 'Перетаскивание или 2 клика — измерение движения цены и баров',
+  },
 ];
 
 export interface DrawingAnchor {
   readonly time: number;
   readonly price: number;
+}
+
+export interface FreehandDrawing {
+  readonly id: string;
+  readonly kind: 'freehand';
+  readonly points: readonly DrawingAnchor[];
 }
 
 export interface HLineDrawing {
@@ -52,7 +75,8 @@ export interface RulerDrawing {
   readonly end: DrawingAnchor;
 }
 
-export type ArenaDrawing = HLineDrawing | TrendlineDrawing | FibDrawing | RulerDrawing;
+export type ArenaDrawing =
+  FreehandDrawing | HLineDrawing | TrendlineDrawing | FibDrawing | RulerDrawing;
 
 export type DrawingsByPaper = Readonly<Record<string, readonly ArenaDrawing[]>>;
 
@@ -76,6 +100,13 @@ export interface ChartCoordinateProjector {
   priceToY(price: number): number | null;
   readonly width: number;
   readonly height: number;
+}
+
+export interface ProjectedFreehand {
+  readonly id: string;
+  readonly kind: 'freehand';
+  readonly pointsAttr: string;
+  readonly pointCount: number;
 }
 
 export interface ProjectedHLine {
@@ -136,7 +167,8 @@ export interface ProjectedRuler {
   readonly lines: readonly [string, string, string];
 }
 
-export type ProjectedDrawing = ProjectedHLine | ProjectedTrendline | ProjectedFib | ProjectedRuler;
+export type ProjectedDrawing =
+  ProjectedFreehand | ProjectedHLine | ProjectedTrendline | ProjectedFib | ProjectedRuler;
 
 const RULER_LABEL_WIDTH = 152;
 const RULER_LABEL_HEIGHT = 54;
@@ -284,6 +316,26 @@ export function projectDrawing(
   }
 
   switch (drawing.kind) {
+    case 'freehand': {
+      const coords: { readonly x: number; readonly y: number }[] = [];
+      for (const point of drawing.points) {
+        const x = proj.timeToX(point.time);
+        const y = proj.priceToY(point.price);
+        if (x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y)) {
+          coords.push({ x, y });
+        }
+      }
+      if (coords.length < 2) {
+        return null;
+      }
+      return {
+        id: drawing.id,
+        kind: 'freehand',
+        pointsAttr: coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' '),
+        pointCount: coords.length,
+      };
+    }
+
     case 'hline': {
       const y = proj.priceToY(drawing.price);
       if (y === null || !Number.isFinite(y)) {

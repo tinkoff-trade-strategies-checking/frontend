@@ -89,6 +89,7 @@ export const PROBLEM_MESSAGES: Readonly<Record<ProblemCode, string | null>> = {
   TOO_MANY_BARS: null,
   CORPORATE_ACTION_ON_PERIOD: null,
   STRATEGY_INVALID: 'Стратегия содержит ошибки DSL и не может быть опубликована или запущена.',
+  DAILY_LOSS_LIMIT_REACHED: 'Достигнут лимит дневного убытка. Торговля остановлена до конца дня.',
   CONFLICT: 'Конфликт данных. Обновите страницу и повторите действие.',
   METHOD_NOT_ALLOWED: null,
   NOT_ACCEPTABLE: null,

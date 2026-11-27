@@ -318,3 +318,84 @@ test('Арена в навигации (S-0104) → Завершить → От�
   await expect(page.locator('.report-header').getByText('S-0104', { exact: true })).toBeVisible();
   await expect(page.getByText('Период раскрыт')).toBeVisible();
 });
+
+test('рисование на графике: блокировка скролла, карандаш и тренд (drag и click-click)', async ({
+  page,
+}) => {
+  await page.goto('/arena');
+  await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
+
+  const drawToggle = page.getByTestId('arena-drawing-toggle');
+  if (await drawToggle.isVisible()) {
+    await drawToggle.click();
+  }
+  await expect(page.getByTestId('arena-drawing-toolbar')).toBeVisible();
+  await expect(page.getByTestId('arena-draw-none')).toHaveAttribute('title', 'Перемещение графика');
+
+  const readScrollAndRange = () =>
+    page.evaluate(() => {
+      const ng = (window as unknown as { ng?: NgDebugApi }).ng;
+      const chartEl = document.querySelector('app-arena-chart');
+      const comp = ng!.getComponent(chartEl!) as {
+        chart?: {
+          options(): {
+            handleScroll?:
+              | boolean
+              | { pressedMouseMove?: boolean; horzTouchDrag?: boolean; vertTouchDrag?: boolean };
+          };
+          timeScale(): { getVisibleLogicalRange(): { from: number; to: number } | null };
+        };
+      };
+      return {
+        handleScroll: comp.chart?.options().handleScroll,
+        range: comp.chart?.timeScale().getVisibleLogicalRange() ?? null,
+      };
+    });
+
+  // Выбираем «Карандаш» и рисуем перетаскиванием — график не должен сдвигаться.
+  await page.getByTestId('arena-draw-freehand').click();
+  const overlay = page.locator('app-arena-chart svg.drawing-overlay');
+  await expect(overlay).toHaveClass(/interactive/);
+
+  const beforeFreehand = await readScrollAndRange();
+  expect(beforeFreehand.handleScroll).toMatchObject({
+    pressedMouseMove: false,
+    horzTouchDrag: false,
+    vertTouchDrag: false,
+  });
+
+  const box = (await overlay.boundingBox())!;
+  await page.mouse.move(box.x + 80, box.y + 120);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 150, box.y + 160, { steps: 6 });
+  await page.mouse.move(box.x + 220, box.y + 110, { steps: 6 });
+  await page.mouse.up();
+
+  await expect(overlay.locator('g.drawing-freehand polyline')).toHaveCount(1);
+  const afterFreehand = await readScrollAndRange();
+  expect(afterFreehand.range?.from).toBeCloseTo(beforeFreehand.range!.from, 4);
+  expect(afterFreehand.range?.to).toBeCloseTo(beforeFreehand.range!.to, 4);
+
+  // «Тренд»: поддерживаются и press-drag-release, и click-click.
+  await page.getByTestId('arena-draw-trendline').click();
+  await page.mouse.move(box.x + 100, box.y + 180);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 240, box.y + 100, { steps: 5 });
+  await page.mouse.up();
+  await expect(overlay.locator('g.drawing-trendline')).toHaveCount(1);
+
+  // Второй тренд через click-click.
+  await page.mouse.click(box.x + 120, box.y + 200);
+  await page.mouse.click(box.x + 260, box.y + 140);
+  await expect(overlay.locator('g.drawing-trendline')).toHaveCount(2);
+
+  // Возврат в «Курсор» восстанавливает перетаскивание графика.
+  await page.getByTestId('arena-draw-none').click();
+  await expect(overlay).not.toHaveClass(/interactive/);
+  const afterCursor = await readScrollAndRange();
+  expect(afterCursor.handleScroll).toMatchObject({
+    pressedMouseMove: true,
+    horzTouchDrag: true,
+    vertTouchDrag: true,
+  });
+});

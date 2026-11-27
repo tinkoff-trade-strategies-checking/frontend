@@ -1,5 +1,6 @@
 import {
   addDrawingForPaper,
+  ARENA_DRAWING_TOOLS,
   ArenaDrawing,
   ChartCoordinateProjector,
   clampLabelBox,
@@ -191,6 +192,49 @@ describe('arena-drawing', () => {
         expect(ruler.lines.join(' ')).not.toContain('₽');
         expect(ruler.lines[2]).toBe('10 баров');
       }
+
+      const freehand = projectDrawing(
+        {
+          id: 'fh1',
+          kind: 'freehand',
+          points: [
+            { time: 1001, price: 100 },
+            { time: 1003, price: 120 },
+            { time: 1006, price: 110 },
+          ],
+        },
+        proj,
+        true,
+      );
+      expect(freehand).toEqual({
+        id: 'fh1',
+        kind: 'freehand',
+        pointsAttr: '10.0,200.0 30.0,180.0 60.0,190.0',
+        pointCount: 3,
+      });
+
+      expect(
+        projectDrawing(
+          {
+            id: 'fh-short',
+            kind: 'freehand',
+            points: [{ time: 1001, price: 100 }],
+          },
+          proj,
+          true,
+        ),
+      ).toBeNull();
+    });
+
+    it('включает инструменты «Курсор» (Перемещение графика) и «Карандаш»', () => {
+      const cursorTool = ARENA_DRAWING_TOOLS.find((t) => t.id === 'none');
+      const freehandTool = ARENA_DRAWING_TOOLS.find((t) => t.id === 'freehand');
+      expect(cursorTool).toEqual({
+        id: 'none',
+        label: 'Курсор',
+        hint: 'Перемещение графика',
+      });
+      expect(freehandTool?.label).toBe('Карандаш');
     });
 
     it('возвращает null, если координаты не определены или область пуста', () => {

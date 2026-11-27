@@ -45,7 +45,9 @@ import { ARENA_SPEEDS, ArenaSpeed } from '../data/arena.models';
         <progress tuiProgressBar [max]="100" [value]="progressPct()"></progress>
       </div>
 
-      <span class="day-counter tui-text_body-s"> День {{ day() }} из {{ totalDays() }} </span>
+      <span class="day-counter tui-text_body-s">
+        День {{ day() }} из {{ displayTotalDays() }}
+      </span>
     </div>
   `,
   styles: `
@@ -87,6 +89,7 @@ export class ArenaPlayer {
 
   protected readonly speeds = ARENA_SPEEDS;
   protected readonly speedIndex = computed(() => Math.max(0, ARENA_SPEEDS.indexOf(this.speed())));
+  protected readonly displayTotalDays = computed(() => Math.max(this.totalDays(), this.day()));
 
   protected onSpeedIndexChange(index: number): void {
     const next = ARENA_SPEEDS[index];

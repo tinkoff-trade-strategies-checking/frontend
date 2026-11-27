@@ -25,7 +25,6 @@ import {
   LineData,
   LineSeries,
   LineStyle,
-  MouseEventParams,
   SeriesMarker,
   Time,
   UTCTimestamp,
@@ -98,6 +97,8 @@ function withAlpha(color: string, alpha: number): string {
 
 const BASE_CHART_HEIGHT = 360;
 const MULTI_PANE_CHART_HEIGHT = 480;
+const DRAG_THRESHOLD_PX = 6;
+const FREEHAND_MIN_STEP_PX = 3;
 
 @Component({
   selector: 'app-arena-chart',
@@ -113,13 +114,24 @@ const MULTI_PANE_CHART_HEIGHT = 480;
       @if (overlayWidth() > 0 && overlayHeight() > 0) {
         <svg
           class="drawing-overlay"
+          [class.interactive]="drawingTool() !== 'none'"
           [attr.viewBox]="'0 0 ' + overlayWidth() + ' ' + overlayHeight()"
           [attr.width]="overlayWidth()"
           [attr.height]="overlayHeight()"
           aria-hidden="true"
+          (pointerdown)="onOverlayPointerDown($event)"
+          (pointermove)="onOverlayPointerMove($event)"
+          (pointerup)="onOverlayPointerUp($event)"
+          (pointercancel)="onOverlayPointerCancel($event)"
+          (pointerleave)="onOverlayPointerLeave()"
         >
           @for (item of projectedDrawings(); track item.id) {
             @switch (item.kind) {
+              @case ('freehand') {
+                <g class="drawing-freehand">
+                  <polyline [attr.points]="item.pointsAttr" />
+                </g>
+              }
               @case ('hline') {
                 <g class="drawing-hline">
                   <line
@@ -224,6 +236,11 @@ const MULTI_PANE_CHART_HEIGHT = 480;
           @if (projectedDraft(); as draft) {
             <g class="drawing-draft">
               @switch (draft.kind) {
+                @case ('freehand') {
+                  <g class="drawing-freehand">
+                    <polyline [attr.points]="draft.pointsAttr" />
+                  </g>
+                }
                 @case ('trendline') {
                   <g class="drawing-trendline">
                     <line
@@ -352,6 +369,20 @@ const MULTI_PANE_CHART_HEIGHT = 480;
       z-index: 4;
       overflow: hidden;
       font-family: var(--tui-font-text, inherit);
+    }
+
+    .drawing-overlay.interactive {
+      pointer-events: auto;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .drawing-freehand polyline {
+      fill: none;
+      stroke: var(--tui-text-action, #3b82f6);
+      stroke-width: 2.25;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .drawing-hline line {
@@ -511,6 +542,12 @@ export class ArenaChart {
   private orderedTimes: number[] = [];
   private pendingAnchor: DrawingAnchor | null = null;
   private hoverAnchor: DrawingAnchor | null = null;
+  private freehandDraftPoints: DrawingAnchor[] = [];
+  private dragStartScreen: { readonly x: number; readonly y: number } | null = null;
+  private lastFreehandScreen: { readonly x: number; readonly y: number } | null = null;
+  private activePointerId: number | null = null;
+  private isDragging = false;
+  private dragMoved = false;
   private drawingSeq = 0;
   private lastUndoNonce = 0;
   private lastClearNonce = 0;
@@ -571,12 +608,12 @@ export class ArenaChart {
     });
 
     effect(() => {
-      // Сбрасываем незавершённый черновик при смене инструмента или бумаги и синхронизируем счётчик.
+      // Сбрасываем незавершённый черновик при смене инструмента или бумаги, блокируем pan и синхронизируем счётчик.
       this.drawingTool();
       const key = this.activePaperKey();
       const store = this.drawingsByPaper();
-      this.pendingAnchor = null;
-      this.hoverAnchor = null;
+      this.resetDraftState();
+      this.syncChartScrollLock();
       this.drawingsCountChange.emit(getDrawingsForPaper(store, key).length);
       this.scheduleOverlayRender();
     });
@@ -587,9 +624,8 @@ export class ArenaChart {
         return;
       }
       this.lastUndoNonce = nonce;
-      if (this.pendingAnchor) {
-        this.pendingAnchor = null;
-        this.hoverAnchor = null;
+      if (this.pendingAnchor || this.freehandDraftPoints.length > 0) {
+        this.resetDraftState();
       } else {
         const key = this.activePaperKey();
         this.drawingsByPaper.update((store) => undoDrawingForPaper(store, key));
@@ -603,8 +639,7 @@ export class ArenaChart {
         return;
       }
       this.lastClearNonce = nonce;
-      this.pendingAnchor = null;
-      this.hoverAnchor = null;
+      this.resetDraftState();
       const key = this.activePaperKey();
       this.drawingsByPaper.update((store) => clearDrawingsForPaper(store, key));
       this.scheduleOverlayRender();
@@ -622,8 +657,6 @@ export class ArenaChart {
       this.themeObserver?.disconnect();
       this.themeObserver = null;
       if (this.chart) {
-        this.chart.unsubscribeClick(this.handleChartClick);
-        this.chart.unsubscribeCrosshairMove(this.handleCrosshairMove);
         this.chart.timeScale().unsubscribeVisibleLogicalRangeChange(this.handleRangeOrSizeChange);
         this.chart.timeScale().unsubscribeSizeChange(this.handleRangeOrSizeChange);
         this.chart.remove();
@@ -846,9 +879,8 @@ export class ArenaChart {
     this.candleSeries = candleSeries;
     this.volumeSeries = volumeSeries;
     this.markersPlugin = createSeriesMarkers(candleSeries, []);
+    this.syncChartScrollLock();
 
-    chart.subscribeClick(this.handleChartClick);
-    chart.subscribeCrosshairMove(this.handleCrosshairMove);
     chart.timeScale().subscribeVisibleLogicalRangeChange(this.handleRangeOrSizeChange);
     chart.timeScale().subscribeSizeChange(this.handleRangeOrSizeChange);
 
@@ -863,9 +895,8 @@ export class ArenaChart {
       if (event.key !== 'Escape') {
         return;
       }
-      if (this.pendingAnchor) {
-        this.pendingAnchor = null;
-        this.hoverAnchor = null;
+      if (this.pendingAnchor || this.freehandDraftPoints.length > 0) {
+        this.resetDraftState();
         this.scheduleOverlayRender();
       } else if (this.drawingTool() !== 'none') {
         this.drawingToolChange.emit('none');
@@ -892,31 +923,67 @@ export class ArenaChart {
     return `d-${this.drawingSeq}`;
   }
 
+  private resetDraftState(): void {
+    this.pendingAnchor = null;
+    this.hoverAnchor = null;
+    this.freehandDraftPoints = [];
+    this.dragStartScreen = null;
+    this.lastFreehandScreen = null;
+    this.activePointerId = null;
+    this.isDragging = false;
+    this.dragMoved = false;
+  }
+
+  private syncChartScrollLock(): void {
+    if (!this.chart) {
+      return;
+    }
+    const canPan = this.drawingTool() === 'none';
+    this.chart.applyOptions({
+      handleScroll: {
+        pressedMouseMove: canPan,
+        horzTouchDrag: canPan,
+        vertTouchDrag: canPan,
+      },
+    });
+  }
+
   private readonly handleRangeOrSizeChange = (): void => {
     this.scheduleOverlayRender();
   };
 
-  private resolveAnchor(param: MouseEventParams<Time>): DrawingAnchor | null {
-    if (!this.chart || !this.candleSeries || !param.point) {
+  private pointerToOverlayPoint(event: PointerEvent): { readonly x: number; readonly y: number } {
+    const target = event.currentTarget as Element | null;
+    if (!target) {
+      return { x: event.offsetX, y: event.offsetY };
+    }
+    const rect = target.getBoundingClientRect();
+    const width = this.overlayWidth();
+    const height = this.overlayHeight();
+    const rawX = event.clientX - rect.left;
+    const rawY = event.clientY - rect.top;
+    return {
+      x: width > 0 ? Math.min(Math.max(rawX, 0), width) : rawX,
+      y: height > 0 ? Math.min(Math.max(rawY, 0), height) : rawY,
+    };
+  }
+
+  private resolveAnchorFromPoint(x: number, y: number): DrawingAnchor | null {
+    if (!this.chart || !this.candleSeries) {
       return null;
     }
-    if (param.paneIndex !== undefined && param.paneIndex !== 0) {
-      return null;
-    }
-    const price = this.candleSeries.coordinateToPrice(param.point.y);
+    const price = this.candleSeries.coordinateToPrice(y);
     if (price === null || !Number.isFinite(price)) {
       return null;
     }
 
-    let time: number | null = typeof param.time === 'number' ? param.time : null;
-    if (time === null) {
-      const coordTime = this.chart.timeScale().coordinateToTime(param.point.x);
-      if (typeof coordTime === 'number') {
-        time = coordTime;
-      }
+    let time: number | null = null;
+    const coordTime = this.chart.timeScale().coordinateToTime(x);
+    if (typeof coordTime === 'number') {
+      time = coordTime;
     }
     if (time === null && this.orderedTimes.length > 0) {
-      const logical = this.chart.timeScale().coordinateToLogical(param.point.x);
+      const logical = this.chart.timeScale().coordinateToLogical(x);
       if (logical !== null && Number.isFinite(logical)) {
         const clampedIndex = Math.min(
           Math.max(Math.round(logical), 0),
@@ -933,18 +1000,21 @@ export class ArenaChart {
     return { time: snapped ?? time, price };
   }
 
-  private readonly handleChartClick = (param: MouseEventParams<Time>): void => {
+  protected onOverlayPointerDown(event: PointerEvent): void {
     const tool = this.drawingTool();
     if (tool === 'none') {
       return;
     }
-    const anchor = this.resolveAnchor(param);
-    if (!anchor) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
       return;
     }
+    event.preventDefault();
+    event.stopPropagation();
 
+    const point = this.pointerToOverlayPoint(event);
+    const anchor = this.resolveAnchorFromPoint(point.x, point.y);
     const key = this.activePaperKey();
-    if (!key) {
+    if (!anchor || !key) {
       return;
     }
 
@@ -959,36 +1029,166 @@ export class ArenaChart {
       return;
     }
 
-    if (!this.pendingAnchor) {
-      this.pendingAnchor = anchor;
+    const target = event.currentTarget as Element | null;
+    if (tool === 'freehand') {
+      this.freehandDraftPoints = [anchor];
+      this.lastFreehandScreen = point;
+      this.activePointerId = event.pointerId;
+      this.isDragging = true;
+      this.dragMoved = false;
+      target?.setPointerCapture?.(event.pointerId);
+      this.scheduleOverlayRender();
+      return;
+    }
+
+    // Второй клик в режиме click-click для Тренд / Фибоначчи / Линейка.
+    if (this.pendingAnchor) {
+      const drawing: ArenaDrawing = {
+        id: this.nextDrawingId(),
+        kind: tool,
+        start: this.pendingAnchor,
+        end: anchor,
+      };
+      this.resetDraftState();
+      this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
+      this.scheduleOverlayRender();
+      return;
+    }
+
+    // Старт рисования (может завершиться либо перетаскиванием, либо вторым кликом).
+    this.pendingAnchor = anchor;
+    this.hoverAnchor = anchor;
+    this.dragStartScreen = point;
+    this.activePointerId = event.pointerId;
+    this.isDragging = true;
+    this.dragMoved = false;
+    target?.setPointerCapture?.(event.pointerId);
+    this.scheduleOverlayRender();
+  }
+
+  protected onOverlayPointerMove(event: PointerEvent): void {
+    const tool = this.drawingTool();
+    if (tool === 'none') {
+      return;
+    }
+    event.stopPropagation();
+
+    const point = this.pointerToOverlayPoint(event);
+    const anchor = this.resolveAnchorFromPoint(point.x, point.y);
+    if (!anchor) {
+      return;
+    }
+
+    if (tool === 'freehand') {
+      if (!this.isDragging || event.pointerId !== this.activePointerId) {
+        return;
+      }
+      const prev = this.lastFreehandScreen;
+      if (!prev || Math.hypot(point.x - prev.x, point.y - prev.y) >= FREEHAND_MIN_STEP_PX) {
+        this.freehandDraftPoints = [...this.freehandDraftPoints, anchor];
+        this.lastFreehandScreen = point;
+        this.dragMoved = true;
+        this.scheduleOverlayRender();
+      }
+      return;
+    }
+
+    if (this.isDragging && event.pointerId === this.activePointerId && this.dragStartScreen) {
+      if (
+        Math.hypot(point.x - this.dragStartScreen.x, point.y - this.dragStartScreen.y) >=
+        DRAG_THRESHOLD_PX
+      ) {
+        this.dragMoved = true;
+      }
       this.hoverAnchor = anchor;
       this.scheduleOverlayRender();
       return;
     }
 
-    const drawing: ArenaDrawing = {
-      id: this.nextDrawingId(),
-      kind: tool,
-      start: this.pendingAnchor,
-      end: anchor,
-    };
-    this.pendingAnchor = null;
-    this.hoverAnchor = null;
-    this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
-    this.scheduleOverlayRender();
-  };
+    if (this.pendingAnchor) {
+      this.hoverAnchor = anchor;
+      this.scheduleOverlayRender();
+    }
+  }
 
-  private readonly handleCrosshairMove = (param: MouseEventParams<Time>): void => {
-    if (!this.pendingAnchor || this.drawingTool() === 'none') {
+  protected onOverlayPointerUp(event: PointerEvent): void {
+    const tool = this.drawingTool();
+    if (tool === 'none') {
       return;
     }
-    const anchor = this.resolveAnchor(param);
-    if (!anchor) {
+    event.stopPropagation();
+
+    if (!this.isDragging || event.pointerId !== this.activePointerId) {
       return;
     }
-    this.hoverAnchor = anchor;
+
+    const target = event.currentTarget as Element | null;
+    target?.releasePointerCapture?.(event.pointerId);
+
+    const point = this.pointerToOverlayPoint(event);
+    const anchor = this.resolveAnchorFromPoint(point.x, point.y);
+    const key = this.activePaperKey();
+
+    if (tool === 'freehand') {
+      const points =
+        anchor && this.freehandDraftPoints.length > 0
+          ? [...this.freehandDraftPoints, anchor]
+          : this.freehandDraftPoints;
+      if (key && points.length >= 2) {
+        const drawing: ArenaDrawing = {
+          id: this.nextDrawingId(),
+          kind: 'freehand',
+          points,
+        };
+        this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
+      }
+      this.resetDraftState();
+      this.scheduleOverlayRender();
+      return;
+    }
+
+    this.isDragging = false;
+    this.activePointerId = null;
+    this.dragStartScreen = null;
+
+    if (this.dragMoved && this.pendingAnchor && key && tool !== 'hline') {
+      const endAnchor = anchor ?? this.hoverAnchor;
+      if (endAnchor) {
+        const drawing: ArenaDrawing = {
+          id: this.nextDrawingId(),
+          kind: tool,
+          start: this.pendingAnchor,
+          end: endAnchor,
+        };
+        this.resetDraftState();
+        this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
+        this.scheduleOverlayRender();
+      }
+    }
+  }
+
+  protected onOverlayPointerCancel(event: PointerEvent): void {
+    if (this.drawingTool() === 'none') {
+      return;
+    }
+    event.stopPropagation();
+    const target = event.currentTarget as Element | null;
+    if (this.activePointerId !== null) {
+      target?.releasePointerCapture?.(this.activePointerId);
+    }
+    this.resetDraftState();
     this.scheduleOverlayRender();
-  };
+  }
+
+  protected onOverlayPointerLeave(): void {
+    if (this.isDragging) {
+      return;
+    }
+    if (this.pendingAnchor) {
+      this.hoverAnchor = null;
+      this.scheduleOverlayRender();
+    }
+  }
 
   private scheduleOverlayRender(): void {
     if (!this.chart || !this.candleSeries) {
@@ -1038,7 +1238,20 @@ export class ArenaChart {
     this.projectedDrawings.set(projectDrawings(saved, projector, blind, this.orderedTimes));
 
     const tool = this.drawingTool();
-    if (this.pendingAnchor && this.hoverAnchor && tool !== 'none' && tool !== 'hline') {
+    if (tool === 'freehand' && this.freehandDraftPoints.length >= 2) {
+      const draft: ArenaDrawing = {
+        id: '__draft__',
+        kind: 'freehand',
+        points: this.freehandDraftPoints,
+      };
+      this.projectedDraft.set(projectDrawing(draft, projector, blind, this.orderedTimes));
+    } else if (
+      this.pendingAnchor &&
+      this.hoverAnchor &&
+      tool !== 'none' &&
+      tool !== 'hline' &&
+      tool !== 'freehand'
+    ) {
       const draft: ArenaDrawing = {
         id: '__draft__',
         kind: tool,

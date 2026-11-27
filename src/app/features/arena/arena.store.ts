@@ -483,12 +483,17 @@ export class ArenaStore {
     // INV-7: пока слепая сессия идёт, даты не показываем, даже если пришли. Воспроизведение (customApi) —
     // всегда завершённая сессия, её даты раскрыты.
     const hideDates = snap.blind && !snap.finished && !this.customApi;
+    const maxCandleDay = snap.papers.reduce(
+      (maxPaper, paper) =>
+        paper.candles.reduce((maxCandle, candle) => Math.max(maxCandle, candle.day), maxPaper),
+      0,
+    );
     this.sessionId.set(snap.sessionId);
     this.blind.set(snap.blind);
     this.step.set(snap.step);
     this.totalSteps.set(snap.totalSteps);
     this.day.set(snap.day);
-    this.totalDays.set(snap.totalDays);
+    this.totalDays.set(Math.max(snap.totalDays, snap.day, maxCandleDay));
     this.finished.set(snap.finished);
     this.papers.set(
       snap.papers.map((paper) => ({
@@ -524,8 +529,18 @@ export class ArenaStore {
     }
     const hideDates = this.blind() && !this.finished() && !res.finished && !this.customApi;
     const strip = (c: ArenaCandle): ArenaCandle => (hideDates ? stripCandleDates(c) : c);
+    let maxBatchDay = res.day;
+    for (const paper of this.papers()) {
+      const batch = res.batches?.[paper.id] ?? (res.bars[paper.id] ? [res.bars[paper.id]] : []);
+      for (const candle of batch) {
+        if (candle.day > maxBatchDay) {
+          maxBatchDay = candle.day;
+        }
+      }
+    }
     this.step.set(res.step);
     this.day.set(res.day);
+    this.totalDays.update((total) => Math.max(total, maxBatchDay));
     this.finished.update((was) => was || res.finished);
     this.portfolio.set(res.portfolio);
     this.orders.set(res.partial ? mergeById(this.orders(), res.orders) : res.orders);
