@@ -298,3 +298,37 @@
 .export-error {
   color: var(--tui-text-negative);
 }
+
+.lessons-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--ttsc-border);
+  background: var(--tui-background-elevation-2, var(--ttsc-surface-alt));
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.lessons-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.lesson-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lesson-what,
+.lesson-advice {
+  margin: 0.2rem 0 0;
+}

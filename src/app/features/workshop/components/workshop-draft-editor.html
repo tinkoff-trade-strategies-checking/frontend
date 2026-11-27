@@ -155,6 +155,27 @@
           <div tuiNotification appearance="positive" size="s">{{ fMsg }}</div>
         }
 
+        <div class="builder-toggle-row">
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            [appearance]="builderOpen() ? 'secondary' : 'outline'"
+            [attr.aria-expanded]="builderOpen()"
+            data-builder-toggle
+            (click)="builderOpen.set(!builderOpen())"
+          >
+            {{
+              builderOpen()
+                ? 'Скрыть конструктор «Если → То»'
+                : 'Конструктор «Если → То» (без кода)'
+            }}
+          </button>
+        </div>
+        @if (builderOpen()) {
+          <app-workshop-rule-builder (applyCode)="applyBuilderCode($event)" />
+        }
+
         <div
           class="dsl-editor-wrap"
           [class.dsl-editor-wrap_dragging]="isDraggingFile()"
@@ -297,6 +318,12 @@
                   <span class="tui-text_body-xs muted">{{ formatLocation(diag) }}</span>
                 </div>
                 <span class="tui-text_body-s">{{ diag.message }}</span>
+                @if (hintFor(diag.code); as hint) {
+                  <div class="diagnostic-hint tui-text_body-xs" data-diagnostic-hint>
+                    <strong>{{ hint.title }}.</strong> {{ hint.explanation }}
+                    <div><em>Как исправить:</em> {{ hint.howToFix }}</div>
+                  </div>
+                }
                 @if (diag.fixes.length > 0) {
                   <div class="fixes-row">
                     @for (fix of diag.fixes; track fix.description) {

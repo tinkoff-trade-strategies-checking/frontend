@@ -603,12 +603,28 @@ export function mapPriceAlertDto(dto: PriceAlertDto): PriceAlert {
 @Injectable({ providedIn: 'root' })
 export class HttpInstrumentsApi implements InstrumentsApi {
   private readonly http = inject(HttpClient);
+  private readonly catalogCache = new Map<string, Promise<unknown>>();
+
+  private cached<T>(key: string, loader: () => Promise<T>): Promise<T> {
+    const existing = this.catalogCache.get(key) as Promise<T> | undefined;
+    if (existing) {
+      return existing;
+    }
+    const promise = loader().catch((err) => {
+      this.catalogCache.delete(key);
+      throw err;
+    });
+    this.catalogCache.set(key, promise);
+    return promise;
+  }
 
   async listBonds(): Promise<readonly BondSummary[]> {
-    const res = await firstValueFrom(
-      this.http.get<readonly BondSummaryDto[]>('/api/v1/instruments/bonds'),
-    );
-    return (res ?? []).map(mapBondDto);
+    return this.cached('bonds', async () => {
+      const res = await firstValueFrom(
+        this.http.get<readonly BondSummaryDto[]>('/api/v1/instruments/bonds'),
+      );
+      return (res ?? []).map(mapBondDto);
+    });
   }
 
   async calculateBond(ticker: string, pricePct: number): Promise<BondCalculation> {
@@ -621,17 +637,21 @@ export class HttpInstrumentsApi implements InstrumentsApi {
   }
 
   async listEtfs(): Promise<readonly EtfSummary[]> {
-    const res = await firstValueFrom(
-      this.http.get<readonly EtfSummaryDto[]>('/api/v1/instruments/etfs'),
-    );
-    return (res ?? []).map(mapEtfDto);
+    return this.cached('etfs', async () => {
+      const res = await firstValueFrom(
+        this.http.get<readonly EtfSummaryDto[]>('/api/v1/instruments/etfs'),
+      );
+      return (res ?? []).map(mapEtfDto);
+    });
   }
 
   async listFutures(): Promise<readonly FuturesSummary[]> {
-    const res = await firstValueFrom(
-      this.http.get<readonly FuturesSummaryDto[]>('/api/v1/instruments/futures'),
-    );
-    return (res ?? []).map(mapFuturesDto);
+    return this.cached('futures', async () => {
+      const res = await firstValueFrom(
+        this.http.get<readonly FuturesSummaryDto[]>('/api/v1/instruments/futures'),
+      );
+      return (res ?? []).map(mapFuturesDto);
+    });
   }
 
   async calculateFutures(ticker: string, params: FuturesCalcParams): Promise<FuturesCalculation> {
@@ -649,10 +669,12 @@ export class HttpInstrumentsApi implements InstrumentsApi {
   }
 
   async listOptions(): Promise<readonly OptionSummary[]> {
-    const res = await firstValueFrom(
-      this.http.get<readonly OptionSummaryDto[]>('/api/v1/instruments/options'),
-    );
-    return (res ?? []).map(mapOptionDto);
+    return this.cached('options', async () => {
+      const res = await firstValueFrom(
+        this.http.get<readonly OptionSummaryDto[]>('/api/v1/instruments/options'),
+      );
+      return (res ?? []).map(mapOptionDto);
+    });
   }
 
   async calculateOptionGreeks(
@@ -674,13 +696,16 @@ export class HttpInstrumentsApi implements InstrumentsApi {
 
   async listDividends(ticker?: string): Promise<readonly DividendEventSummary[]> {
     const trimmed = ticker?.trim().toUpperCase();
-    const params = trimmed ? new HttpParams().set('ticker', trimmed) : undefined;
-    const res = await firstValueFrom(
-      this.http.get<readonly DividendEventSummaryDto[]>('/api/v1/instruments/dividends', {
-        params,
-      }),
-    );
-    return (res ?? []).map(mapDividendDto);
+    const fetch = async (): Promise<readonly DividendEventSummary[]> => {
+      const params = trimmed ? new HttpParams().set('ticker', trimmed) : undefined;
+      const res = await firstValueFrom(
+        this.http.get<readonly DividendEventSummaryDto[]>('/api/v1/instruments/dividends', {
+          params,
+        }),
+      );
+      return (res ?? []).map(mapDividendDto);
+    };
+    return trimmed ? fetch() : this.cached('dividends', fetch);
   }
 
   async calculateDividendPayout(
@@ -732,28 +757,33 @@ export class HttpInstrumentsApi implements InstrumentsApi {
   }
 
   async listScreenerPapers(): Promise<readonly ScreenerPaper[]> {
-    const res = await firstValueFrom(
-      this.http.get<readonly ScreenerPaperDto[]>('/api/v1/instruments/screener'),
-    );
-    return (res ?? []).map(mapScreenerPaperDto);
+    return this.cached('screener', async () => {
+      const res = await firstValueFrom(
+        this.http.get<readonly ScreenerPaperDto[]>('/api/v1/instruments/screener'),
+      );
+      return (res ?? []).map(mapScreenerPaperDto);
+    });
   }
 
   async listMarketEvents(
     type?: MarketEventType,
     ticker?: string,
   ): Promise<readonly MarketEventSummary[]> {
-    let params = new HttpParams();
-    if (type) {
-      params = params.set('type', type);
-    }
     const trimmed = ticker?.trim().toUpperCase();
-    if (trimmed) {
-      params = params.set('ticker', trimmed);
-    }
-    const res = await firstValueFrom(
-      this.http.get<readonly MarketEventSummaryDto[]>('/api/v1/instruments/events', { params }),
-    );
-    return (res ?? []).map(mapMarketEventDto);
+    const fetch = async (): Promise<readonly MarketEventSummary[]> => {
+      let params = new HttpParams();
+      if (type) {
+        params = params.set('type', type);
+      }
+      if (trimmed) {
+        params = params.set('ticker', trimmed);
+      }
+      const res = await firstValueFrom(
+        this.http.get<readonly MarketEventSummaryDto[]>('/api/v1/instruments/events', { params }),
+      );
+      return (res ?? []).map(mapMarketEventDto);
+    };
+    return !type && !trimmed ? this.cached('events', fetch) : fetch();
   }
 
   async listAlerts(): Promise<readonly PriceAlert[]> {

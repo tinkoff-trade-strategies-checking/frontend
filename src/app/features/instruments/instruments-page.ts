@@ -150,7 +150,7 @@ export class InstrumentsPage implements OnInit {
 
   protected onTabIndexChange(index: number): void {
     const tab = TAB_ORDER[index] ?? 'bonds';
-    this.store.activeTab.set(tab);
+    void this.store.setActiveTab(tab);
   }
 
   protected onSelectBond(bond: BondSummary): void {

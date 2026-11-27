@@ -63,16 +63,52 @@ export function mapLaunchOptions(options: ApiLaunchOptions): LaunchOptions {
   };
 }
 
+@Injectable({ providedIn: 'root' })
+export class LaunchCatalogCache {
+  private optionsPromise: Promise<LaunchOptions> | null = null;
+  private papersPromise: Promise<readonly LaunchCustomPaper[]> | null = null;
+
+  getOptions(loader: () => Promise<LaunchOptions>): Promise<LaunchOptions> {
+    if (!this.optionsPromise) {
+      this.optionsPromise = loader().catch((err) => {
+        this.optionsPromise = null;
+        throw err;
+      });
+    }
+    return this.optionsPromise;
+  }
+
+  getPapers(
+    loader: () => Promise<readonly LaunchCustomPaper[]>,
+  ): Promise<readonly LaunchCustomPaper[]> {
+    if (!this.papersPromise) {
+      this.papersPromise = loader().catch((err) => {
+        this.papersPromise = null;
+        throw err;
+      });
+    }
+    return this.papersPromise;
+  }
+
+  clear(): void {
+    this.optionsPromise = null;
+    this.papersPromise = null;
+  }
+}
+
 @Injectable()
 export class HttpLaunchApi implements LaunchApi {
   private readonly api = inject(Api);
+  private readonly cache = inject(LaunchCatalogCache);
 
   async getLaunchOptions(): Promise<LaunchOptions> {
-    return mapLaunchOptions(await this.api.invoke(getLaunchOptions));
+    return this.cache.getOptions(async () =>
+      mapLaunchOptions(await this.api.invoke(getLaunchOptions)),
+    );
   }
 
   async getAvailablePapers(): Promise<readonly LaunchCustomPaper[]> {
-    return this.api.invoke(listAvailablePapers);
+    return this.cache.getPapers(() => this.api.invoke(listAvailablePapers));
   }
 
   async startSession(command: StartSessionCommand): Promise<LaunchCommandResult> {

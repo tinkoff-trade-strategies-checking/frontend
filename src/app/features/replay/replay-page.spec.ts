@@ -19,6 +19,7 @@ class StubArenaChart {
   readonly paperId = input<string>('');
   readonly paperKey = input<string>('');
   readonly blind = input(true);
+  readonly chartMode = input<'candles' | 'line'>('candles');
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);

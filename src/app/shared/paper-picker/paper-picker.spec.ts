@@ -220,4 +220,27 @@ describe('PaperPicker', () => {
     expect(root.querySelectorAll('.picker-group').length).toBe(0);
     expect(root.querySelectorAll('.picker-row').length).toBe(60);
   });
+
+  it('рендерит не более 60 строк за раз и подгружает остальные по кнопке «Показать ещё»', () => {
+    const fixture = TestBed.createComponent(HostComponent);
+    const host = fixture.componentInstance;
+    const many = Array.from({ length: 130 }, (_, i) => ({
+      id: `P${i}`,
+      ticker: `T${i}`,
+      name: `Компания ${i}`,
+      sector: 'Финансы',
+    }));
+    host.papers.set(many);
+    host.selectedIds.set([]);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelectorAll('.picker-row').length).toBe(60);
+    const moreBtn = root.querySelector<HTMLButtonElement>('[data-picker-show-more]');
+    expect(moreBtn?.textContent).toContain('осталось 70');
+
+    moreBtn!.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.picker-row').length).toBe(120);
+  });
 });

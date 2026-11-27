@@ -179,7 +179,7 @@
           }
         </div>
       } @else if (showGroupedView()) {
-        @for (group of groupedPapers(); track group.key) {
+        @for (group of visibleGroupedPapers(); track group.key) {
           @let collapsed = isGroupCollapsed(group.key);
           <div class="picker-group" [attr.data-sector-group]="group.key">
             <div class="picker-group-header">
@@ -224,7 +224,7 @@
                     </span>
                     <span class="picker-ticker mono">{{ paper.ticker }}</span>
                     <span class="picker-name">{{ paper.name }}</span>
-                    <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
+                    <span class="picker-sector">{{ sectorLabelsById().get(paper.id) ?? '' }}</span>
                   </button>
                   @if (showFundamentals()) {
                     <button
@@ -243,7 +243,7 @@
           </div>
         }
       } @else {
-        @for (paper of filteredPapers(); track paper.id) {
+        @for (paper of visibleFilteredPapers(); track paper.id) {
           @let selected = selectedSet().has(paper.id);
           <div class="picker-row" [class.selected]="selected" [attr.data-paper-id]="paper.id">
             <button
@@ -260,7 +260,7 @@
               </span>
               <span class="picker-ticker mono">{{ paper.ticker }}</span>
               <span class="picker-name">{{ paper.name }}</span>
-              <span class="picker-sector">{{ paperSectorLabel(paper) }}</span>
+              <span class="picker-sector">{{ sectorLabelsById().get(paper.id) ?? '' }}</span>
             </button>
             @if (showFundamentals()) {
               <button
@@ -275,6 +275,20 @@
             }
           </div>
         }
+      }
+      @if (hiddenPapersCount() > 0) {
+        <div class="picker-show-more">
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            appearance="outline"
+            data-picker-show-more
+            (click)="showMorePapers()"
+          >
+            Показать ещё (осталось {{ hiddenPapersCount() }})
+          </button>
+        </div>
       }
     </div>
   }

@@ -58,6 +58,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-etfs')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     expect(root.querySelectorAll('.etf-card').length).toBeGreaterThanOrEqual(6);
@@ -79,6 +80,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-futures')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     expect(root.querySelectorAll('tbody tr.future-row').length).toBeGreaterThanOrEqual(6);
@@ -116,6 +118,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-options')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     expect(root.querySelectorAll('tbody tr.option-row').length).toBeGreaterThanOrEqual(6);
@@ -147,6 +150,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-dividends')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     expect(root.querySelectorAll('tbody tr.dividend-row').length).toBeGreaterThanOrEqual(8);
@@ -171,6 +175,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-tax-dca')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     const taxCalc = root.querySelector('app-tax-iis-calculator')!;
@@ -205,6 +210,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-screener')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     const initialRows = root.querySelectorAll('tbody tr.screener-row');
@@ -222,6 +228,7 @@ describe('InstrumentsPage', () => {
     expect(root.querySelectorAll('tbody tr.screener-row').length).toBe(initialRows.length);
 
     root.querySelector<HTMLButtonElement>('[data-screener-alert]')?.click();
+    await flushAsync();
     fixture.detectChanges();
     expect(root.querySelector('app-alerts-panel')).not.toBeNull();
   });
@@ -234,6 +241,7 @@ describe('InstrumentsPage', () => {
 
     const root = fixture.nativeElement as HTMLElement;
     root.querySelector<HTMLButtonElement>('#tab-events-alerts')?.click();
+    await flushAsync();
     fixture.detectChanges();
 
     expect(root.querySelectorAll('.event-card').length).toBeGreaterThanOrEqual(4);

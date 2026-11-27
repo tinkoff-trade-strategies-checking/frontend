@@ -106,6 +106,7 @@ export class ArenaPage implements OnInit {
   protected readonly showBollinger = signal(false);
   protected readonly showVwap = signal(false);
   protected readonly oscillator = signal<TaOscillatorId>('none');
+  protected readonly chartMode = signal<'candles' | 'line'>('candles');
   protected readonly showTaPanel = signal(false);
   protected readonly taToolbarOpen = signal(false);
   protected readonly drawingTool = signal<ArenaDrawingTool>('none');

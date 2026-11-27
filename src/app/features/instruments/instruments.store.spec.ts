@@ -16,12 +16,23 @@ describe('InstrumentsStore', () => {
     store = TestBed.inject(InstrumentsStore);
   });
 
-  it('загружает облигации и БПИФ и автоматически выбирает первую облигацию для калькулятора', async () => {
+  it('лениво загружает вкладки: при init запрашивает только облигации, остальные — при переключении', async () => {
+    const bondsSpy = vi.spyOn(api, 'listBonds');
+    const etfsSpy = vi.spyOn(api, 'listEtfs');
     await store.init();
+    expect(bondsSpy).toHaveBeenCalledTimes(1);
+    expect(etfsSpy).not.toHaveBeenCalled();
     expect(store.bonds().length).toBeGreaterThan(0);
-    expect(store.etfs().length).toBeGreaterThan(0);
     expect(store.selectedBondTicker()).toBe(store.bonds()[0].ticker);
     expect(store.calcResult()?.ticker).toBe(store.bonds()[0].ticker);
+
+    await store.setActiveTab('etfs');
+    expect(etfsSpy).toHaveBeenCalledTimes(1);
+    expect(store.etfs().length).toBeGreaterThan(0);
+    // Повторное переключение не делает лишних запросов.
+    await store.setActiveTab('bonds');
+    await store.setActiveTab('etfs');
+    expect(etfsSpy).toHaveBeenCalledTimes(1);
   });
 
   it('фильтрует облигации по типу, амортизации и поисковому запросу', async () => {
@@ -45,6 +56,7 @@ describe('InstrumentsStore', () => {
 
   it('фильтрует БПИФ по категории и поиску', async () => {
     await store.init();
+    await store.setActiveTab('etfs');
 
     store.etfFilter.set('liquidity');
     expect(store.filteredEtfs().length).toBeGreaterThan(0);
@@ -76,6 +88,7 @@ describe('InstrumentsStore', () => {
   it('фильтрует фьючерсы и передаёт знак контрактов при переключении Лонг / Шорт', async () => {
     const calcSpy = vi.spyOn(api, 'calculateFutures');
     await store.init();
+    await store.setActiveTab('futures');
 
     expect(store.futures().length).toBeGreaterThan(0);
     expect(store.selectedFutureTicker()).toBe(store.futures()[0].ticker);
@@ -103,6 +116,7 @@ describe('InstrumentsStore', () => {
   it('фильтрует опционы Call / Put и пересчитывает греки при изменении параметров', async () => {
     const calcSpy = vi.spyOn(api, 'calculateOptionGreeks');
     await store.init();
+    await store.setActiveTab('options');
 
     expect(store.options().length).toBeGreaterThan(0);
     expect(store.selectedOptionTicker()).toBe(store.options()[0].ticker);
@@ -126,6 +140,7 @@ describe('InstrumentsStore', () => {
   it('загружает дивиденды, фильтрует по тикеру/компании и пересчитывает выплату при смене НДФЛ', async () => {
     const calcSpy = vi.spyOn(api, 'calculateDividendPayout');
     await store.init();
+    await store.setActiveTab('dividends');
 
     expect(store.dividends().length).toBeGreaterThan(0);
     expect(store.selectedDividend()?.ticker).toBe(store.dividends()[0].ticker);
@@ -146,6 +161,7 @@ describe('InstrumentsStore', () => {
     const taxSpy = vi.spyOn(api, 'calculateTax');
     const dcaSpy = vi.spyOn(api, 'calculateDca');
     await store.init();
+    await store.setActiveTab('tax_dca');
 
     expect(store.taxCalcResult()).not.toBeNull();
     expect(store.dcaCalcResult()).not.toBeNull();
@@ -166,6 +182,7 @@ describe('InstrumentsStore', () => {
 
   it('фильтрует и сортирует скринер акций по пресетам, сектору и числовым порогам', async () => {
     await store.init();
+    await store.setActiveTab('screener');
     expect(store.screenerPapers().length).toBeGreaterThanOrEqual(10);
     expect(store.screenerSectors().length).toBeGreaterThanOrEqual(3);
 
@@ -208,6 +225,7 @@ describe('InstrumentsStore', () => {
 
   it('фильтрует события календаря и создаёт/удаляет алерты', async () => {
     await store.init();
+    await store.setActiveTab('events_alerts');
     expect(store.marketEvents().length).toBeGreaterThan(0);
 
     store.eventFilter.set('CBR_RATE');
