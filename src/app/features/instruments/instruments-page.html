@@ -3,8 +3,8 @@
     <div>
       <h1 class="tui-text_h3">Инструменты</h1>
       <p class="tui-text_body-m muted">
-        Справочник облигаций, БПИФ / ETF и срочного рынка ФОРТС (фьючерсы и опционы) с понятными
-        пояснениями и серверными калькуляторами.
+        Справочник облигаций, БПИФ / ETF, срочного рынка ФОРТС, дивидендных отсечек (T+1), налогов
+        (ИИС) и доходности DCA / XIRR с серверными калькуляторами.
       </p>
     </div>
 
@@ -20,6 +20,10 @@
         Фьючерсы (ФОРТС) ({{ store.futures().length }})
       </button>
       <button id="tab-options" type="button">Опционы (ФОРТС) ({{ store.options().length }})</button>
+      <button id="tab-dividends" type="button">
+        Дивиденды (T+1) ({{ store.dividends().length }})
+      </button>
+      <button id="tab-tax-dca" type="button">Налоги (ИИС) и DCA</button>
     </tui-segmented>
   </header>
 
@@ -469,7 +473,7 @@
         />
       </aside>
     </div>
-  } @else {
+  } @else if (store.activeTab() === 'options') {
     <div class="bonds-layout">
       <section class="panel bonds-catalog" aria-label="Каталог опционов ФОРТС">
         <div class="catalog-toolbar">
@@ -608,6 +612,160 @@
           (resetParams)="onResetOptionParams()"
         />
       </aside>
+    </div>
+  } @else if (store.activeTab() === 'dividends') {
+    <div class="bonds-layout">
+      <section class="panel bonds-catalog" aria-label="Календарь дивидендов T+1">
+        <div class="catalog-toolbar">
+          <div class="toolbar-top">
+            <h2 class="tui-text_h6 toolbar-title">
+              Дивиденды (T+1)
+              <app-term-hint
+                term="Дивидендная отсечка"
+                text="Чтобы получить дивиденды, купите акции не позднее последнего дня покупки с учётом режима расчётов T+1. На следующий торговый день происходит дивидендный гэп."
+              />
+            </h2>
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ store.filteredDividends().length }} из {{ store.dividends().length }}
+            </span>
+          </div>
+
+          <div class="toolbar-controls">
+            <tui-textfield tuiTextfieldSize="s" class="search-field">
+              <input
+                id="dividends-search"
+                tuiInput
+                type="search"
+                placeholder="Поиск по тикеру или компании…"
+                aria-label="Поиск дивидендов"
+                [ngModel]="store.dividendQuery()"
+                (ngModelChange)="store.dividendQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+        </div>
+
+        @if (store.filteredDividends().length === 0) {
+          <div class="empty-state">
+            <p class="tui-text_body-m muted">По запросу дивидендные отсечки не найдены.</p>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.dividendQuery.set('')"
+            >
+              Сбросить поиск
+            </button>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="bonds-table">
+              <thead>
+                <tr>
+                  <th>Тикер</th>
+                  <th>Компания</th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>Последний день (T+1)</span>
+                      <app-term-hint
+                        term="Режим T+1"
+                        text="Последний торговый день, в который покупка акции даёт право попасть в реестр акционеров."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">
+                    <span class="th-with-hint">
+                      <span>Дивгэп (экс-дата)</span>
+                      <app-term-hint
+                        term="Дивидендный гэп"
+                        text="Первый день торгов без дивиденда: цена обычно открывается ниже примерно на величину выплаты за вычетом НДФЛ."
+                      />
+                    </span>
+                  </th>
+                  <th class="num">Реестр</th>
+                  <th class="num">Выплата (₽)</th>
+                  <th class="num">Доходность %</th>
+                  <th class="num">Оценка дивгэпа %</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (div of store.filteredDividends(); track div.id) {
+                  @let selected = store.selectedDividendId() === div.id;
+                  <tr
+                    class="bond-row dividend-row"
+                    [class.selected]="selected"
+                    [attr.data-dividend-ticker]="div.ticker"
+                    tabindex="0"
+                    (click)="onSelectDividend(div)"
+                    (keydown.enter)="onSelectDividend(div)"
+                    (keydown.space)="$event.preventDefault(); onSelectDividend(div)"
+                  >
+                    <td>
+                      <strong class="mono">{{ div.ticker }}</strong>
+                    </td>
+                    <td>{{ div.issuerName }}</td>
+                    <td class="num">{{ formatDateRu(div.lastBuyDate) }}</td>
+                    <td class="num">{{ formatDateRu(div.exDividendDate) }}</td>
+                    <td class="num">{{ formatDateRu(div.recordDate) }}</td>
+                    <td class="num">{{ formatRub(div.dividendPerShareRub) }}</td>
+                    <td class="num ytm-cell">{{ formatPct(div.yieldPct) }}</td>
+                    <td class="num">{{ formatPct(div.estimatedGapPct) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <aside class="calculator-col">
+        <app-dividend-calculator
+          [dividend]="store.selectedDividend()"
+          [shares]="store.dividendShares()"
+          [taxRatePct]="store.dividendTaxRate()"
+          [result]="store.dividendCalcResult()"
+          [loading]="store.dividendCalcLoading()"
+          [error]="store.dividendCalcError()"
+          (sharesChange)="onDividendSharesChange($event)"
+          (taxRateChange)="onDividendTaxRateChange($event)"
+          (resetParams)="onResetDividendParams()"
+        />
+      </aside>
+    </div>
+  } @else {
+    <div class="tax-dca-layout">
+      <app-tax-iis-calculator
+        [accountType]="store.taxAccountType()"
+        [grossProfitRub]="store.taxGrossProfitRub()"
+        [priorLossesRub]="store.taxPriorLossesRub()"
+        [dividendsRub]="store.taxDividendsRub()"
+        [annualContributionsRub]="store.taxAnnualContributionsRub()"
+        [result]="store.taxCalcResult()"
+        [loading]="store.taxCalcLoading()"
+        [error]="store.taxCalcError()"
+        (accountTypeChange)="onTaxAccountTypeChange($event)"
+        (grossProfitChange)="onTaxGrossProfitChange($event)"
+        (priorLossesChange)="onTaxPriorLossesChange($event)"
+        (dividendsChange)="onTaxDividendsChange($event)"
+        (annualContributionsChange)="onTaxAnnualContributionsChange($event)"
+        (resetParams)="onResetTaxParams()"
+      />
+
+      <app-dca-xirr-calculator
+        [cashflows]="store.dcaCashflows()"
+        [finalValueRub]="store.dcaFinalValueRub()"
+        [finalDate]="store.dcaFinalDate()"
+        [result]="store.dcaCalcResult()"
+        [loading]="store.dcaCalcLoading()"
+        [error]="store.dcaCalcError()"
+        (cashflowChange)="onDcaCashflowChange($event)"
+        (addCashflow)="onAddDcaCashflow()"
+        (removeCashflow)="onRemoveDcaCashflow($event)"
+        (finalValueChange)="onDcaFinalValueChange($event)"
+        (finalDateChange)="onDcaFinalDateChange($event)"
+        (resetParams)="onResetDcaParams()"
+      />
     </div>
   }
 </section>

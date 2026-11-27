@@ -5,6 +5,11 @@ import {
   BondCalculation,
   BondKind,
   BondSummary,
+  DcaCalcParams,
+  DcaCalculation,
+  DividendEventSummary,
+  DividendPayoutCalculation,
+  DividendPayoutParams,
   EtfAssetClass,
   EtfCategory,
   EtfSummary,
@@ -17,6 +22,9 @@ import {
   OptionGreeksCalculation,
   OptionSummary,
   OptionType,
+  TaxAccountType,
+  TaxCalcParams,
+  TaxCalculation,
 } from './instruments.models';
 
 type DecimalWire = string | number | null | undefined;
@@ -133,6 +141,63 @@ export interface OptionGreeksDto {
   readonly theta?: DecimalWire;
   readonly vega?: DecimalWire;
   readonly rho?: DecimalWire;
+}
+
+export interface DividendEventSummaryDto {
+  readonly id?: number | null;
+  readonly ticker: string;
+  readonly issuerName?: string | null;
+  readonly recordDate?: string | null;
+  readonly exDividendDate?: string | null;
+  readonly lastBuyDate?: string | null;
+  readonly paymentDate?: string | null;
+  readonly dividendPerShareRub?: DecimalWire;
+  readonly yieldPct?: DecimalWire;
+  readonly estimatedGapPct?: DecimalWire;
+  readonly currency?: string | null;
+}
+
+export interface DividendPayoutDto {
+  readonly ticker?: string | null;
+  readonly issuerName?: string | null;
+  readonly shares?: number | null;
+  readonly taxRatePct?: DecimalWire;
+  readonly dividendPerShareRub?: DecimalWire;
+  readonly grossPayoutRub?: DecimalWire;
+  readonly taxWithheldRub?: DecimalWire;
+  readonly netPayoutRub?: DecimalWire;
+  readonly lastBuyDate?: string | null;
+  readonly exDividendDate?: string | null;
+  readonly recordDate?: string | null;
+  readonly paymentDate?: string | null;
+  readonly yieldPct?: DecimalWire;
+  readonly estimatedGapPct?: DecimalWire;
+  readonly currency?: string | null;
+}
+
+export interface TaxCalculationDto {
+  readonly accountType?: string | null;
+  readonly taxableProfitRub?: DecimalWire;
+  readonly lossOffsetUsedRub?: DecimalWire;
+  readonly tradingTaxRub?: DecimalWire;
+  readonly dividendTaxRub?: DecimalWire;
+  readonly totalTaxRub?: DecimalWire;
+  readonly iisDeductionRefundRub?: DecimalWire;
+  readonly netAfterTaxRub?: DecimalWire;
+  readonly effectiveTaxRatePct?: DecimalWire;
+}
+
+export interface DcaCalculationDto {
+  readonly totalContributedRub?: DecimalWire;
+  readonly totalWithdrawnRub?: DecimalWire;
+  readonly netInvestedRub?: DecimalWire;
+  readonly finalValueRub?: DecimalWire;
+  readonly netProfitRub?: DecimalWire;
+  readonly simpleReturnPct?: DecimalWire;
+  readonly xirrPct?: DecimalWire;
+  readonly twrPct?: DecimalWire;
+  readonly holdingDays?: number | null;
+  readonly cashflowsCount?: number | null;
 }
 
 function parseDecimal(value: DecimalWire, fallback = 0): number {
@@ -323,6 +388,86 @@ export function mapOptionGreeksDto(
   };
 }
 
+function normalizeTaxAccountType(raw: string | null | undefined): TaxAccountType {
+  const upper = (raw ?? '').toUpperCase();
+  if (upper === 'IIS_A' || upper === 'IIS_B' || upper === 'IIS_3') {
+    return upper;
+  }
+  return 'BROKERAGE';
+}
+
+export function mapDividendDto(dto: DividendEventSummaryDto): DividendEventSummary {
+  return {
+    id: dto.id ?? 0,
+    ticker: dto.ticker,
+    issuerName: dto.issuerName ?? dto.ticker,
+    recordDate: dto.recordDate ?? '',
+    exDividendDate: dto.exDividendDate ?? '',
+    lastBuyDate: dto.lastBuyDate ?? '',
+    paymentDate: dto.paymentDate ?? '',
+    dividendPerShareRub: parseDecimal(dto.dividendPerShareRub, 0),
+    yieldPct: parseDecimal(dto.yieldPct, 0),
+    estimatedGapPct: parseDecimal(dto.estimatedGapPct, 0),
+    currency: dto.currency ?? 'RUB',
+  };
+}
+
+export function mapDividendPayoutDto(
+  ticker: string,
+  params: DividendPayoutParams,
+  dto: DividendPayoutDto,
+): DividendPayoutCalculation {
+  return {
+    ticker: dto.ticker ?? ticker,
+    issuerName: dto.issuerName ?? ticker,
+    shares: dto.shares ?? params.shares,
+    taxRatePct: parseDecimal(dto.taxRatePct, params.taxRatePct),
+    dividendPerShareRub: parseDecimal(dto.dividendPerShareRub, 0),
+    grossPayoutRub: parseDecimal(dto.grossPayoutRub, 0),
+    taxWithheldRub: parseDecimal(dto.taxWithheldRub, 0),
+    netPayoutRub: parseDecimal(dto.netPayoutRub, 0),
+    lastBuyDate: dto.lastBuyDate ?? '',
+    exDividendDate: dto.exDividendDate ?? '',
+    recordDate: dto.recordDate ?? '',
+    paymentDate: dto.paymentDate ?? '',
+    yieldPct: parseDecimal(dto.yieldPct, 0),
+    estimatedGapPct: parseDecimal(dto.estimatedGapPct, 0),
+    currency: dto.currency ?? 'RUB',
+  };
+}
+
+export function mapTaxCalculationDto(
+  fallbackAccountType: TaxAccountType,
+  dto: TaxCalculationDto,
+): TaxCalculation {
+  return {
+    accountType: dto.accountType ? normalizeTaxAccountType(dto.accountType) : fallbackAccountType,
+    taxableProfitRub: parseDecimal(dto.taxableProfitRub, 0),
+    lossOffsetUsedRub: parseDecimal(dto.lossOffsetUsedRub, 0),
+    tradingTaxRub: parseDecimal(dto.tradingTaxRub, 0),
+    dividendTaxRub: parseDecimal(dto.dividendTaxRub, 0),
+    totalTaxRub: parseDecimal(dto.totalTaxRub, 0),
+    iisDeductionRefundRub: parseDecimal(dto.iisDeductionRefundRub, 0),
+    netAfterTaxRub: parseDecimal(dto.netAfterTaxRub, 0),
+    effectiveTaxRatePct: parseDecimal(dto.effectiveTaxRatePct, 0),
+  };
+}
+
+export function mapDcaCalculationDto(dto: DcaCalculationDto): DcaCalculation {
+  return {
+    totalContributedRub: parseDecimal(dto.totalContributedRub, 0),
+    totalWithdrawnRub: parseDecimal(dto.totalWithdrawnRub, 0),
+    netInvestedRub: parseDecimal(dto.netInvestedRub, 0),
+    finalValueRub: parseDecimal(dto.finalValueRub, 0),
+    netProfitRub: parseDecimal(dto.netProfitRub, 0),
+    simpleReturnPct: parseDecimal(dto.simpleReturnPct, 0),
+    xirrPct: parseDecimal(dto.xirrPct, 0),
+    twrPct: parseDecimal(dto.twrPct, 0),
+    holdingDays: dto.holdingDays ?? 0,
+    cashflowsCount: dto.cashflowsCount ?? 0,
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class HttpInstrumentsApi implements InstrumentsApi {
   private readonly http = inject(HttpClient);
@@ -393,5 +538,64 @@ export class HttpInstrumentsApi implements InstrumentsApi {
       }),
     );
     return mapOptionGreeksDto(ticker, params, res);
+  }
+
+  async listDividends(ticker?: string): Promise<readonly DividendEventSummary[]> {
+    const trimmed = ticker?.trim().toUpperCase();
+    const params = trimmed ? new HttpParams().set('ticker', trimmed) : undefined;
+    const res = await firstValueFrom(
+      this.http.get<readonly DividendEventSummaryDto[]>('/api/v1/instruments/dividends', {
+        params,
+      }),
+    );
+    return (res ?? []).map(mapDividendDto);
+  }
+
+  async calculateDividendPayout(
+    ticker: string,
+    params: DividendPayoutParams,
+  ): Promise<DividendPayoutCalculation> {
+    const encoded = encodeURIComponent(ticker.trim().toUpperCase());
+    const httpParams = new HttpParams()
+      .set('shares', String(Math.max(1, Math.trunc(params.shares))))
+      .set('taxRatePct', String(params.taxRatePct));
+    const res = await firstValueFrom(
+      this.http.get<DividendPayoutDto>(`/api/v1/instruments/dividends/${encoded}/calc`, {
+        params: httpParams,
+      }),
+    );
+    return mapDividendPayoutDto(ticker, params, res);
+  }
+
+  async calculateTax(params: TaxCalcParams): Promise<TaxCalculation> {
+    const body = {
+      accountType: params.accountType,
+      grossProfitRub: params.grossProfitRub.toFixed(2),
+      priorLossesRub: params.priorLossesRub.toFixed(2),
+      dividendsRub: params.dividendsRub.toFixed(2),
+      annualContributionsRub: params.annualContributionsRub.toFixed(2),
+    };
+    const res = await firstValueFrom(
+      this.http.post<TaxCalculationDto>('/api/v1/instruments/tax/calc', body),
+    );
+    return mapTaxCalculationDto(params.accountType, res);
+  }
+
+  async calculateDca(params: DcaCalcParams): Promise<DcaCalculation> {
+    const body = {
+      cashflows: params.cashflows.map((cf) => ({
+        date: cf.date,
+        amountRub: cf.amountRub.toFixed(2),
+        ...(cf.portfolioValueBeforeRub !== undefined && cf.portfolioValueBeforeRub !== null
+          ? { portfolioValueBeforeRub: cf.portfolioValueBeforeRub.toFixed(2) }
+          : {}),
+      })),
+      finalValueRub: params.finalValueRub.toFixed(2),
+      finalDate: params.finalDate,
+    };
+    const res = await firstValueFrom(
+      this.http.post<DcaCalculationDto>('/api/v1/instruments/dca/calc', body),
+    );
+    return mapDcaCalculationDto(res);
   }
 }

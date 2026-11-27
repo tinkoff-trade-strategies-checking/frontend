@@ -298,4 +298,149 @@ describe('HttpInstrumentsApi', () => {
       rho: 172.1,
     });
   });
+
+  it('загружает дивиденды и рассчитывает выплату через GET /api/v1/instruments/dividends', async () => {
+    const listPromise = api.listDividends('sber');
+    const listReq = http.expectOne('/api/v1/instruments/dividends?ticker=SBER');
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush([
+      {
+        id: 1,
+        ticker: 'SBER',
+        issuerName: 'ПАО Сбербанк',
+        recordDate: '2026-07-17',
+        exDividendDate: '2026-07-17',
+        lastBuyDate: '2026-07-16',
+        paymentDate: '2026-08-05',
+        dividendPerShareRub: '34.84',
+        yieldPct: '11.45',
+        estimatedGapPct: '9.96',
+        currency: 'RUB',
+      },
+    ]);
+
+    const dividends = await listPromise;
+    expect(dividends).toHaveLength(1);
+    expect(dividends[0]).toMatchObject({
+      ticker: 'SBER',
+      dividendPerShareRub: 34.84,
+      yieldPct: 11.45,
+      estimatedGapPct: 9.96,
+      lastBuyDate: '2026-07-16',
+    });
+
+    const calcPromise = api.calculateDividendPayout('SBER', { shares: 200, taxRatePct: 15 });
+    const calcReq = http.expectOne(
+      '/api/v1/instruments/dividends/SBER/calc?shares=200&taxRatePct=15',
+    );
+    expect(calcReq.request.method).toBe('GET');
+    calcReq.flush({
+      ticker: 'SBER',
+      issuerName: 'ПАО Сбербанк',
+      shares: 200,
+      taxRatePct: '15.00',
+      dividendPerShareRub: '34.84',
+      grossPayoutRub: '6968.00',
+      taxWithheldRub: '1045.20',
+      netPayoutRub: '5922.80',
+      lastBuyDate: '2026-07-16',
+      exDividendDate: '2026-07-17',
+      recordDate: '2026-07-17',
+      paymentDate: '2026-08-05',
+      yieldPct: '11.45',
+      estimatedGapPct: '9.96',
+      currency: 'RUB',
+    });
+
+    const payout = await calcPromise;
+    expect(payout).toMatchObject({
+      ticker: 'SBER',
+      shares: 200,
+      taxRatePct: 15,
+      grossPayoutRub: 6968,
+      taxWithheldRub: 1045.2,
+      netPayoutRub: 5922.8,
+    });
+  });
+
+  it('отправляет decimal-строки в POST /api/v1/instruments/tax/calc и /dca/calc', async () => {
+    const taxPromise = api.calculateTax({
+      accountType: 'IIS_A',
+      grossProfitRub: 250000,
+      priorLossesRub: 50000,
+      dividendsRub: 40000,
+      annualContributionsRub: 400000,
+    });
+    const taxReq = http.expectOne('/api/v1/instruments/tax/calc');
+    expect(taxReq.request.method).toBe('POST');
+    expect(taxReq.request.body).toEqual({
+      accountType: 'IIS_A',
+      grossProfitRub: '250000.00',
+      priorLossesRub: '50000.00',
+      dividendsRub: '40000.00',
+      annualContributionsRub: '400000.00',
+    });
+    taxReq.flush({
+      accountType: 'IIS_A',
+      taxableProfitRub: '200000.00',
+      lossOffsetUsedRub: '50000.00',
+      tradingTaxRub: '26000.00',
+      dividendTaxRub: '5200.00',
+      totalTaxRub: '31200.00',
+      iisDeductionRefundRub: '52000.00',
+      netAfterTaxRub: '310800.00',
+      effectiveTaxRatePct: '-7.17',
+    });
+
+    const tax = await taxPromise;
+    expect(tax).toMatchObject({
+      accountType: 'IIS_A',
+      taxableProfitRub: 200000,
+      lossOffsetUsedRub: 50000,
+      iisDeductionRefundRub: 52000,
+      netAfterTaxRub: 310800,
+    });
+
+    const dcaPromise = api.calculateDca({
+      cashflows: [
+        { date: '2025-01-15', amountRub: 50000 },
+        { date: '2025-07-15', amountRub: 50000 },
+      ],
+      finalValueRub: 120000,
+      finalDate: '2026-01-15',
+    });
+    const dcaReq = http.expectOne('/api/v1/instruments/dca/calc');
+    expect(dcaReq.request.method).toBe('POST');
+    expect(dcaReq.request.body).toEqual({
+      cashflows: [
+        { date: '2025-01-15', amountRub: '50000.00' },
+        { date: '2025-07-15', amountRub: '50000.00' },
+      ],
+      finalValueRub: '120000.00',
+      finalDate: '2026-01-15',
+    });
+    dcaReq.flush({
+      totalContributedRub: '100000.00',
+      totalWithdrawnRub: '0.00',
+      netInvestedRub: '100000.00',
+      finalValueRub: '120000.00',
+      netProfitRub: '20000.00',
+      simpleReturnPct: '20.00',
+      xirrPct: '27.45',
+      twrPct: '21.10',
+      holdingDays: 365,
+      cashflowsCount: 2,
+    });
+
+    const dca = await dcaPromise;
+    expect(dca).toMatchObject({
+      totalContributedRub: 100000,
+      netProfitRub: 20000,
+      simpleReturnPct: 20,
+      xirrPct: 27.45,
+      twrPct: 21.1,
+      holdingDays: 365,
+      cashflowsCount: 2,
+    });
+  });
 });

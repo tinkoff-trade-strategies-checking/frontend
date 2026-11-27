@@ -2,6 +2,11 @@ import { Injectable } from '@angular/core';
 import {
   BondCalculation,
   BondSummary,
+  DcaCalcParams,
+  DcaCalculation,
+  DividendEventSummary,
+  DividendPayoutCalculation,
+  DividendPayoutParams,
   EtfSummary,
   FuturesCalcParams,
   FuturesCalculation,
@@ -10,6 +15,8 @@ import {
   OptionCalcParams,
   OptionGreeksCalculation,
   OptionSummary,
+  TaxCalcParams,
+  TaxCalculation,
 } from './instruments.models';
 
 const STUB_BONDS: readonly BondSummary[] = [
@@ -422,6 +429,164 @@ export class StubInstrumentsApi implements InstrumentsApi {
       rho: Number(rho.toFixed(4)),
     };
   }
+
+  async listDividends(ticker?: string): Promise<readonly DividendEventSummary[]> {
+    const trimmed = ticker?.trim().toUpperCase();
+    if (!trimmed) {
+      return STUB_DIVIDENDS;
+    }
+    return STUB_DIVIDENDS.filter((d) => d.ticker.toUpperCase() === trimmed);
+  }
+
+  async calculateDividendPayout(
+    ticker: string,
+    params: DividendPayoutParams,
+  ): Promise<DividendPayoutCalculation> {
+    const normalized = ticker.trim().toUpperCase();
+    const ev =
+      STUB_DIVIDENDS.find((item) => item.ticker.toUpperCase() === normalized) ?? STUB_DIVIDENDS[0];
+    const shares = Math.max(1, Math.trunc(params.shares));
+    const taxRatePct = params.taxRatePct === 15 ? 15 : 13;
+    const grossPayoutRub = Number((ev.dividendPerShareRub * shares).toFixed(2));
+    const taxWithheldRub = Number(((grossPayoutRub * taxRatePct) / 100).toFixed(2));
+    const netPayoutRub = Number((grossPayoutRub - taxWithheldRub).toFixed(2));
+
+    return {
+      ticker: ev.ticker,
+      issuerName: ev.issuerName,
+      shares,
+      taxRatePct,
+      dividendPerShareRub: ev.dividendPerShareRub,
+      grossPayoutRub,
+      taxWithheldRub,
+      netPayoutRub,
+      lastBuyDate: ev.lastBuyDate,
+      exDividendDate: ev.exDividendDate,
+      recordDate: ev.recordDate,
+      paymentDate: ev.paymentDate,
+      yieldPct: ev.yieldPct,
+      estimatedGapPct: ev.estimatedGapPct,
+      currency: ev.currency,
+    };
+  }
+
+  async calculateTax(params: TaxCalcParams): Promise<TaxCalculation> {
+    const grossProfit = Math.max(0, params.grossProfitRub);
+    const priorLosses = Math.max(0, params.priorLossesRub);
+    const dividends = Math.max(0, params.dividendsRub);
+    const contributions = Math.max(0, params.annualContributionsRub);
+
+    const lossOffsetUsedRub = Number(Math.min(grossProfit, priorLosses).toFixed(2));
+    const taxableProfitRub = Number(Math.max(0, grossProfit - lossOffsetUsedRub).toFixed(2));
+
+    const computeProgressiveNdfl = (base: number): number => {
+      const threshold = 2_400_000;
+      if (base <= threshold) {
+        return Number((base * 0.13).toFixed(2));
+      }
+      return Number((threshold * 0.13 + (base - threshold) * 0.15).toFixed(2));
+    };
+
+    const tradingExempt = params.accountType === 'IIS_B' || params.accountType === 'IIS_3';
+    const tradingTaxRub = tradingExempt ? 0 : computeProgressiveNdfl(taxableProfitRub);
+    const dividendTaxRub = computeProgressiveNdfl(dividends);
+    const totalTaxRub = Number((tradingTaxRub + dividendTaxRub).toFixed(2));
+
+    const hasContributionDeduction =
+      params.accountType === 'IIS_A' || params.accountType === 'IIS_3';
+    const iisDeductionRefundRub = hasContributionDeduction
+      ? Number((Math.min(contributions, 400_000) * 0.13).toFixed(2))
+      : 0;
+
+    const totalIncome = grossProfit + dividends;
+    const netAfterTaxRub = Number((totalIncome - totalTaxRub + iisDeductionRefundRub).toFixed(2));
+    const effectiveTaxRatePct =
+      totalIncome > 0
+        ? Number((((totalTaxRub - iisDeductionRefundRub) / totalIncome) * 100).toFixed(2))
+        : 0;
+
+    return {
+      accountType: params.accountType,
+      taxableProfitRub,
+      lossOffsetUsedRub,
+      tradingTaxRub,
+      dividendTaxRub,
+      totalTaxRub,
+      iisDeductionRefundRub,
+      netAfterTaxRub,
+      effectiveTaxRatePct,
+    };
+  }
+
+  async calculateDca(params: DcaCalcParams): Promise<DcaCalculation> {
+    const flows = [...params.cashflows].sort((a, b) => a.date.localeCompare(b.date));
+    let totalContributed = 0;
+    let totalWithdrawn = 0;
+    for (const cf of flows) {
+      if (cf.amountRub >= 0) {
+        totalContributed += cf.amountRub;
+      } else {
+        totalWithdrawn += Math.abs(cf.amountRub);
+      }
+    }
+    const netInvested = totalContributed - totalWithdrawn;
+    const finalValue = Math.max(0, params.finalValueRub);
+    const netProfit = finalValue - netInvested;
+    const simpleReturnPct =
+      totalContributed > 0 ? Number(((netProfit / totalContributed) * 100).toFixed(2)) : 0;
+
+    const firstMs = flows.length > 0 ? Date.parse(flows[0].date) : Date.parse(params.finalDate);
+    const finalMs = Date.parse(params.finalDate);
+    const holdingDays = Math.max(1, Math.round((finalMs - firstMs) / 86_400_000));
+
+    // Newton-Raphson XIRR approximation for stub mode
+    const cashEvents: { readonly t: number; readonly cf: number }[] = [
+      ...flows.map((f) => ({
+        t: (Date.parse(f.date) - firstMs) / (365 * 86_400_000),
+        cf: -f.amountRub,
+      })),
+      { t: holdingDays / 365, cf: finalValue },
+    ];
+    let rate = 0.15;
+    for (let i = 0; i < 40; i++) {
+      let npv = 0;
+      let dnpv = 0;
+      for (const e of cashEvents) {
+        const base = Math.max(0.01, 1 + rate);
+        const factor = Math.pow(base, -e.t);
+        npv += e.cf * factor;
+        dnpv -= (e.t * e.cf * factor) / base;
+      }
+      if (Math.abs(dnpv) < 1e-10) {
+        break;
+      }
+      const nextRate = rate - npv / dnpv;
+      if (!Number.isFinite(nextRate) || nextRate <= -0.99 || nextRate > 10) {
+        break;
+      }
+      if (Math.abs(nextRate - rate) < 1e-6) {
+        rate = nextRate;
+        break;
+      }
+      rate = nextRate;
+    }
+
+    const xirrPct = Number((rate * 100).toFixed(2));
+    const twrPct = Number((simpleReturnPct * 1.05).toFixed(2));
+
+    return {
+      totalContributedRub: Number(totalContributed.toFixed(2)),
+      totalWithdrawnRub: Number(totalWithdrawn.toFixed(2)),
+      netInvestedRub: Number(netInvested.toFixed(2)),
+      finalValueRub: Number(finalValue.toFixed(2)),
+      netProfitRub: Number(netProfit.toFixed(2)),
+      simpleReturnPct,
+      xirrPct,
+      twrPct,
+      holdingDays,
+      cashflowsCount: flows.length,
+    };
+  }
 }
 
 function normalPdf(x: number): number {
@@ -649,5 +814,138 @@ const STUB_OPTIONS: readonly OptionSummary[] = [
     riskFreeRatePct: 16.0,
     contractSize: 1,
     initialMarginRub: 2700,
+  },
+];
+
+const STUB_DIVIDENDS: readonly DividendEventSummary[] = [
+  {
+    id: 1,
+    ticker: 'SBER',
+    issuerName: 'ПАО Сбербанк',
+    lastBuyDate: '2026-07-16',
+    exDividendDate: '2026-07-17',
+    recordDate: '2026-07-17',
+    paymentDate: '2026-08-05',
+    dividendPerShareRub: 34.84,
+    yieldPct: 11.45,
+    estimatedGapPct: 9.96,
+    currency: 'RUB',
+  },
+  {
+    id: 2,
+    ticker: 'LKOH',
+    issuerName: 'ПАО ЛУКОЙЛ',
+    lastBuyDate: '2026-06-02',
+    exDividendDate: '2026-06-03',
+    recordDate: '2026-06-03',
+    paymentDate: '2026-06-24',
+    dividendPerShareRub: 541.0,
+    yieldPct: 7.62,
+    estimatedGapPct: 6.63,
+    currency: 'RUB',
+  },
+  {
+    id: 3,
+    ticker: 'TATN',
+    issuerName: 'ПАО Татнефть',
+    lastBuyDate: '2026-06-29',
+    exDividendDate: '2026-06-30',
+    recordDate: '2026-06-30',
+    paymentDate: '2026-07-17',
+    dividendPerShareRub: 43.11,
+    yieldPct: 6.85,
+    estimatedGapPct: 5.96,
+    currency: 'RUB',
+  },
+  {
+    id: 4,
+    ticker: 'ROSN',
+    issuerName: 'ПАО НК Роснефть',
+    lastBuyDate: '2026-07-08',
+    exDividendDate: '2026-07-09',
+    recordDate: '2026-07-09',
+    paymentDate: '2026-07-28',
+    dividendPerShareRub: 36.47,
+    yieldPct: 6.9,
+    estimatedGapPct: 6.0,
+    currency: 'RUB',
+  },
+  {
+    id: 5,
+    ticker: 'SNGSP',
+    issuerName: 'Сургутнефтегаз (прив.)',
+    lastBuyDate: '2026-07-17',
+    exDividendDate: '2026-07-20',
+    recordDate: '2026-07-20',
+    paymentDate: '2026-08-07',
+    dividendPerShareRub: 8.5,
+    yieldPct: 14.9,
+    estimatedGapPct: 12.96,
+    currency: 'RUB',
+  },
+  {
+    id: 6,
+    ticker: 'MTSS',
+    issuerName: 'ПАО МТС',
+    lastBuyDate: '2026-07-13',
+    exDividendDate: '2026-07-14',
+    recordDate: '2026-07-14',
+    paymentDate: '2026-08-03',
+    dividendPerShareRub: 35.0,
+    yieldPct: 14.2,
+    estimatedGapPct: 12.35,
+    currency: 'RUB',
+  },
+  {
+    id: 7,
+    ticker: 'PHOR',
+    issuerName: 'ПАО ФосАгро',
+    lastBuyDate: '2026-09-29',
+    exDividendDate: '2026-09-30',
+    recordDate: '2026-09-30',
+    paymentDate: '2026-10-16',
+    dividendPerShareRub: 249.0,
+    yieldPct: 4.15,
+    estimatedGapPct: 3.61,
+    currency: 'RUB',
+  },
+  {
+    id: 8,
+    ticker: 'MOEX',
+    issuerName: 'ПАО Московская Биржа',
+    lastBuyDate: '2026-06-11',
+    exDividendDate: '2026-06-12',
+    recordDate: '2026-06-12',
+    paymentDate: '2026-07-01',
+    dividendPerShareRub: 26.11,
+    yieldPct: 11.8,
+    estimatedGapPct: 10.27,
+    currency: 'RUB',
+  },
+  {
+    id: 9,
+    ticker: 'X5',
+    issuerName: 'ПАО Корпоративный центр ИКС 5',
+    lastBuyDate: '2026-07-07',
+    exDividendDate: '2026-07-08',
+    recordDate: '2026-07-08',
+    paymentDate: '2026-07-24',
+    dividendPerShareRub: 368.0,
+    yieldPct: 11.2,
+    estimatedGapPct: 9.74,
+    currency: 'RUB',
+  },
+  {
+    id: 10,
+    ticker: 'T',
+    issuerName: 'МКПАО Т-Технологии',
+    lastBuyDate: '2026-08-20',
+    exDividendDate: '2026-08-21',
+    recordDate: '2026-08-21',
+    paymentDate: '2026-09-07',
+    dividendPerShareRub: 35.0,
+    yieldPct: 1.12,
+    estimatedGapPct: 0.97,
+    currency: 'RUB',
   },
 ];

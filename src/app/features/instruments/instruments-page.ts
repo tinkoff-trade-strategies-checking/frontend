@@ -5,16 +5,23 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { INSTRUMENTS_API_IMPL } from '../../api-impls';
 import { TermHint } from '../../shared/term-hint/term-hint';
 import { BondYtmCalculator } from './components/bond-ytm-calculator';
+import { DcaXirrCalculator } from './components/dca-xirr-calculator';
+import { DividendCalculator } from './components/dividend-calculator';
 import { FuturesCalculator } from './components/futures-calculator';
 import { OptionGreeksCalculator } from './components/option-greeks-calculator';
+import { TaxIisCalculator } from './components/tax-iis-calculator';
 import {
   BondSummary,
+  DcaCashflowItem,
+  DividendEventSummary,
+  DividendTaxRate,
   ETF_CATEGORY_LABELS,
   ETF_FILTER_LABELS,
   FuturesDirection,
   FuturesSummary,
   INSTRUMENTS_API,
   OptionSummary,
+  TaxAccountType,
 } from './data/instruments.models';
 import {
   formatDateRu,
@@ -32,7 +39,14 @@ import {
   OptionFilter,
 } from './instruments.store';
 
-const TAB_ORDER: readonly InstrumentsTab[] = ['bonds', 'etfs', 'futures', 'options'];
+const TAB_ORDER: readonly InstrumentsTab[] = [
+  'bonds',
+  'etfs',
+  'futures',
+  'options',
+  'dividends',
+  'tax_dca',
+];
 
 const BOND_FILTERS: readonly { readonly id: BondFilter; readonly label: string }[] = [
   { id: 'all', label: 'Все' },
@@ -75,6 +89,9 @@ const OPTION_FILTERS: readonly { readonly id: OptionFilter; readonly label: stri
     BondYtmCalculator,
     FuturesCalculator,
     OptionGreeksCalculator,
+    DividendCalculator,
+    TaxIisCalculator,
+    DcaXirrCalculator,
   ],
   providers: [{ provide: INSTRUMENTS_API, useClass: INSTRUMENTS_API_IMPL }, InstrumentsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -164,6 +181,73 @@ export class InstrumentsPage implements OnInit {
 
   protected onResetOptionParams(): void {
     void this.store.resetOptionParams();
+  }
+
+  protected onSelectDividend(dividend: DividendEventSummary): void {
+    void this.store.selectDividend(dividend);
+  }
+
+  protected onDividendSharesChange(shares: number): void {
+    void this.store.updateDividendShares(shares);
+  }
+
+  protected onDividendTaxRateChange(rate: DividendTaxRate): void {
+    void this.store.updateDividendTaxRate(rate);
+  }
+
+  protected onResetDividendParams(): void {
+    void this.store.resetDividendParams();
+  }
+
+  protected onTaxAccountTypeChange(accountType: TaxAccountType): void {
+    void this.store.updateTaxAccountType(accountType);
+  }
+
+  protected onTaxGrossProfitChange(value: number): void {
+    void this.store.updateTaxGrossProfit(value);
+  }
+
+  protected onTaxPriorLossesChange(value: number): void {
+    void this.store.updateTaxPriorLosses(value);
+  }
+
+  protected onTaxDividendsChange(value: number): void {
+    void this.store.updateTaxDividends(value);
+  }
+
+  protected onTaxAnnualContributionsChange(value: number): void {
+    void this.store.updateTaxAnnualContributions(value);
+  }
+
+  protected onResetTaxParams(): void {
+    void this.store.resetTaxParams();
+  }
+
+  protected onDcaCashflowChange(event: {
+    readonly index: number;
+    readonly item: DcaCashflowItem;
+  }): void {
+    void this.store.updateDcaCashflow(event.index, event.item);
+  }
+
+  protected onAddDcaCashflow(): void {
+    void this.store.addDcaCashflow();
+  }
+
+  protected onRemoveDcaCashflow(index: number): void {
+    void this.store.removeDcaCashflow(index);
+  }
+
+  protected onDcaFinalValueChange(value: number): void {
+    void this.store.updateDcaFinalValue(value);
+  }
+
+  protected onDcaFinalDateChange(date: string): void {
+    void this.store.updateDcaFinalDate(date);
+  }
+
+  protected onResetDcaParams(): void {
+    void this.store.resetDcaParams();
   }
 
   protected retry(): void {

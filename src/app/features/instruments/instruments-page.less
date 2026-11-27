@@ -50,6 +50,13 @@
   align-items: start;
 }
 
+.tax-dca-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
 .calculator-col {
   position: sticky;
   top: 1rem;
@@ -321,7 +328,8 @@
 }
 
 @media (max-width: 1024px) {
-  .bonds-layout {
+  .bonds-layout,
+  .tax-dca-layout {
     grid-template-columns: 1fr;
   }
 

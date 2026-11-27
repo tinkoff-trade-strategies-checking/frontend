@@ -15,6 +15,11 @@ export type OrderStatus = 'active' | 'filled' | 'partial' | 'cancelled' | 'expir
 export type ArenaRejectReason =
   | 'INVALID_PARAMS'
   | 'INSUFFICIENT_CASH'
+  | 'INSUFFICIENT_MARGIN'
+  | 'MARGIN_CALL_LIQUIDATION'
+  | 'IMMEDIATE_OR_CANCEL'
+  | 'FILL_OR_KILL'
+  | 'PRICE_OUT_OF_BAND'
   | 'INSUFFICIENT_POSITION'
   | 'SESSION_NOT_ACTIVE'
   | 'ORDER_NOT_ACTIVE'

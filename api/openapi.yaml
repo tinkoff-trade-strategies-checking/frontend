@@ -352,6 +352,117 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '404': { $ref: '#/components/responses/Problem' }
+  /instruments/dividends:
+    get:
+      tags: [marketdata]
+      operationId: listDividends
+      summary: Календарь дивидендных выплат MOEX (режим расчётов T+1)
+      description: |
+        Возвращает список дивидендных событий MOEX с датой последнего дня покупки с дивидендами (`lastBuyDate`),
+        датой дивидендного гэпа (`exDividendDate`, T+1), датой закрытия реестра (`recordDate`), датой выплаты,
+        размером дивиденда на акцию, доходностью и оценкой дивидендного гэпа (INV-6). Опционально фильтруется по тикеру.
+      parameters:
+        - name: ticker
+          in: query
+          required: false
+          description: 'Необязательный фильтр по тикеру MOEX (например, `SBER`, `LKOH`).'
+          schema: { type: string, minLength: 1, maxLength: 32 }
+      responses:
+        '200':
+          description: Список дивидендных событий
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DividendEventSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /instruments/dividends/{ticker}/calc:
+    get:
+      tags: [marketdata]
+      operationId: calculateDividendPayout
+      summary: Расчёт дивидендной выплаты, НДФЛ и дат отсечки T+1 по тикеру
+      description: |
+        Точный расчёт на `BigDecimal` (INV-4, INV-6) по последней отсечке выбранного тикера: грязная выплата,
+        удерживаемый НДФЛ (13% или 15%), чистая выплата на счёт, даты `lastBuyDate` (T+1), `exDividendDate`,
+        `recordDate` и оценка дивидендного гэпа.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          description: Тикер акции MOEX (например, `SBER`, `LKOH`)
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - name: shares
+          in: query
+          required: false
+          description: 'Количество акций в позиции (`>= 1`, по умолчанию `100`).'
+          schema: { type: integer, minimum: 1, maximum: 10000000, default: 100 }
+        - name: taxRatePct
+          in: query
+          required: false
+          description: 'Ставка НДФЛ на дивиденды: `13` или `15` (% по умолчанию `13`).'
+          schema: { type: integer, enum: [13, 15], default: 13 }
+      responses:
+        '200':
+          description: Результат расчёта дивидендной выплаты
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DividendPayoutResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /instruments/tax/calc:
+    post:
+      tags: [marketdata]
+      operationId: calculateTax
+      summary: Расчёт НДФЛ (13%/15%), сальдирования убытков и льгот ИИС (А / Б / ИИС-3)
+      description: |
+        Точный расчёт на `BigDecimal` (INV-4, INV-6): прогрессивная шкала НДФЛ РФ (13% до 2 400 000 ₽, 15% свыше),
+        сальдирование убытков прошлых лет, освобождение торговой прибыли на ИИС-Б / ИИС-3 (дивиденды облагаются
+        НДФЛ на всех типах счетов по НК РФ) и налоговый вычет на взносы по ИИС-А (до 400 000 ₽ в год).
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaxCalculationRequest' }
+      responses:
+        '200':
+          description: Результат налогового расчёта
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaxCalculationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /instruments/dca/calc:
+    post:
+      tags: [marketdata]
+      operationId: calculateDca
+      summary: Расчёт доходности портфеля с пополнениями и снятиями (DCA, TWR, XIRR)
+      description: |
+        Точный расчёт на `BigDecimal` и численном методе Ньютона — Рафсона / бисекции (INV-4, INV-6):
+        совокупные пополнения и снятия, чистые вложения, прибыль, простая доходность, годовая денежно-взвешенная
+        доходность (`xirrPct`, actual/365) и взвешенная по времени доходность (`twrPct`).
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DcaCalculationRequest' }
+      responses:
+        '200':
+          description: Результат расчёта DCA (TWR и XIRR)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DcaCalculationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /sessions:
     post:
       tags: [sessions]
@@ -1422,6 +1533,11 @@ components:
         - SESSION_END
         - CANCELLED_BY_USER
         - DAY_EXPIRED
+        - INSUFFICIENT_MARGIN
+        - MARGIN_CALL_LIQUIDATION
+        - IMMEDIATE_OR_CANCEL
+        - FILL_OR_KILL
+        - PRICE_OUT_OF_BAND
     LaunchRejectReason:
       type: string
       enum: [NO_MATCHING_PERIOD, TOO_MANY_BARS, INVALID_PARAMS, CORPORATE_ACTION_ON_PERIOD]
@@ -3506,3 +3622,154 @@ components:
         theta: { $ref: '#/components/schemas/Ratio' }
         vega: { $ref: '#/components/schemas/Ratio' }
         rho: { $ref: '#/components/schemas/Ratio' }
+    DividendEventSummary:
+      type: object
+      required:
+        - id
+        - ticker
+        - issuerName
+        - recordDate
+        - exDividendDate
+        - lastBuyDate
+        - paymentDate
+        - dividendPerShareRub
+        - yieldPct
+        - estimatedGapPct
+        - currency
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        ticker: { type: string, examples: ['SBER'] }
+        issuerName: { type: string, examples: ['Сбербанк'] }
+        recordDate: { type: string, format: date }
+        exDividendDate: { type: string, format: date }
+        lastBuyDate: { type: string, format: date }
+        paymentDate: { type: string, format: date }
+        dividendPerShareRub: { $ref: '#/components/schemas/Price' }
+        yieldPct: { $ref: '#/components/schemas/Pct' }
+        estimatedGapPct: { $ref: '#/components/schemas/Pct' }
+        currency: { type: string, examples: ['RUB'] }
+    DividendPayoutResponse:
+      type: object
+      required:
+        - ticker
+        - issuerName
+        - shares
+        - taxRatePct
+        - dividendPerShareRub
+        - grossPayoutRub
+        - taxWithheldRub
+        - netPayoutRub
+        - lastBuyDate
+        - exDividendDate
+        - recordDate
+        - paymentDate
+        - yieldPct
+        - estimatedGapPct
+        - currency
+      properties:
+        ticker: { type: string, examples: ['SBER'] }
+        issuerName: { type: string, examples: ['Сбербанк'] }
+        shares: { type: integer, minimum: 1 }
+        taxRatePct: { $ref: '#/components/schemas/Pct' }
+        dividendPerShareRub: { $ref: '#/components/schemas/Price' }
+        grossPayoutRub: { $ref: '#/components/schemas/Money' }
+        taxWithheldRub: { $ref: '#/components/schemas/Money' }
+        netPayoutRub: { $ref: '#/components/schemas/Money' }
+        lastBuyDate: { type: string, format: date }
+        exDividendDate: { type: string, format: date }
+        recordDate: { type: string, format: date }
+        paymentDate: { type: string, format: date }
+        yieldPct: { $ref: '#/components/schemas/Pct' }
+        estimatedGapPct: { $ref: '#/components/schemas/Pct' }
+        currency: { type: string, examples: ['RUB'] }
+    TaxAccountType:
+      type: string
+      enum: [BROKERAGE, IIS_A, IIS_B, IIS_3]
+      description: 'Тип счёта: обычный брокерский, ИИС типа А (вычет на взнос), ИИС типа Б или ИИС-3 (освобождение от НДФЛ на торговую прибыль).'
+    TaxCalculationRequest:
+      type: object
+      required:
+        - grossProfitRub
+        - accountType
+      properties:
+        grossProfitRub: { $ref: '#/components/schemas/Money' }
+        priorLossesRub: { $ref: '#/components/schemas/Money' }
+        dividendsRub: { $ref: '#/components/schemas/Money' }
+        accountType: { $ref: '#/components/schemas/TaxAccountType' }
+        annualContributionsRub: { $ref: '#/components/schemas/Money' }
+    TaxCalculationResponse:
+      type: object
+      required:
+        - accountType
+        - taxableProfitRub
+        - lossOffsetUsedRub
+        - tradingTaxRub
+        - dividendTaxRub
+        - totalTaxRub
+        - iisDeductionRefundRub
+        - netAfterTaxRub
+        - effectiveTaxRatePct
+      properties:
+        accountType: { $ref: '#/components/schemas/TaxAccountType' }
+        taxableProfitRub: { $ref: '#/components/schemas/Money' }
+        lossOffsetUsedRub: { $ref: '#/components/schemas/Money' }
+        tradingTaxRub: { $ref: '#/components/schemas/Money' }
+        dividendTaxRub: { $ref: '#/components/schemas/Money' }
+        totalTaxRub: { $ref: '#/components/schemas/Money' }
+        iisDeductionRefundRub: { $ref: '#/components/schemas/Money' }
+        netAfterTaxRub: { $ref: '#/components/schemas/Money' }
+        effectiveTaxRatePct: { $ref: '#/components/schemas/Pct' }
+    DcaCashflowItem:
+      type: object
+      required:
+        - date
+        - amountRub
+      properties:
+        date: { type: string, format: date }
+        amountRub:
+          allOf:
+            - { $ref: '#/components/schemas/Money' }
+          description: 'Сумма денежного потока в рублях: `> 0` — пополнение, `< 0` — снятие.'
+        portfolioValueBeforeRub:
+          oneOf:
+            - { $ref: '#/components/schemas/Money' }
+            - { type: 'null' }
+          description: 'Необязательная стоимость портфеля непосредственно до данного денежного потока для точного расчёта цепного TWR.'
+    DcaCalculationRequest:
+      type: object
+      required:
+        - cashflows
+        - finalValueRub
+        - finalDate
+      properties:
+        cashflows:
+          type: array
+          minItems: 1
+          maxItems: 120
+          items: { $ref: '#/components/schemas/DcaCashflowItem' }
+        finalValueRub: { $ref: '#/components/schemas/Money' }
+        finalDate: { type: string, format: date }
+    DcaCalculationResponse:
+      type: object
+      required:
+        - totalContributedRub
+        - totalWithdrawnRub
+        - netInvestedRub
+        - finalValueRub
+        - netProfitRub
+        - simpleReturnPct
+        - xirrPct
+        - twrPct
+        - holdingDays
+        - cashflowsCount
+      properties:
+        totalContributedRub: { $ref: '#/components/schemas/Money' }
+        totalWithdrawnRub: { $ref: '#/components/schemas/Money' }
+        netInvestedRub: { $ref: '#/components/schemas/Money' }
+        finalValueRub: { $ref: '#/components/schemas/Money' }
+        netProfitRub: { $ref: '#/components/schemas/Money' }
+        simpleReturnPct: { $ref: '#/components/schemas/Pct' }
+        xirrPct: { $ref: '#/components/schemas/Pct' }
+        twrPct: { $ref: '#/components/schemas/Pct' }
+        holdingDays: { type: integer, minimum: 0 }
+        cashflowsCount: { type: integer, minimum: 1 }

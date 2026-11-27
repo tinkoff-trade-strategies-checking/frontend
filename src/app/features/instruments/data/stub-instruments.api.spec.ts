@@ -86,4 +86,57 @@ describe('StubInstrumentsApi', () => {
     expect(callGreeks.theta).toBeLessThan(0);
     expect(callGreeks.premium).toBeGreaterThan(0);
   });
+
+  it('возвращает дивиденды T+1 и считает чистую выплату после НДФЛ 13% и 15%', async () => {
+    const dividends = await api.listDividends();
+    expect(dividends.length).toBeGreaterThanOrEqual(8);
+
+    const calc13 = await api.calculateDividendPayout('SBER', { shares: 100, taxRatePct: 13 });
+    const calc15 = await api.calculateDividendPayout('SBER', { shares: 100, taxRatePct: 15 });
+
+    expect(calc13.grossPayoutRub).toBe(3484);
+    expect(calc13.taxWithheldRub).toBeCloseTo(452.92, 2);
+    expect(calc13.netPayoutRub).toBeGreaterThan(calc15.netPayoutRub);
+    expect(calc13.lastBuyDate).toBeTruthy();
+  });
+
+  it('считает налоги НДФЛ, сальдирование, вычеты ИИС и доходность DCA / XIRR', async () => {
+    const iisA = await api.calculateTax({
+      accountType: 'IIS_A',
+      grossProfitRub: 250000,
+      priorLossesRub: 50000,
+      dividendsRub: 40000,
+      annualContributionsRub: 400000,
+    });
+    const iisB = await api.calculateTax({
+      accountType: 'IIS_B',
+      grossProfitRub: 250000,
+      priorLossesRub: 50000,
+      dividendsRub: 40000,
+      annualContributionsRub: 400000,
+    });
+
+    expect(iisA.lossOffsetUsedRub).toBe(50000);
+    expect(iisA.taxableProfitRub).toBe(200000);
+    expect(iisA.iisDeductionRefundRub).toBe(52000);
+    expect(iisB.tradingTaxRub).toBe(0);
+    expect(iisB.iisDeductionRefundRub).toBe(0);
+
+    const dca = await api.calculateDca({
+      cashflows: [
+        { date: '2025-01-15', amountRub: 50000 },
+        { date: '2025-04-15', amountRub: 50000 },
+        { date: '2025-07-15', amountRub: 50000 },
+        { date: '2025-10-15', amountRub: 50000 },
+      ],
+      finalValueRub: 236000,
+      finalDate: '2026-01-15',
+    });
+
+    expect(dca.totalContributedRub).toBe(200000);
+    expect(dca.netProfitRub).toBe(36000);
+    expect(dca.simpleReturnPct).toBe(18);
+    expect(dca.xirrPct).toBeGreaterThan(18);
+    expect(dca.cashflowsCount).toBe(4);
+  });
 });
