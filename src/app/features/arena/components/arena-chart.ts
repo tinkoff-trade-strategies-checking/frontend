@@ -584,6 +584,14 @@ export class ArenaChart {
   private borderColor = 'currentColor';
   private positiveVolumeColor = 'currentColor';
   private negativeVolumeColor = 'currentColor';
+  private sma20Color = '#3b82f6';
+  private sma50Color = '#f59e0b';
+  private ema20Color = '#22d3ee';
+  private ema50Color = '#c084fc';
+  private bbColor = 'rgba(59, 130, 246, 0.7)';
+  private vwapColor = '#fb923c';
+  private currentChartHeight = BASE_CHART_HEIGHT;
+  private readonly populatedOverlays = new Set<string>();
 
   constructor() {
     afterNextRender(() => {
@@ -696,12 +704,12 @@ export class ArenaChart {
     const el = this.container().nativeElement;
     this.textColor = readCssColor(el, '--tui-text-secondary');
     this.borderColor = readCssColor(el, '--tui-border-normal');
-    const sma20Color = readCssColor(el, '--tui-text-action', '#3b82f6');
-    const sma50Color = readCssColor(el, '--tui-background-accent-1', '#f59e0b');
-    const ema20Color = '#22d3ee';
-    const ema50Color = '#c084fc';
-    const bbColor = withAlpha(sma20Color, 0.7);
-    const vwapColor = '#fb923c';
+    this.sma20Color = readCssColor(el, '--tui-text-action', '#3b82f6');
+    this.sma50Color = readCssColor(el, '--tui-background-accent-1', '#f59e0b');
+    this.ema20Color = '#22d3ee';
+    this.ema50Color = '#c084fc';
+    this.bbColor = withAlpha(this.sma20Color, 0.7);
+    this.vwapColor = '#fb923c';
     this.positiveColor = readCssColor(el, '--tui-text-positive', '#22c55e');
     this.negativeColor = readCssColor(el, '--tui-text-negative', '#ef4444');
     this.warningColor = readCssColor(el, '--tui-background-accent-2', '#f59e0b');
@@ -710,17 +718,17 @@ export class ArenaChart {
     return {
       textColor: this.textColor,
       borderColor: this.borderColor,
-      sma20Color,
-      sma50Color,
-      ema20Color,
-      ema50Color,
-      bbColor,
-      vwapColor,
+      sma20Color: this.sma20Color,
+      sma50Color: this.sma50Color,
+      ema20Color: this.ema20Color,
+      ema50Color: this.ema50Color,
+      bbColor: this.bbColor,
+      vwapColor: this.vwapColor,
     };
   }
 
   private applyThemeColors(): void {
-    if (!this.chart || !this.candleSeries || !this.sma20Series || !this.sma50Series) {
+    if (!this.chart || !this.candleSeries) {
       return;
     }
     const palette = this.readThemePalette();
@@ -737,8 +745,8 @@ export class ArenaChart {
       timeScale: { borderColor: palette.borderColor },
     });
     this.applyChartModeStyle();
-    this.sma20Series.applyOptions({ color: palette.sma20Color });
-    this.sma50Series.applyOptions({ color: palette.sma50Color });
+    this.sma20Series?.applyOptions({ color: palette.sma20Color });
+    this.sma50Series?.applyOptions({ color: palette.sma50Color });
     this.ema20Series?.applyOptions({ color: palette.ema20Color });
     this.ema50Series?.applyOptions({ color: palette.ema50Color });
     this.bbUpperSeries?.applyOptions({ color: palette.bbColor });
@@ -789,9 +797,13 @@ export class ArenaChart {
       return formatBlindAxisTick(candle.step, candle.day);
     };
 
+    const initialHeight =
+      this.oscillator() !== 'none' ? MULTI_PANE_CHART_HEIGHT : BASE_CHART_HEIGHT;
+    this.currentChartHeight = initialHeight;
+
     const chart = createChart(el, {
       autoSize: true,
-      height: this.oscillator() !== 'none' ? MULTI_PANE_CHART_HEIGHT : BASE_CHART_HEIGHT,
+      height: initialHeight,
       layout: {
         attributionLogo: false,
         background: { color: 'transparent' },
@@ -827,15 +839,6 @@ export class ArenaChart {
       wickDownColor: this.negativeColor,
     });
 
-    this.closeLineSeries = chart.addSeries(LineSeries, {
-      color: this.lineColor,
-      lineWidth: 2,
-      visible: this.chartMode() === 'line',
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: true,
-    });
-
     const volumeSeries = chart.addSeries(HistogramSeries, {
       priceScaleId: 'volume',
       priceFormat: { type: 'volume' },
@@ -847,56 +850,6 @@ export class ArenaChart {
         top: 0.78,
         bottom: 0.02,
       },
-    });
-
-    const overlayBase = {
-      priceLineVisible: false,
-      lastValueVisible: false,
-    };
-
-    this.sma20Series = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.sma20Color,
-      lineWidth: 2,
-    });
-    this.sma50Series = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.sma50Color,
-      lineWidth: 2,
-    });
-    this.ema20Series = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.ema20Color,
-      lineWidth: 2,
-    });
-    this.ema50Series = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.ema50Color,
-      lineWidth: 2,
-    });
-    this.bbUpperSeries = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.bbColor,
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-    });
-    this.bbMiddleSeries = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: withAlpha(palette.bbColor, 0.65),
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-    });
-    this.bbLowerSeries = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.bbColor,
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-    });
-    this.vwapSeries = chart.addSeries(LineSeries, {
-      ...overlayBase,
-      color: palette.vwapColor,
-      lineWidth: 2,
-      lineStyle: LineStyle.SparseDotted,
     });
 
     this.chart = chart;
@@ -1325,7 +1278,10 @@ export class ArenaChart {
     }
     const osc = this.oscillator();
     const targetHeight = osc !== 'none' ? MULTI_PANE_CHART_HEIGHT : BASE_CHART_HEIGHT;
-    this.chart.applyOptions({ height: targetHeight });
+    if (this.currentChartHeight !== targetHeight) {
+      this.currentChartHeight = targetHeight;
+      this.chart.applyOptions({ height: targetHeight });
+    }
 
     if (osc === 'none') {
       if (this.activeOscillator !== 'none') {
@@ -1514,14 +1470,114 @@ export class ArenaChart {
     }
   }
 
+  private ensureCloseLineSeries(): ISeriesApi<'Line'> {
+    if (!this.closeLineSeries) {
+      this.closeLineSeries = this.chart!.addSeries(LineSeries, {
+        color: this.lineColor,
+        lineWidth: 2,
+        visible: this.chartMode() === 'line',
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: true,
+      });
+    }
+    return this.closeLineSeries;
+  }
+
+  private ensureSma20Series(): ISeriesApi<'Line'> {
+    if (!this.sma20Series) {
+      this.sma20Series = this.chart!.addSeries(LineSeries, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        color: this.sma20Color,
+        lineWidth: 2,
+      });
+    }
+    return this.sma20Series;
+  }
+
+  private ensureSma50Series(): ISeriesApi<'Line'> {
+    if (!this.sma50Series) {
+      this.sma50Series = this.chart!.addSeries(LineSeries, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        color: this.sma50Color,
+        lineWidth: 2,
+      });
+    }
+    return this.sma50Series;
+  }
+
+  private ensureEma20Series(): ISeriesApi<'Line'> {
+    if (!this.ema20Series) {
+      this.ema20Series = this.chart!.addSeries(LineSeries, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        color: this.ema20Color,
+        lineWidth: 2,
+      });
+    }
+    return this.ema20Series;
+  }
+
+  private ensureEma50Series(): ISeriesApi<'Line'> {
+    if (!this.ema50Series) {
+      this.ema50Series = this.chart!.addSeries(LineSeries, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        color: this.ema50Color,
+        lineWidth: 2,
+      });
+    }
+    return this.ema50Series;
+  }
+
+  private ensureBollingerSeries(): void {
+    const overlayBase = {
+      priceLineVisible: false,
+      lastValueVisible: false,
+    };
+    if (!this.bbUpperSeries) {
+      this.bbUpperSeries = this.chart!.addSeries(LineSeries, {
+        ...overlayBase,
+        color: this.bbColor,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+      });
+    }
+    if (!this.bbMiddleSeries) {
+      this.bbMiddleSeries = this.chart!.addSeries(LineSeries, {
+        ...overlayBase,
+        color: withAlpha(this.bbColor, 0.65),
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+      });
+    }
+    if (!this.bbLowerSeries) {
+      this.bbLowerSeries = this.chart!.addSeries(LineSeries, {
+        ...overlayBase,
+        color: this.bbColor,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+      });
+    }
+  }
+
+  private ensureVwapSeries(): ISeriesApi<'Line'> {
+    if (!this.vwapSeries) {
+      this.vwapSeries = this.chart!.addSeries(LineSeries, {
+        priceLineVisible: false,
+        lastValueVisible: false,
+        color: this.vwapColor,
+        lineWidth: 2,
+        lineStyle: LineStyle.SparseDotted,
+      });
+    }
+    return this.vwapSeries;
+  }
+
   private syncData(): void {
-    if (
-      !this.chart ||
-      !this.candleSeries ||
-      !this.volumeSeries ||
-      !this.sma20Series ||
-      !this.sma50Series
-    ) {
+    if (!this.chart || !this.candleSeries || !this.volumeSeries) {
       return;
     }
 
@@ -1551,28 +1607,62 @@ export class ArenaChart {
 
     // INV-1: отображаем только уже полученные свечи без дорисовывания вперёд.
     this.candleSeries.setData(data);
+    if (this.chartMode() === 'line') {
+      this.ensureCloseLineSeries().setData(data.map((d) => ({ time: d.time, value: d.close })));
+      this.populatedOverlays.add('closeLine');
+    } else if (this.populatedOverlays.delete('closeLine')) {
+      this.closeLineSeries?.setData([]);
+    }
     this.applyChartModeStyle();
-    this.closeLineSeries?.setData(
-      this.chartMode() === 'line' ? data.map((d) => ({ time: d.time, value: d.close })) : [],
-    );
     this.volumeSeries.setData(volumeData);
-    this.sma20Series.setData(this.showSma20() ? toLineData(computeSmaSeries(list, 20)) : []);
-    this.sma50Series.setData(this.showSma50() ? toLineData(computeSmaSeries(list, 50)) : []);
-    this.ema20Series?.setData(this.showEma20() ? toLineData(computeEmaSeries(list, 20)) : []);
-    this.ema50Series?.setData(this.showEma50() ? toLineData(computeEmaSeries(list, 50)) : []);
+
+    if (this.showSma20()) {
+      this.ensureSma20Series().setData(toLineData(computeSmaSeries(list, 20)));
+      this.populatedOverlays.add('sma20');
+    } else if (this.populatedOverlays.delete('sma20')) {
+      this.sma20Series?.setData([]);
+    }
+
+    if (this.showSma50()) {
+      this.ensureSma50Series().setData(toLineData(computeSmaSeries(list, 50)));
+      this.populatedOverlays.add('sma50');
+    } else if (this.populatedOverlays.delete('sma50')) {
+      this.sma50Series?.setData([]);
+    }
+
+    if (this.showEma20()) {
+      this.ensureEma20Series().setData(toLineData(computeEmaSeries(list, 20)));
+      this.populatedOverlays.add('ema20');
+    } else if (this.populatedOverlays.delete('ema20')) {
+      this.ema20Series?.setData([]);
+    }
+
+    if (this.showEma50()) {
+      this.ensureEma50Series().setData(toLineData(computeEmaSeries(list, 50)));
+      this.populatedOverlays.add('ema50');
+    } else if (this.populatedOverlays.delete('ema50')) {
+      this.ema50Series?.setData([]);
+    }
 
     if (this.showBollinger()) {
+      this.ensureBollingerSeries();
       const bb = computeBollingerSeries(list, 20, 2);
-      this.bbUpperSeries?.setData(toLineData(bb.upper));
-      this.bbMiddleSeries?.setData(toLineData(bb.middle));
-      this.bbLowerSeries?.setData(toLineData(bb.lower));
-    } else {
+      this.bbUpperSeries!.setData(toLineData(bb.upper));
+      this.bbMiddleSeries!.setData(toLineData(bb.middle));
+      this.bbLowerSeries!.setData(toLineData(bb.lower));
+      this.populatedOverlays.add('bb');
+    } else if (this.populatedOverlays.delete('bb')) {
       this.bbUpperSeries?.setData([]);
       this.bbMiddleSeries?.setData([]);
       this.bbLowerSeries?.setData([]);
     }
 
-    this.vwapSeries?.setData(this.showVwap() ? toLineData(computeVwapSeries(list)) : []);
+    if (this.showVwap()) {
+      this.ensureVwapSeries().setData(toLineData(computeVwapSeries(list)));
+      this.populatedOverlays.add('vwap');
+    } else if (this.populatedOverlays.delete('vwap')) {
+      this.vwapSeries?.setData([]);
+    }
 
     this.syncOscillator(list);
 

@@ -223,6 +223,68 @@ describe('InstrumentsStore', () => {
     expect(sorted[sorted.length - 1].peRatio).toBeNull();
   });
 
+  it('разбивает скринер на страницы по 50 строк и сбрасывает на 1-ю страницу при смене фильтра или сортировки', async () => {
+    const manyPapers = Array.from({ length: 120 }, (_, i) => ({
+      ticker: `T${String(i + 1).padStart(3, '0')}`,
+      name: `Компания ${i + 1}`,
+      sector: i % 2 === 0 ? 'Финансы' : 'Энергетика',
+      marketCapRub: (120 - i) * 1_000_000_000,
+      peRatio: 4 + (i % 10),
+      pbRatio: 1.1,
+      psRatio: 1.5,
+      evEbitda: 5,
+      roe: 18 + (i % 10),
+      netMargin: 12,
+      debtToEquity: 0.3,
+      dividendYield: 8 + (i % 6),
+      beta: 1.0,
+      hasFundamentals: true,
+    }));
+    vi.spyOn(api, 'listScreenerPapers').mockResolvedValue(manyPapers);
+
+    await store.init();
+    await store.setActiveTab('screener');
+
+    expect(store.screenerTotalPages()).toBe(3);
+    expect(store.currentScreenerPage()).toBe(1);
+    expect(store.visibleScreenerPapers()).toHaveLength(50);
+    expect(store.visibleScreenerPapers()[0].ticker).toBe('T001');
+
+    store.nextScreenerPage();
+    expect(store.currentScreenerPage()).toBe(2);
+    expect(store.visibleScreenerPapers()).toHaveLength(50);
+    expect(store.visibleScreenerPapers()[0].ticker).toBe('T051');
+
+    store.nextScreenerPage();
+    expect(store.currentScreenerPage()).toBe(3);
+    expect(store.visibleScreenerPapers()).toHaveLength(20);
+    expect(store.visibleScreenerPapers()[0].ticker).toBe('T101');
+
+    // Не выходит за последнюю страницу.
+    store.nextScreenerPage();
+    expect(store.currentScreenerPage()).toBe(3);
+
+    store.prevScreenerPage();
+    expect(store.currentScreenerPage()).toBe(2);
+
+    // Смена сортировки сбрасывает на 1-ю страницу.
+    store.toggleScreenerSort('ticker');
+    expect(store.currentScreenerPage()).toBe(1);
+
+    // Смена поиска сбрасывает на 1-ю страницу.
+    store.nextScreenerPage();
+    expect(store.currentScreenerPage()).toBe(2);
+    store.setScreenerQuery('T0');
+    expect(store.currentScreenerPage()).toBe(1);
+
+    // Смена сектора сбрасывает на 1-ю страницу.
+    store.setScreenerQuery('');
+    store.nextScreenerPage();
+    expect(store.currentScreenerPage()).toBe(2);
+    store.setScreenerSector('Финансы');
+    expect(store.currentScreenerPage()).toBe(1);
+  });
+
   it('фильтрует события календаря и создаёт/удаляет алерты', async () => {
     await store.init();
     await store.setActiveTab('events_alerts');

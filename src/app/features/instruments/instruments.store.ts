@@ -83,7 +83,8 @@ export class InstrumentsStore {
   readonly screenerMinDivYield = signal<number | null>(null);
   readonly screenerSortField = signal<ScreenerSortField>('marketCapRub');
   readonly screenerSortDir = signal<SortDirection>('desc');
-  readonly screenerVisibleLimit = signal<number>(50);
+  readonly screenerPageSize = 50;
+  readonly screenerPage = signal<number>(1);
   readonly selectedScreenerTicker = signal<string | null>(null);
 
   // Market events & alerts state
@@ -369,9 +370,19 @@ export class InstrumentsStore {
     return [...filtered].sort((a, b) => compareScreenerPapers(a, b, sortField, factor));
   });
 
-  readonly visibleScreenerPapers = computed<readonly ScreenerPaper[]>(() =>
-    this.filteredScreenerPapers().slice(0, this.screenerVisibleLimit()),
+  readonly screenerTotalPages = computed<number>(() =>
+    Math.max(1, Math.ceil(this.filteredScreenerPapers().length / this.screenerPageSize)),
   );
+
+  readonly currentScreenerPage = computed<number>(() =>
+    Math.min(Math.max(1, this.screenerPage()), this.screenerTotalPages()),
+  );
+
+  readonly visibleScreenerPapers = computed<readonly ScreenerPaper[]>(() => {
+    const page = this.currentScreenerPage();
+    const start = (page - 1) * this.screenerPageSize;
+    return this.filteredScreenerPapers().slice(start, start + this.screenerPageSize);
+  });
 
   readonly selectedScreenerPaper = computed<ScreenerPaper | null>(() => {
     const ticker = this.selectedScreenerTicker();
@@ -743,14 +754,40 @@ export class InstrumentsStore {
     await this.recalculateDca();
   }
 
+  setScreenerQuery(query: string): void {
+    this.screenerQuery.set(query);
+    this.screenerPage.set(1);
+  }
+
+  setScreenerSector(sector: string): void {
+    this.screenerSector.set(sector);
+    this.screenerPage.set(1);
+  }
+
+  setScreenerMaxPe(value: number | null): void {
+    this.screenerMaxPe.set(value);
+    this.screenerPage.set(1);
+  }
+
+  setScreenerMinRoe(value: number | null): void {
+    this.screenerMinRoe.set(value);
+    this.screenerPage.set(1);
+  }
+
+  setScreenerMinDivYield(value: number | null): void {
+    this.screenerMinDivYield.set(value);
+    this.screenerPage.set(1);
+  }
+
   applyScreenerPreset(preset: ScreenerPreset): void {
     this.screenerPreset.set(preset);
-    this.screenerVisibleLimit.set(50);
+    this.screenerPage.set(1);
   }
 
   toggleScreenerSort(field: ScreenerSortField): void {
     if (this.screenerSortField() === field) {
       this.screenerSortDir.set(this.screenerSortDir() === 'asc' ? 'desc' : 'asc');
+      this.screenerPage.set(1);
       return;
     }
     this.screenerSortField.set(field);
@@ -762,6 +799,7 @@ export class InstrumentsStore {
       field === 'pbRatio' ||
       field === 'debtToEquity';
     this.screenerSortDir.set(ascDefault ? 'asc' : 'desc');
+    this.screenerPage.set(1);
   }
 
   resetScreenerFilters(): void {
@@ -771,19 +809,24 @@ export class InstrumentsStore {
     this.screenerMaxPe.set(null);
     this.screenerMinRoe.set(null);
     this.screenerMinDivYield.set(null);
-    this.screenerVisibleLimit.set(50);
+    this.screenerPage.set(1);
   }
 
   selectScreenerPaper(paper: ScreenerPaper): void {
     this.selectedScreenerTicker.set(paper.ticker);
   }
 
-  showMoreScreenerPapers(): void {
-    this.screenerVisibleLimit.update((limit) => limit + 50);
+  setScreenerPage(page: number): void {
+    const clamped = Math.min(Math.max(1, Math.trunc(page)), this.screenerTotalPages());
+    this.screenerPage.set(clamped);
   }
 
-  showAllScreenerPapers(): void {
-    this.screenerVisibleLimit.set(Math.max(50, this.filteredScreenerPapers().length));
+  prevScreenerPage(): void {
+    this.setScreenerPage(this.currentScreenerPage() - 1);
+  }
+
+  nextScreenerPage(): void {
+    this.setScreenerPage(this.currentScreenerPage() + 1);
   }
 
   openAlertForTicker(ticker: string): void {

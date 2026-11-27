@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TuiButton, TuiInput, TuiTextfield } from '@taiga-ui/core';
@@ -326,10 +326,10 @@ const SCREENER_PRESETS: readonly { readonly id: ScreenerPreset; readonly label: 
             </table>
           </div>
 
-          @if (filteredCount() > papers().length) {
-            <div class="pagination-bar">
-              <span class="tui-text_body-xs muted">
-                Показано {{ papers().length }} из {{ filteredCount() }}
+          @if (totalPages() > 1) {
+            <div class="pagination-bar" data-screener-pagination>
+              <span class="tui-text_body-xs muted num">
+                Показано {{ pageRangeStart() }}–{{ pageRangeEnd() }} из {{ filteredCount() }}
               </span>
               <div class="pagination-actions">
                 <button
@@ -337,18 +337,25 @@ const SCREENER_PRESETS: readonly { readonly id: ScreenerPreset; readonly label: 
                   type="button"
                   size="xs"
                   appearance="outline"
-                  (click)="showMore.emit()"
+                  data-screener-prev
+                  [disabled]="page() <= 1"
+                  (click)="prevPage.emit()"
                 >
-                  Показать ещё 50
+                  ← Назад
                 </button>
+                <span class="tui-text_body-xs muted num pagination-indicator" data-screener-page>
+                  Стр. {{ page() }} из {{ totalPages() }}
+                </span>
                 <button
                   tuiButton
                   type="button"
                   size="xs"
-                  appearance="flat"
-                  (click)="showAll.emit()"
+                  appearance="outline"
+                  data-screener-next
+                  [disabled]="page() >= totalPages()"
+                  (click)="nextPage.emit()"
                 >
-                  Показать все ({{ filteredCount() }})
+                  Вперёд →
                 </button>
               </div>
             </div>
@@ -620,6 +627,8 @@ const SCREENER_PRESETS: readonly { readonly id: ScreenerPreset; readonly label: 
       .screener-row {
         cursor: pointer;
         transition: background-color 0.12s ease;
+        content-visibility: auto;
+        contain-intrinsic-size: auto 44px;
       }
 
       .screener-row:hover {
@@ -647,7 +656,13 @@ const SCREENER_PRESETS: readonly { readonly id: ScreenerPreset; readonly label: 
 
       .pagination-actions {
         display: flex;
+        align-items: center;
         gap: 0.5rem;
+      }
+
+      .pagination-indicator {
+        min-width: 5.5rem;
+        text-align: center;
       }
 
       .detail-panel {
@@ -746,6 +761,9 @@ export class ScreenerPanel {
   readonly sortDir = input.required<SortDirection>();
   readonly selectedTicker = input.required<string | null>();
   readonly selectedPaper = input.required<ScreenerPaper | null>();
+  readonly page = input<number>(1);
+  readonly totalPages = input<number>(1);
+  readonly pageSize = input<number>(50);
 
   readonly queryChange = output<string>();
   readonly sectorChange = output<string>();
@@ -756,14 +774,21 @@ export class ScreenerPanel {
   readonly sortToggle = output<ScreenerSortField>();
   readonly resetFilters = output<void>();
   readonly selectPaper = output<ScreenerPaper>();
-  readonly showMore = output<void>();
-  readonly showAll = output<void>();
+  readonly prevPage = output<void>();
+  readonly nextPage = output<void>();
   readonly createAlertForTicker = output<string>();
 
   protected readonly presets = SCREENER_PRESETS;
   protected readonly formatMarketCapRub = formatMarketCapRub;
   protected readonly formatPct = formatPct;
   protected readonly formatRatio = formatRatio;
+
+  protected readonly pageRangeStart = computed(() =>
+    this.filteredCount() === 0 ? 0 : (this.page() - 1) * this.pageSize() + 1,
+  );
+  protected readonly pageRangeEnd = computed(() =>
+    Math.min(this.filteredCount(), (this.page() - 1) * this.pageSize() + this.papers().length),
+  );
 
   protected sortIndicator(field: ScreenerSortField): string {
     if (this.sortField() !== field) {
