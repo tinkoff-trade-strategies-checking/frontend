@@ -1,9 +1,10 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
 import { formatBlindAxisTick, formatBlindCandleLabel, formatRejectReason } from './arena.format';
+import { ArenaDrawingTool } from './arena-drawing';
 import { ArenaPage } from './arena-page';
 import { TaOscillatorId } from './arena-ta';
 import { ArenaChart } from './components/arena-chart';
@@ -19,6 +20,8 @@ import { UI_MODE_STORAGE_KEY, UiModeService } from '../../shared/ui-mode.service
 })
 class StubArenaChart {
   readonly paperId = input<string>('');
+  readonly paperKey = input<string>('');
+  readonly blind = input(true);
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -29,6 +32,11 @@ class StubArenaChart {
   readonly showBollinger = input(false);
   readonly showVwap = input(false);
   readonly oscillator = input<TaOscillatorId>('none');
+  readonly drawingTool = input<ArenaDrawingTool>('none');
+  readonly undoNonce = input(0);
+  readonly clearNonce = input(0);
+  readonly drawingsCountChange = output<number>();
+  readonly drawingToolChange = output<ArenaDrawingTool>();
 }
 
 describe('ArenaPage', () => {
@@ -359,5 +367,50 @@ describe('ArenaPage', () => {
     oscSelect!.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(fixture.componentInstance['oscillator']()).toBe('rsi');
+  });
+
+  it('в Базовом режиме скрывает панель рисования за кнопкой «Рисование», а в Профи показывает сразу', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('[data-testid="arena-drawing-toolbar"]')).toBeNull();
+
+    const toggleBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-drawing-toggle"]');
+    expect(toggleBtn).not.toBeNull();
+    expect(toggleBtn!.textContent?.trim()).toBe('Рисование');
+    toggleBtn!.click();
+    fixture.detectChanges();
+
+    const toolbar = root.querySelector('[data-testid="arena-drawing-toolbar"]');
+    expect(toolbar).not.toBeNull();
+    const toolbarText = toolbar!.textContent ?? '';
+    expect(toolbarText).toContain('Курсор');
+    expect(toolbarText).toContain('Уровень');
+    expect(toolbarText).toContain('Тренд');
+    expect(toolbarText).toContain('Фибоначчи');
+    expect(toolbarText).toContain('Линейка');
+    expect(toolbarText).toContain('Отменить');
+    expect(toolbarText).toContain('Очистить');
+    expect(toolbarText).not.toContain('₽');
+
+    const fibBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-draw-fib"]');
+    expect(fibBtn).not.toBeNull();
+    fibBtn!.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['drawingTool']()).toBe('fib');
+
+    // Скрываем панель в Базовом, затем включаем режим Профи — панель рисования видна сразу.
+    toggleBtn!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('[data-testid="arena-drawing-toolbar"]')).toBeNull();
+
+    TestBed.inject(UiModeService).setMode('pro');
+    fixture.detectChanges();
+    expect(root.querySelector('[data-testid="arena-drawing-toolbar"]')).not.toBeNull();
+    expect(root.querySelector('[data-testid="arena-drawing-toggle"]')).toBeNull();
   });
 });

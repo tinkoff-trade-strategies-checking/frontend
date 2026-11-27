@@ -7,6 +7,8 @@ import {
   ElementRef,
   inject,
   input,
+  output,
+  signal,
   viewChild,
 } from '@angular/core';
 import {
@@ -23,11 +25,27 @@ import {
   LineData,
   LineSeries,
   LineStyle,
+  MouseEventParams,
   SeriesMarker,
   Time,
   UTCTimestamp,
 } from 'lightweight-charts';
 import { formatBlindAxisTick, formatBlindCandleLabel } from '../arena.format';
+import {
+  addDrawingForPaper,
+  ArenaDrawing,
+  ArenaDrawingTool,
+  ChartCoordinateProjector,
+  clearDrawingsForPaper,
+  DrawingAnchor,
+  DrawingsByPaper,
+  getDrawingsForPaper,
+  projectDrawing,
+  projectDrawings,
+  ProjectedDrawing,
+  snapTimeToOrderedTimes,
+  undoDrawingForPaper,
+} from '../arena-drawing';
 import {
   computeAdxSeries,
   computeAtrSeries,
@@ -86,20 +104,373 @@ const MULTI_PANE_CHART_HEIGHT = 480;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
-      #container
-      class="chart-host"
+      class="chart-wrapper"
       [class.with-oscillator]="oscillator() !== 'none'"
-      aria-label="График свечей"
-    ></div>
+      [class.drawing-active]="drawingTool() !== 'none'"
+    >
+      <div #container class="chart-host" aria-label="График свечей"></div>
+
+      @if (overlayWidth() > 0 && overlayHeight() > 0) {
+        <svg
+          class="drawing-overlay"
+          [attr.viewBox]="'0 0 ' + overlayWidth() + ' ' + overlayHeight()"
+          [attr.width]="overlayWidth()"
+          [attr.height]="overlayHeight()"
+          aria-hidden="true"
+        >
+          @for (item of projectedDrawings(); track item.id) {
+            @switch (item.kind) {
+              @case ('hline') {
+                <g class="drawing-hline">
+                  <line
+                    [attr.x1]="0"
+                    [attr.y1]="item.y"
+                    [attr.x2]="item.width"
+                    [attr.y2]="item.y"
+                  />
+                  <rect [attr.x]="6" [attr.y]="item.y - 18" width="66" height="16" rx="3" />
+                  <text [attr.x]="12" [attr.y]="item.y - 6">{{ item.priceLabel }}</text>
+                </g>
+              }
+              @case ('trendline') {
+                <g class="drawing-trendline">
+                  <line
+                    [attr.x1]="item.x1"
+                    [attr.y1]="item.y1"
+                    [attr.x2]="item.x2"
+                    [attr.y2]="item.y2"
+                  />
+                  <circle [attr.cx]="item.x1" [attr.cy]="item.y1" r="3.5" />
+                  <circle [attr.cx]="item.x2" [attr.cy]="item.y2" r="3.5" />
+                </g>
+              }
+              @case ('fib') {
+                <g class="drawing-fib">
+                  @for (band of item.bands; track band.index) {
+                    <rect
+                      class="fib-band"
+                      [class.fib-band-alt]="band.index % 2 === 1"
+                      [attr.x]="item.x1"
+                      [attr.y]="band.y"
+                      [attr.width]="item.x2 - item.x1"
+                      [attr.height]="band.height"
+                    />
+                  }
+                  @for (lvl of item.levels; track lvl.ratio) {
+                    <line
+                      class="fib-line"
+                      [class.fib-line-golden]="lvl.ratio === 0.618 || lvl.ratio === 0.5"
+                      [attr.x1]="item.x1"
+                      [attr.y1]="lvl.y"
+                      [attr.x2]="item.x2"
+                      [attr.y2]="lvl.y"
+                    />
+                    <text class="fib-label" [attr.x]="item.x1 + 4" [attr.y]="lvl.y - 3">
+                      {{ lvl.label }} · {{ lvl.priceLabel }}
+                    </text>
+                  }
+                </g>
+              }
+              @case ('ruler') {
+                <g
+                  class="drawing-ruler"
+                  [class.ruler-pos]="item.isPositive"
+                  [class.ruler-neg]="!item.isPositive"
+                >
+                  <rect
+                    class="ruler-box"
+                    [attr.x]="item.x"
+                    [attr.y]="item.y"
+                    [attr.width]="item.width"
+                    [attr.height]="item.height"
+                  />
+                  <line
+                    class="ruler-diag"
+                    [attr.x1]="item.x1"
+                    [attr.y1]="item.y1"
+                    [attr.x2]="item.x2"
+                    [attr.y2]="item.y2"
+                  />
+                  <rect
+                    class="ruler-pill"
+                    [attr.x]="item.labelX"
+                    [attr.y]="item.labelY"
+                    [attr.width]="item.labelWidth"
+                    [attr.height]="item.labelHeight"
+                    rx="5"
+                  />
+                  <text
+                    class="ruler-text ruler-text-strong"
+                    [attr.x]="item.labelX + 8"
+                    [attr.y]="item.labelY + 16"
+                  >
+                    {{ item.lines[0] }}
+                  </text>
+                  <text class="ruler-text" [attr.x]="item.labelX + 8" [attr.y]="item.labelY + 32">
+                    {{ item.lines[1] }}
+                  </text>
+                  <text
+                    class="ruler-text ruler-text-muted"
+                    [attr.x]="item.labelX + 8"
+                    [attr.y]="item.labelY + 47"
+                  >
+                    {{ item.lines[2] }}
+                  </text>
+                </g>
+              }
+            }
+          }
+
+          @if (projectedDraft(); as draft) {
+            <g class="drawing-draft">
+              @switch (draft.kind) {
+                @case ('trendline') {
+                  <g class="drawing-trendline">
+                    <line
+                      [attr.x1]="draft.x1"
+                      [attr.y1]="draft.y1"
+                      [attr.x2]="draft.x2"
+                      [attr.y2]="draft.y2"
+                    />
+                    <circle [attr.cx]="draft.x1" [attr.cy]="draft.y1" r="3.5" />
+                    <circle [attr.cx]="draft.x2" [attr.cy]="draft.y2" r="3.5" />
+                  </g>
+                }
+                @case ('fib') {
+                  <g class="drawing-fib">
+                    @for (band of draft.bands; track band.index) {
+                      <rect
+                        class="fib-band"
+                        [class.fib-band-alt]="band.index % 2 === 1"
+                        [attr.x]="draft.x1"
+                        [attr.y]="band.y"
+                        [attr.width]="draft.x2 - draft.x1"
+                        [attr.height]="band.height"
+                      />
+                    }
+                    @for (lvl of draft.levels; track lvl.ratio) {
+                      <line
+                        class="fib-line"
+                        [attr.x1]="draft.x1"
+                        [attr.y1]="lvl.y"
+                        [attr.x2]="draft.x2"
+                        [attr.y2]="lvl.y"
+                      />
+                      <text class="fib-label" [attr.x]="draft.x1 + 4" [attr.y]="lvl.y - 3">
+                        {{ lvl.label }} · {{ lvl.priceLabel }}
+                      </text>
+                    }
+                  </g>
+                }
+                @case ('ruler') {
+                  <g
+                    class="drawing-ruler"
+                    [class.ruler-pos]="draft.isPositive"
+                    [class.ruler-neg]="!draft.isPositive"
+                  >
+                    <rect
+                      class="ruler-box"
+                      [attr.x]="draft.x"
+                      [attr.y]="draft.y"
+                      [attr.width]="draft.width"
+                      [attr.height]="draft.height"
+                    />
+                    <line
+                      class="ruler-diag"
+                      [attr.x1]="draft.x1"
+                      [attr.y1]="draft.y1"
+                      [attr.x2]="draft.x2"
+                      [attr.y2]="draft.y2"
+                    />
+                    <rect
+                      class="ruler-pill"
+                      [attr.x]="draft.labelX"
+                      [attr.y]="draft.labelY"
+                      [attr.width]="draft.labelWidth"
+                      [attr.height]="draft.labelHeight"
+                      rx="5"
+                    />
+                    <text
+                      class="ruler-text ruler-text-strong"
+                      [attr.x]="draft.labelX + 8"
+                      [attr.y]="draft.labelY + 16"
+                    >
+                      {{ draft.lines[0] }}
+                    </text>
+                    <text
+                      class="ruler-text"
+                      [attr.x]="draft.labelX + 8"
+                      [attr.y]="draft.labelY + 32"
+                    >
+                      {{ draft.lines[1] }}
+                    </text>
+                    <text
+                      class="ruler-text ruler-text-muted"
+                      [attr.x]="draft.labelX + 8"
+                      [attr.y]="draft.labelY + 47"
+                    >
+                      {{ draft.lines[2] }}
+                    </text>
+                  </g>
+                }
+              }
+            </g>
+          }
+
+          @if (projectedPendingPoint(); as pt) {
+            <circle class="drawing-anchor-dot" [attr.cx]="pt.x" [attr.cy]="pt.y" r="4.5" />
+          }
+        </svg>
+      }
+    </div>
   `,
   styles: `
-    .chart-host {
+    .chart-wrapper {
+      position: relative;
       width: 100%;
       height: 360px;
     }
 
-    .chart-host.with-oscillator {
+    .chart-wrapper.with-oscillator {
       height: 480px;
+    }
+
+    .chart-wrapper.drawing-active {
+      cursor: crosshair;
+    }
+
+    .chart-host {
+      width: 100%;
+      height: 100%;
+    }
+
+    .drawing-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 4;
+      overflow: hidden;
+      font-family: var(--tui-font-text, inherit);
+    }
+
+    .drawing-hline line {
+      stroke: var(--tui-text-action, #3b82f6);
+      stroke-width: 1.5;
+      stroke-dasharray: 5 3;
+    }
+
+    .drawing-hline rect {
+      fill: var(--tui-text-action, #3b82f6);
+      opacity: 0.9;
+    }
+
+    .drawing-hline text {
+      fill: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .drawing-trendline line {
+      stroke: var(--tui-background-accent-1, #f59e0b);
+      stroke-width: 2;
+    }
+
+    .drawing-trendline circle {
+      fill: var(--tui-background-accent-1, #f59e0b);
+      stroke: var(--tui-background-base, #ffffff);
+      stroke-width: 1.5;
+    }
+
+    .drawing-fib .fib-band {
+      fill: rgba(59, 130, 246, 0.08);
+    }
+
+    .drawing-fib .fib-band.fib-band-alt {
+      fill: rgba(168, 85, 247, 0.08);
+    }
+
+    .drawing-fib .fib-line {
+      stroke: var(--tui-text-action, #3b82f6);
+      stroke-width: 1;
+      stroke-dasharray: 3 3;
+      opacity: 0.85;
+    }
+
+    .drawing-fib .fib-line.fib-line-golden {
+      stroke: var(--tui-background-accent-1, #f59e0b);
+      stroke-width: 1.5;
+      stroke-dasharray: none;
+    }
+
+    .drawing-fib .fib-label {
+      fill: var(--tui-text-primary, currentColor);
+      font-size: 10px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .drawing-ruler.ruler-pos .ruler-box {
+      fill: rgba(34, 197, 94, 0.14);
+      stroke: var(--tui-text-positive, #22c55e);
+      stroke-width: 1.25;
+    }
+
+    .drawing-ruler.ruler-neg .ruler-box {
+      fill: rgba(239, 68, 68, 0.14);
+      stroke: var(--tui-text-negative, #ef4444);
+      stroke-width: 1.25;
+    }
+
+    .drawing-ruler.ruler-pos .ruler-diag {
+      stroke: var(--tui-text-positive, #22c55e);
+      stroke-width: 1.25;
+      stroke-dasharray: 4 3;
+    }
+
+    .drawing-ruler.ruler-neg .ruler-diag {
+      stroke: var(--tui-text-negative, #ef4444);
+      stroke-width: 1.25;
+      stroke-dasharray: 4 3;
+    }
+
+    .drawing-ruler .ruler-pill {
+      fill: var(--tui-background-base, #1e293b);
+      stroke: var(--tui-border-normal, #64748b);
+      stroke-width: 1;
+      opacity: 0.94;
+    }
+
+    .drawing-ruler .ruler-text {
+      fill: var(--tui-text-primary, currentColor);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .drawing-ruler.ruler-pos .ruler-text-strong {
+      fill: var(--tui-text-positive, #22c55e);
+      font-weight: 700;
+    }
+
+    .drawing-ruler.ruler-neg .ruler-text-strong {
+      fill: var(--tui-text-negative, #ef4444);
+      font-weight: 700;
+    }
+
+    .drawing-ruler .ruler-text-muted {
+      fill: var(--tui-text-secondary, currentColor);
+      font-size: 10px;
+    }
+
+    .drawing-draft {
+      opacity: 0.78;
+    }
+
+    .drawing-anchor-dot {
+      fill: var(--tui-text-action, #3b82f6);
+      stroke: var(--tui-background-base, #ffffff);
+      stroke-width: 1.5;
     }
   `,
 })
@@ -108,6 +479,8 @@ export class ArenaChart {
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   readonly paperId = input<string>('');
+  readonly paperKey = input<string>('');
+  readonly blind = input(true);
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -118,6 +491,32 @@ export class ArenaChart {
   readonly showBollinger = input(false);
   readonly showVwap = input(false);
   readonly oscillator = input<TaOscillatorId>('none');
+  readonly drawingTool = input<ArenaDrawingTool>('none');
+  readonly undoNonce = input(0);
+  readonly clearNonce = input(0);
+
+  readonly drawingsCountChange = output<number>();
+  readonly drawingToolChange = output<ArenaDrawingTool>();
+
+  protected readonly overlayWidth = signal(0);
+  protected readonly overlayHeight = signal(0);
+  protected readonly projectedDrawings = signal<readonly ProjectedDrawing[]>([]);
+  protected readonly projectedDraft = signal<ProjectedDrawing | null>(null);
+  protected readonly projectedPendingPoint = signal<{
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
+
+  private readonly drawingsByPaper = signal<DrawingsByPaper>({});
+  private orderedTimes: number[] = [];
+  private pendingAnchor: DrawingAnchor | null = null;
+  private hoverAnchor: DrawingAnchor | null = null;
+  private drawingSeq = 0;
+  private lastUndoNonce = 0;
+  private lastClearNonce = 0;
+  private overlayRafId: number | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private cleanupDomListeners: (() => void) | null = null;
 
   private chart: IChartApi | null = null;
   private candleSeries: ISeriesApi<'Candlestick'> | null = null;
@@ -156,6 +555,8 @@ export class ArenaChart {
     effect(() => {
       // Отслеживаем все входные сигналы для перерисовки при обновлении бумаги, свечей, заявок и индикаторов.
       this.paperId();
+      this.paperKey();
+      this.blind();
       this.candles();
       this.orders();
       this.fills();
@@ -169,11 +570,65 @@ export class ArenaChart {
       this.syncData();
     });
 
+    effect(() => {
+      // Сбрасываем незавершённый черновик при смене инструмента или бумаги и синхронизируем счётчик.
+      this.drawingTool();
+      const key = this.activePaperKey();
+      const store = this.drawingsByPaper();
+      this.pendingAnchor = null;
+      this.hoverAnchor = null;
+      this.drawingsCountChange.emit(getDrawingsForPaper(store, key).length);
+      this.scheduleOverlayRender();
+    });
+
+    effect(() => {
+      const nonce = this.undoNonce();
+      if (nonce === this.lastUndoNonce) {
+        return;
+      }
+      this.lastUndoNonce = nonce;
+      if (this.pendingAnchor) {
+        this.pendingAnchor = null;
+        this.hoverAnchor = null;
+      } else {
+        const key = this.activePaperKey();
+        this.drawingsByPaper.update((store) => undoDrawingForPaper(store, key));
+      }
+      this.scheduleOverlayRender();
+    });
+
+    effect(() => {
+      const nonce = this.clearNonce();
+      if (nonce === this.lastClearNonce) {
+        return;
+      }
+      this.lastClearNonce = nonce;
+      this.pendingAnchor = null;
+      this.hoverAnchor = null;
+      const key = this.activePaperKey();
+      this.drawingsByPaper.update((store) => clearDrawingsForPaper(store, key));
+      this.scheduleOverlayRender();
+    });
+
     this.destroyRef.onDestroy(() => {
+      if (this.overlayRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+        cancelAnimationFrame(this.overlayRafId);
+        this.overlayRafId = null;
+      }
+      this.resizeObserver?.disconnect();
+      this.resizeObserver = null;
+      this.cleanupDomListeners?.();
+      this.cleanupDomListeners = null;
       this.themeObserver?.disconnect();
       this.themeObserver = null;
-      this.chart?.remove();
-      this.chart = null;
+      if (this.chart) {
+        this.chart.unsubscribeClick(this.handleChartClick);
+        this.chart.unsubscribeCrosshairMove(this.handleCrosshairMove);
+        this.chart.timeScale().unsubscribeVisibleLogicalRangeChange(this.handleRangeOrSizeChange);
+        this.chart.timeScale().unsubscribeSizeChange(this.handleRangeOrSizeChange);
+        this.chart.remove();
+        this.chart = null;
+      }
     });
   }
 
@@ -391,6 +846,217 @@ export class ArenaChart {
     this.candleSeries = candleSeries;
     this.volumeSeries = volumeSeries;
     this.markersPlugin = createSeriesMarkers(candleSeries, []);
+
+    chart.subscribeClick(this.handleChartClick);
+    chart.subscribeCrosshairMove(this.handleCrosshairMove);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(this.handleRangeOrSizeChange);
+    chart.timeScale().subscribeSizeChange(this.handleRangeOrSizeChange);
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => this.scheduleOverlayRender());
+      ro.observe(el);
+      this.resizeObserver = ro;
+    }
+
+    const onPointerOrWheel = () => this.scheduleOverlayRender();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      if (this.pendingAnchor) {
+        this.pendingAnchor = null;
+        this.hoverAnchor = null;
+        this.scheduleOverlayRender();
+      } else if (this.drawingTool() !== 'none') {
+        this.drawingToolChange.emit('none');
+      }
+    };
+    el.addEventListener('wheel', onPointerOrWheel, { passive: true });
+    el.addEventListener('pointerup', onPointerOrWheel, { passive: true });
+    el.addEventListener('pointermove', onPointerOrWheel, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    this.cleanupDomListeners = () => {
+      el.removeEventListener('wheel', onPointerOrWheel);
+      el.removeEventListener('pointerup', onPointerOrWheel);
+      el.removeEventListener('pointermove', onPointerOrWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }
+
+  private activePaperKey(): string {
+    return this.paperKey() || this.paperId();
+  }
+
+  private nextDrawingId(): string {
+    this.drawingSeq += 1;
+    return `d-${this.drawingSeq}`;
+  }
+
+  private readonly handleRangeOrSizeChange = (): void => {
+    this.scheduleOverlayRender();
+  };
+
+  private resolveAnchor(param: MouseEventParams<Time>): DrawingAnchor | null {
+    if (!this.chart || !this.candleSeries || !param.point) {
+      return null;
+    }
+    if (param.paneIndex !== undefined && param.paneIndex !== 0) {
+      return null;
+    }
+    const price = this.candleSeries.coordinateToPrice(param.point.y);
+    if (price === null || !Number.isFinite(price)) {
+      return null;
+    }
+
+    let time: number | null = typeof param.time === 'number' ? param.time : null;
+    if (time === null) {
+      const coordTime = this.chart.timeScale().coordinateToTime(param.point.x);
+      if (typeof coordTime === 'number') {
+        time = coordTime;
+      }
+    }
+    if (time === null && this.orderedTimes.length > 0) {
+      const logical = this.chart.timeScale().coordinateToLogical(param.point.x);
+      if (logical !== null && Number.isFinite(logical)) {
+        const clampedIndex = Math.min(
+          Math.max(Math.round(logical), 0),
+          this.orderedTimes.length - 1,
+        );
+        time = this.orderedTimes[clampedIndex] ?? null;
+      }
+    }
+    if (time === null) {
+      return null;
+    }
+
+    const snapped = snapTimeToOrderedTimes(time, this.orderedTimes);
+    return { time: snapped ?? time, price };
+  }
+
+  private readonly handleChartClick = (param: MouseEventParams<Time>): void => {
+    const tool = this.drawingTool();
+    if (tool === 'none') {
+      return;
+    }
+    const anchor = this.resolveAnchor(param);
+    if (!anchor) {
+      return;
+    }
+
+    const key = this.activePaperKey();
+    if (!key) {
+      return;
+    }
+
+    if (tool === 'hline') {
+      const drawing: ArenaDrawing = {
+        id: this.nextDrawingId(),
+        kind: 'hline',
+        price: anchor.price,
+      };
+      this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
+      this.scheduleOverlayRender();
+      return;
+    }
+
+    if (!this.pendingAnchor) {
+      this.pendingAnchor = anchor;
+      this.hoverAnchor = anchor;
+      this.scheduleOverlayRender();
+      return;
+    }
+
+    const drawing: ArenaDrawing = {
+      id: this.nextDrawingId(),
+      kind: tool,
+      start: this.pendingAnchor,
+      end: anchor,
+    };
+    this.pendingAnchor = null;
+    this.hoverAnchor = null;
+    this.drawingsByPaper.update((store) => addDrawingForPaper(store, key, drawing));
+    this.scheduleOverlayRender();
+  };
+
+  private readonly handleCrosshairMove = (param: MouseEventParams<Time>): void => {
+    if (!this.pendingAnchor || this.drawingTool() === 'none') {
+      return;
+    }
+    const anchor = this.resolveAnchor(param);
+    if (!anchor) {
+      return;
+    }
+    this.hoverAnchor = anchor;
+    this.scheduleOverlayRender();
+  };
+
+  private scheduleOverlayRender(): void {
+    if (!this.chart || !this.candleSeries) {
+      return;
+    }
+    if (typeof requestAnimationFrame === 'undefined') {
+      this.renderOverlay();
+      return;
+    }
+    if (this.overlayRafId !== null) {
+      return;
+    }
+    this.overlayRafId = requestAnimationFrame(() => {
+      this.overlayRafId = null;
+      this.renderOverlay();
+    });
+  }
+
+  private renderOverlay(): void {
+    if (!this.chart || !this.candleSeries) {
+      return;
+    }
+    const paneSize = this.chart.paneSize(0);
+    const width = paneSize.width;
+    const height = paneSize.height;
+    this.overlayWidth.set(width);
+    this.overlayHeight.set(height);
+
+    if (width <= 0 || height <= 0) {
+      this.projectedDrawings.set([]);
+      this.projectedDraft.set(null);
+      this.projectedPendingPoint.set(null);
+      return;
+    }
+
+    const timeScale = this.chart.timeScale();
+    const series = this.candleSeries;
+    const projector: ChartCoordinateProjector = {
+      width,
+      height,
+      timeToX: (time) => timeScale.timeToCoordinate(time as UTCTimestamp),
+      priceToY: (price) => series.priceToCoordinate(price),
+    };
+
+    const blind = this.blind();
+    const saved = getDrawingsForPaper(this.drawingsByPaper(), this.activePaperKey());
+    this.projectedDrawings.set(projectDrawings(saved, projector, blind, this.orderedTimes));
+
+    const tool = this.drawingTool();
+    if (this.pendingAnchor && this.hoverAnchor && tool !== 'none' && tool !== 'hline') {
+      const draft: ArenaDrawing = {
+        id: '__draft__',
+        kind: tool,
+        start: this.pendingAnchor,
+        end: this.hoverAnchor,
+      };
+      this.projectedDraft.set(projectDrawing(draft, projector, blind, this.orderedTimes));
+    } else {
+      this.projectedDraft.set(null);
+    }
+
+    if (this.pendingAnchor) {
+      const x = projector.timeToX(this.pendingAnchor.time);
+      const y = projector.priceToY(this.pendingAnchor.price);
+      this.projectedPendingPoint.set(x !== null && y !== null ? { x, y } : null);
+    } else {
+      this.projectedPendingPoint.set(null);
+    }
   }
 
   private clearOscillatorPane(): void {
@@ -615,12 +1281,14 @@ export class ArenaChart {
 
     const list = this.candles();
     this.candleByTime.clear();
+    this.orderedTimes = [];
 
     const data: CandlestickData<Time>[] = [];
     const volumeData: HistogramData<Time>[] = [];
     for (const c of list) {
       const t = toChartTime(c.step);
       this.candleByTime.set(t as number, c);
+      this.orderedTimes.push(t as number);
       data.push({
         time: t,
         open: c.open,
@@ -719,5 +1387,7 @@ export class ArenaChart {
       this.lastFittedPaperId = currentPaperId;
       this.chart.timeScale().fitContent();
     }
+
+    this.scheduleOverlayRender();
   }
 }

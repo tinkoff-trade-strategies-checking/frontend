@@ -13,6 +13,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TuiButton, TuiDialogService, TuiNotification } from '@taiga-ui/core';
 import { TUI_CONFIRM, TuiBadge } from '@taiga-ui/kit';
 import { ArenaStore } from './arena.store';
+import { ARENA_DRAWING_TOOLS, ArenaDrawingTool } from './arena-drawing';
 import { TA_OSCILLATOR_OPTIONS, TaOscillatorId } from './arena-ta';
 import { ArenaChart } from './components/arena-chart';
 import { ArenaOrderTicket } from './components/arena-order-ticket';
@@ -96,6 +97,7 @@ export class ArenaPage implements OnInit {
   readonly apiSource = input<ArenaApi | null>(null);
 
   protected readonly oscillatorOptions = TA_OSCILLATOR_OPTIONS;
+  protected readonly drawingTools = ARENA_DRAWING_TOOLS;
   protected readonly tourSteps = ARENA_TOUR_STEPS;
   protected readonly showSma20 = signal(false);
   protected readonly showSma50 = signal(false);
@@ -106,10 +108,26 @@ export class ArenaPage implements OnInit {
   protected readonly oscillator = signal<TaOscillatorId>('none');
   protected readonly showTaPanel = signal(false);
   protected readonly taToolbarOpen = signal(false);
+  protected readonly drawingTool = signal<ArenaDrawingTool>('none');
+  protected readonly drawingToolbarOpen = signal(false);
+  protected readonly drawingUndoNonce = signal(0);
+  protected readonly drawingClearNonce = signal(0);
+  protected readonly activePaperDrawingsCount = signal(0);
   protected readonly guideDismissed = signal(readGuideDismissed());
   protected readonly tourStep = signal(0);
 
   protected readonly showTaControls = computed(() => this.uiMode.isPro() || this.taToolbarOpen());
+  protected readonly showDrawingControls = computed(
+    () => this.uiMode.isPro() || this.drawingToolbarOpen(),
+  );
+  protected readonly drawingPaperKey = computed(() => {
+    const paper = this.store.selectedPaper();
+    if (!paper) {
+      return '';
+    }
+    const sid = this.store.sessionId() ?? 'local';
+    return `${sid}:${paper.id}`;
+  });
   protected readonly showTour = computed(
     () => !this.readOnly() && !this.store.finished() && !this.guideDismissed(),
   );
@@ -126,6 +144,22 @@ export class ArenaPage implements OnInit {
 
   protected toggleTaToolbar(): void {
     this.taToolbarOpen.update((open) => !open);
+  }
+
+  protected toggleDrawingToolbar(): void {
+    this.drawingToolbarOpen.update((open) => !open);
+  }
+
+  protected selectDrawingTool(tool: ArenaDrawingTool): void {
+    this.drawingTool.set(tool);
+  }
+
+  protected undoDrawing(): void {
+    this.drawingUndoNonce.update((n) => n + 1);
+  }
+
+  protected clearDrawings(): void {
+    this.drawingClearNonce.update((n) => n + 1);
   }
 
   protected nextTourStep(): void {
