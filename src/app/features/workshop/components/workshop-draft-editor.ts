@@ -18,7 +18,9 @@ import {
   readAndValidateDslFile,
 } from '../data/dsl-file';
 import { DSL_GUIDE_EXAMPLES } from '../data/dsl-guide.data';
+import { diagnosticHint } from '../data/diagnostic-hints';
 import { WorkshopVisibility } from '../data/workshop.models';
+import { WorkshopRuleBuilder } from './workshop-rule-builder';
 
 export interface StarterTemplateOption {
   readonly id: string;
@@ -57,6 +59,7 @@ import { WorkshopStore } from '../workshop.store';
     TuiNotification,
     TuiSegmented,
     TuiTextfield,
+    WorkshopRuleBuilder,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './workshop-draft-editor.html',
@@ -76,6 +79,21 @@ export class WorkshopDraftEditor {
   protected readonly isDraggingFile = signal(false);
   protected readonly fileError = signal<string | null>(null);
   protected readonly fileSuccess = signal<string | null>(null);
+  protected readonly builderOpen = signal(false);
+  protected readonly hintFor = diagnosticHint;
+
+  protected applyBuilderCode(code: string): void {
+    if (!code.trim()) {
+      return;
+    }
+    this.fileError.set(null);
+    this.fileSuccess.set(null);
+    if (!this.store.draftName().trim()) {
+      this.store.setDraftName('Стратегия из конструктора');
+    }
+    this.store.setDraftSource(code);
+    void this.store.checkDraft();
+  }
 
   protected readonly canDownload = computed(() => this.store.draftSource().trim().length > 0);
   protected readonly lineNumbers = computed<readonly number[]>(() => {

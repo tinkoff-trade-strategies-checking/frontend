@@ -152,6 +152,8 @@ export class InstrumentsStore {
   private dividendCalcRequestId = 0;
   private taxCalcRequestId = 0;
   private dcaCalcRequestId = 0;
+  private readonly loadedTabs = new Set<InstrumentsTab>();
+  private readonly loadingTabs = new Map<InstrumentsTab, Promise<void>>();
 
   readonly filteredBonds = computed<readonly BondSummary[]>(() => {
     const filter = this.bondFilter();
@@ -401,51 +403,103 @@ export class InstrumentsStore {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [bonds, etfs, futures, options, dividends, screenerPapers, marketEvents, alerts] =
-        await Promise.all([
-          this.api.listBonds(),
-          this.api.listEtfs(),
-          this.api.listFutures(),
-          this.api.listOptions(),
-          this.api.listDividends(),
-          this.api.listScreenerPapers(),
-          this.api.listMarketEvents(),
-          this.api.listAlerts().catch(() => [] as readonly PriceAlert[]),
-        ]);
-      this.bonds.set(bonds);
-      this.etfs.set(etfs);
-      this.futures.set(futures);
-      this.options.set(options);
-      this.dividends.set(dividends);
-      this.screenerPapers.set(screenerPapers);
-      this.marketEvents.set(marketEvents);
-      this.alerts.set(alerts);
-
-      if (screenerPapers.length > 0 && !this.selectedScreenerTicker()) {
-        const preferred = screenerPapers.find((p) => p.hasFundamentals) ?? screenerPapers[0];
-        this.selectedScreenerTicker.set(preferred.ticker);
-      }
-
-      const initCalcs: Promise<void>[] = [];
-      if (bonds.length > 0 && !this.selectedBondTicker()) {
-        initCalcs.push(this.selectBond(bonds[0]));
-      }
-      if (futures.length > 0 && !this.selectedFutureTicker()) {
-        initCalcs.push(this.selectFuture(futures[0]));
-      }
-      if (options.length > 0 && !this.selectedOptionTicker()) {
-        initCalcs.push(this.selectOption(options[0]));
-      }
-      if (dividends.length > 0 && this.selectedDividendId() === null) {
-        initCalcs.push(this.selectDividend(dividends[0]));
-      }
-      initCalcs.push(this.recalculateTax(), this.recalculateDca());
-      await Promise.all(initCalcs);
+      await this.ensureTabLoaded(this.activeTab());
     } catch {
       this.error.set('Не удалось загрузить каталог инструментов. Попробуйте обновить страницу.');
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async setActiveTab(tab: InstrumentsTab): Promise<void> {
+    this.activeTab.set(tab);
+    if (this.loadedTabs.has(tab)) {
+      return;
+    }
+    this.error.set(null);
+    try {
+      await this.ensureTabLoaded(tab);
+    } catch {
+      this.error.set('Не удалось загрузить каталог инструментов. Попробуйте обновить страницу.');
+    }
+  }
+
+  private ensureTabLoaded(tab: InstrumentsTab): Promise<void> {
+    if (this.loadedTabs.has(tab)) {
+      return Promise.resolve();
+    }
+    const inflight = this.loadingTabs.get(tab);
+    if (inflight) {
+      return inflight;
+    }
+    const task = this.loadTab(tab)
+      .then(() => {
+        this.loadedTabs.add(tab);
+      })
+      .finally(() => {
+        this.loadingTabs.delete(tab);
+      });
+    this.loadingTabs.set(tab, task);
+    return task;
+  }
+
+  private async loadTab(tab: InstrumentsTab): Promise<void> {
+    if (tab === 'bonds') {
+      const bonds = await this.api.listBonds();
+      this.bonds.set(bonds);
+      if (bonds.length > 0 && !this.selectedBondTicker()) {
+        await this.selectBond(bonds[0]);
+      }
+      return;
+    }
+    if (tab === 'etfs') {
+      const etfs = await this.api.listEtfs();
+      this.etfs.set(etfs);
+      return;
+    }
+    if (tab === 'futures') {
+      const futures = await this.api.listFutures();
+      this.futures.set(futures);
+      if (futures.length > 0 && !this.selectedFutureTicker()) {
+        await this.selectFuture(futures[0]);
+      }
+      return;
+    }
+    if (tab === 'options') {
+      const options = await this.api.listOptions();
+      this.options.set(options);
+      if (options.length > 0 && !this.selectedOptionTicker()) {
+        await this.selectOption(options[0]);
+      }
+      return;
+    }
+    if (tab === 'dividends') {
+      const dividends = await this.api.listDividends();
+      this.dividends.set(dividends);
+      if (dividends.length > 0 && this.selectedDividendId() === null) {
+        await this.selectDividend(dividends[0]);
+      }
+      return;
+    }
+    if (tab === 'tax_dca') {
+      await Promise.all([this.recalculateTax(), this.recalculateDca()]);
+      return;
+    }
+    if (tab === 'screener') {
+      const screenerPapers = await this.api.listScreenerPapers();
+      this.screenerPapers.set(screenerPapers);
+      if (screenerPapers.length > 0 && !this.selectedScreenerTicker()) {
+        const preferred = screenerPapers.find((p) => p.hasFundamentals) ?? screenerPapers[0];
+        this.selectedScreenerTicker.set(preferred.ticker);
+      }
+      return;
+    }
+    const [marketEvents, alerts] = await Promise.all([
+      this.api.listMarketEvents(),
+      this.api.listAlerts().catch(() => [] as readonly PriceAlert[]),
+    ]);
+    this.marketEvents.set(marketEvents);
+    this.alerts.set(alerts);
   }
 
   async selectBond(bond: BondSummary): Promise<void> {
@@ -734,7 +788,7 @@ export class InstrumentsStore {
 
   openAlertForTicker(ticker: string): void {
     this.alertDraftTicker.set(ticker.trim().toUpperCase());
-    this.activeTab.set('events_alerts');
+    void this.setActiveTab('events_alerts');
   }
 
   async createAlert(params: CreatePriceAlertParams): Promise<boolean> {

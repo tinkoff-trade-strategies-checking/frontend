@@ -554,8 +554,8 @@ export class ArenaStore {
         if (batch.length === 0) {
           return paper;
         }
-        const known = new Set(paper.candles.map((c) => c.step));
-        const fresh = batch.filter((c) => !known.has(c.step)).map(strip);
+        const lastStep = paper.candles.at(-1)?.step ?? -1;
+        const fresh = batch.filter((c) => c.step > lastStep).map(strip);
         const last = batch[batch.length - 1];
         return {
           ...paper,

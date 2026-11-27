@@ -156,6 +156,31 @@
           (selectPaper)="store.selectPaper($event)"
         />
 
+        <div class="chart-mode-toggle" role="group" aria-label="Вид графика">
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            [appearance]="chartMode() === 'line' ? 'secondary' : 'outline'"
+            [attr.aria-pressed]="chartMode() === 'line'"
+            data-testid="arena-chart-mode-line"
+            (click)="chartMode.set('line')"
+          >
+            Линия
+          </button>
+          <button
+            tuiButton
+            type="button"
+            size="xs"
+            [appearance]="chartMode() === 'candles' ? 'secondary' : 'outline'"
+            [attr.aria-pressed]="chartMode() === 'candles'"
+            data-testid="arena-chart-mode-candles"
+            (click)="chartMode.set('candles')"
+          >
+            Свечи
+          </button>
+        </div>
+
         @if (uiMode.isBasic()) {
           <div class="chart-toolbar chart-toolbar-compact">
             <button
@@ -341,6 +366,7 @@
               [paperId]="paper.id"
               [paperKey]="drawingPaperKey()"
               [blind]="store.blind() && !store.finished()"
+              [chartMode]="chartMode()"
               [candles]="paper.candles"
               [orders]="selectedPaperOrders()"
               [fills]="selectedPaperFills()"

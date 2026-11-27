@@ -22,6 +22,7 @@ class StubArenaChart {
   readonly paperId = input<string>('');
   readonly paperKey = input<string>('');
   readonly blind = input(true);
+  readonly chartMode = input<'candles' | 'line'>('candles');
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -424,5 +425,29 @@ describe('ArenaPage', () => {
     fixture.detectChanges();
     expect(root.querySelector('[data-testid="arena-drawing-toolbar"]')).not.toBeNull();
     expect(root.querySelector('[data-testid="arena-drawing-toggle"]')).toBeNull();
+  });
+
+  it('переключает режим графика «Линия / Свечи» в один клик', async () => {
+    const fixture = TestBed.createComponent(ArenaPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const lineBtn = root.querySelector<HTMLButtonElement>('[data-testid="arena-chart-mode-line"]');
+    const candlesBtn = root.querySelector<HTMLButtonElement>(
+      '[data-testid="arena-chart-mode-candles"]',
+    );
+    expect(lineBtn).not.toBeNull();
+    expect(candlesBtn?.getAttribute('aria-pressed')).toBe('true');
+
+    lineBtn!.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['chartMode']()).toBe('line');
+    expect(lineBtn!.getAttribute('aria-pressed')).toBe('true');
+
+    candlesBtn!.click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance['chartMode']()).toBe('candles');
   });
 });

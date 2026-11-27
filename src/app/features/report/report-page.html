@@ -754,6 +754,28 @@
                 </div>
               }
 
+              @let lessons = buildLessons(rep.divergences);
+              @if (lessons.length > 0) {
+                <section class="lessons-card" data-report-lessons aria-label="Топ-3 урока сессии">
+                  <h3 class="tui-text_h6">Топ-3 урока сессии</h3>
+                  <ol class="lessons-list">
+                    @for (lesson of lessons; track lesson.id) {
+                      <li class="lesson-item" [attr.data-lesson-type]="lesson.type">
+                        <div class="lesson-head">
+                          <strong>{{ lesson.title }}</strong>
+                          <span class="tui-text_body-xs muted">
+                            {{ lesson.dateLabel }} · цена ошибки
+                            <span class="num neg">{{ formatRubExact(lesson.errorCostRub) }}</span>
+                          </span>
+                        </div>
+                        <p class="tui-text_body-s lesson-what">{{ lesson.what }}</p>
+                        <p class="tui-text_body-s lesson-advice">{{ lesson.advice }}</p>
+                      </li>
+                    }
+                  </ol>
+                </section>
+              }
+
               <div class="controls-bar">
                 <div class="filters-row">
                   @for (f of divergenceFilters; track f.id) {

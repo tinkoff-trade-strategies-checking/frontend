@@ -281,4 +281,22 @@ describe('WorkshopDraftEditor', () => {
     expect(store.draftSource()).toContain('rsi(close, rsi_n)');
     expect(checkMock).toHaveBeenCalled();
   });
+
+  it('открывает No-Code конструктор «Если → То» и вставляет сгенерированный DSL-код', async () => {
+    const fixture = TestBed.createComponent(WorkshopDraftEditor);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLButtonElement>('[data-builder-toggle]')!.click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('app-workshop-rule-builder')).not.toBeNull();
+    el.querySelector<HTMLButtonElement>('[data-builder-apply]')!.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(store.draftSource()).toContain('param rsi_n_1 = 14');
+    expect(store.draftSource()).toContain('then buy size_pct_1 % cash');
+    expect(checkMock).toHaveBeenCalled();
+  });
 });

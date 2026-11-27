@@ -20,6 +20,7 @@ import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
 import { TermHint } from '../../shared/term-hint/term-hint';
 import { UiModeService } from '../../shared/ui-mode.service';
 import { DivergenceType, EquityCurvePoint, REPORT_API, SessionReport } from './data/report.models';
+import { buildTopLessons, SessionLesson } from './report-lessons';
 import { STUB_MODE } from '../../core/api-mode';
 import { errorMessage } from '../../core/api-problem';
 import { ReportExportFormat, ReportExportService } from './data/report-export.service';
@@ -193,6 +194,10 @@ export class ReportPage implements OnInit {
 
   protected divergenceTypeLabel(type: DivergenceType): string {
     return this.divergenceLabels[type];
+  }
+
+  protected buildLessons(divergences: SessionReport['divergences']): readonly SessionLesson[] {
+    return buildTopLessons(divergences);
   }
 
   protected openWorkshop(): void {

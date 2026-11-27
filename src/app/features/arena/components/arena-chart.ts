@@ -512,6 +512,7 @@ export class ArenaChart {
   readonly paperId = input<string>('');
   readonly paperKey = input<string>('');
   readonly blind = input(true);
+  readonly chartMode = input<'candles' | 'line'>('candles');
   readonly candles = input.required<readonly ArenaCandle[]>();
   readonly orders = input<readonly ArenaOrder[]>([]);
   readonly fills = input<readonly ArenaFill[]>([]);
@@ -557,6 +558,8 @@ export class ArenaChart {
 
   private chart: IChartApi | null = null;
   private candleSeries: ISeriesApi<'Candlestick'> | null = null;
+  private closeLineSeries: ISeriesApi<'Line'> | null = null;
+  private lineColor = '#3b82f6';
   private volumeSeries: ISeriesApi<'Histogram'> | null = null;
   private sma20Series: ISeriesApi<'Line'> | null = null;
   private sma50Series: ISeriesApi<'Line'> | null = null;
@@ -594,6 +597,7 @@ export class ArenaChart {
       this.paperId();
       this.paperKey();
       this.blind();
+      this.chartMode();
       this.candles();
       this.orders();
       this.fills();
@@ -732,12 +736,7 @@ export class ArenaChart {
       rightPriceScale: { borderColor: palette.borderColor },
       timeScale: { borderColor: palette.borderColor },
     });
-    this.candleSeries.applyOptions({
-      upColor: this.positiveColor,
-      downColor: this.negativeColor,
-      wickUpColor: this.positiveColor,
-      wickDownColor: this.negativeColor,
-    });
+    this.applyChartModeStyle();
     this.sma20Series.applyOptions({ color: palette.sma20Color });
     this.sma50Series.applyOptions({ color: palette.sma50Color });
     this.ema20Series?.applyOptions({ color: palette.ema20Color });
@@ -746,6 +745,22 @@ export class ArenaChart {
     this.bbMiddleSeries?.applyOptions({ color: withAlpha(palette.bbColor, 0.65) });
     this.bbLowerSeries?.applyOptions({ color: palette.bbColor });
     this.vwapSeries?.applyOptions({ color: palette.vwapColor });
+  }
+
+  /** «Линия / Свечи»: в режиме линии свечи прозрачны (шкала, маркеры и рисунки остаются привязаны к ним). */
+  private applyChartModeStyle(): void {
+    if (!this.candleSeries) {
+      return;
+    }
+    const line = this.chartMode() === 'line';
+    const clear = 'rgba(0, 0, 0, 0)';
+    this.candleSeries.applyOptions({
+      upColor: line ? clear : this.positiveColor,
+      downColor: line ? clear : this.negativeColor,
+      wickUpColor: line ? clear : this.positiveColor,
+      wickDownColor: line ? clear : this.negativeColor,
+    });
+    this.closeLineSeries?.applyOptions({ visible: line, color: this.lineColor });
   }
 
   private initChart(): void {
@@ -810,6 +825,15 @@ export class ArenaChart {
       borderVisible: false,
       wickUpColor: this.positiveColor,
       wickDownColor: this.negativeColor,
+    });
+
+    this.closeLineSeries = chart.addSeries(LineSeries, {
+      color: this.lineColor,
+      lineWidth: 2,
+      visible: this.chartMode() === 'line',
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true,
     });
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -1194,6 +1218,15 @@ export class ArenaChart {
     if (!this.chart || !this.candleSeries) {
       return;
     }
+    // Нечего перерисовывать: инструмент не выбран, рисунков нет, оверлей уже пуст.
+    if (
+      this.drawingTool() === 'none' &&
+      this.projectedDrawings().length === 0 &&
+      this.projectedDraft() === null &&
+      getDrawingsForPaper(this.drawingsByPaper(), this.activePaperKey()).length === 0
+    ) {
+      return;
+    }
     if (typeof requestAnimationFrame === 'undefined') {
       this.renderOverlay();
       return;
@@ -1518,6 +1551,10 @@ export class ArenaChart {
 
     // INV-1: отображаем только уже полученные свечи без дорисовывания вперёд.
     this.candleSeries.setData(data);
+    this.applyChartModeStyle();
+    this.closeLineSeries?.setData(
+      this.chartMode() === 'line' ? data.map((d) => ({ time: d.time, value: d.close })) : [],
+    );
     this.volumeSeries.setData(volumeData);
     this.sma20Series.setData(this.showSma20() ? toLineData(computeSmaSeries(list, 20)) : []);
     this.sma50Series.setData(this.showSma50() ? toLineData(computeSmaSeries(list, 50)) : []);

@@ -67,6 +67,15 @@ export class PaperPicker {
   protected readonly groupBySector = signal(true);
   protected readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
   protected readonly inspectedPaper = signal<SelectablePaper | null>(null);
+  protected readonly visibleLimit = signal(60);
+
+  protected readonly sectorLabelsById = computed<ReadonlyMap<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const paper of this.papers()) {
+      map.set(paper.id, sectorDisplayLabel(normalizePaperSector(paper.sector)));
+    }
+    return map;
+  });
 
   protected readonly normalizedQuery = computed(() => this.searchQuery().trim().toLowerCase());
 
@@ -193,6 +202,36 @@ export class PaperPicker {
       }));
   });
 
+  protected readonly visibleFilteredPapers = computed<readonly SelectablePaper[]>(() =>
+    this.filteredPapers().slice(0, this.visibleLimit()),
+  );
+
+  protected readonly visibleGroupedPapers = computed<readonly PaperSectorGroup[]>(() => {
+    const limit = this.visibleLimit();
+    const result: PaperSectorGroup[] = [];
+    let remaining = limit;
+    for (const group of this.groupedPapers()) {
+      if (remaining <= 0) {
+        break;
+      }
+      if (group.papers.length <= remaining) {
+        result.push(group);
+        remaining -= group.papers.length;
+      } else {
+        result.push({
+          ...group,
+          papers: group.papers.slice(0, remaining),
+        });
+        remaining = 0;
+      }
+    }
+    return result;
+  });
+
+  protected readonly hiddenPapersCount = computed(() =>
+    Math.max(0, this.filteredPapers().length - this.visibleLimit()),
+  );
+
   protected readonly selectedPapers = computed<readonly SelectablePaper[]>(() => {
     const selected = this.selectedSet();
     if (selected.size === 0) {
@@ -244,23 +283,32 @@ export class PaperPicker {
 
   protected onSearchChange(value: string): void {
     this.searchQuery.set(value);
+    this.visibleLimit.set(60);
   }
 
   protected clearSearch(): void {
     this.searchQuery.set('');
+    this.visibleLimit.set(60);
   }
 
   protected resetFilters(): void {
     this.searchQuery.set('');
     this.activeCategory.set(CATEGORY_ALL);
+    this.visibleLimit.set(60);
   }
 
   protected selectCategory(categoryId: string): void {
     this.activeCategory.set(categoryId);
+    this.visibleLimit.set(60);
   }
 
   protected toggleGroupBySector(): void {
     this.groupBySector.update((v) => !v);
+    this.visibleLimit.set(60);
+  }
+
+  protected showMorePapers(): void {
+    this.visibleLimit.update((limit) => limit + 60);
   }
 
   protected isGroupCollapsed(groupKey: string): boolean {
