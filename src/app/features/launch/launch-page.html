@@ -53,6 +53,26 @@
             <span class="tui-text_body-xs muted">Слепой режим · капитал 1 000 000 ₽</span>
           </div>
           <div class="panel-body">
+            <div class="quick-start-cta">
+              <div class="quick-start-cta-text">
+                <strong>Впервые здесь?</strong>
+                <span class="tui-text_body-xs muted">
+                  Короткая тренировка на 20 дней (1 свеча = 1 день), виртуальный капитал 1 000 000 ₽
+                </span>
+              </div>
+              <button
+                id="launch-quick-start-btn"
+                tuiButton
+                type="button"
+                size="m"
+                appearance="primary"
+                [disabled]="store.submitting()"
+                (click)="startFirstTraining()"
+              >
+                Начать первую тренировку
+              </button>
+            </div>
+
             <div class="presets-grid">
               @for (preset of presets; track preset.id) {
                 @let active = store.activePresetId() === preset.id;
@@ -156,6 +176,9 @@
                       </button>
                     }
                   </tui-segmented>
+                  <p class="tui-text_body-xs muted hint">
+                    {{ timeframeHumanHints[store.timeframe()] }}
+                  </p>
                   @if (disabledTimeframes(opts.availableTimeframes); as offTf) {
                     @if (offTf.length > 0) {
                       <p id="launch-timeframe-note" class="tui-text_body-xs muted hint">
@@ -188,10 +211,22 @@
                     <button type="button">{{ regimeLabels[item] }}</button>
                   }
                 </tui-segmented>
-                <p class="tui-text_body-s muted hint">
-                  {{ regimeHints[store.regime()] }}
+                <p class="tui-text_body-s muted hint regime-hint-row">
+                  <span>
+                    {{
+                      uiMode.isBasic()
+                        ? regimeHintsBasic[store.regime()]
+                        : regimeHints[store.regime()]
+                    }}
+                  </span>
+                  @if (uiMode.isBasic()) {
+                    <app-term-hint
+                      [term]="'Критерий режима: ' + regimeLabels[store.regime()]"
+                      [text]="regimeHints[store.regime()]"
+                    />
+                  }
                   @if (!store.isBlind()) {
-                    · Должен совпадать с категорией выбранного отрезка.
+                    <span>· Должен совпадать с категорией выбранного отрезка.</span>
                   }
                 </p>
               </div>
@@ -403,7 +438,12 @@
             </div>
             <div class="kv">
               <span class="muted">Шаг свечей</span>
-              <span>{{ timeframeLabels[store.timeframe()] }}</span>
+              <span>
+                {{ timeframeLabels[store.timeframe()] }}
+                @if (uiMode.isBasic()) {
+                  <span class="muted">({{ timeframeHumanHints[store.timeframe()] }})</span>
+                }
+              </span>
             </div>
             <div class="kv">
               <span class="muted">Тип периода</span>
@@ -444,28 +484,57 @@
 
             <div class="divider"></div>
 
-            <div class="kv">
-              <span class="muted">Комиссия и сбор</span>
-              <span class="num">
-                {{ formatExecutionPct(opts.executionRules.commissionPct) }} +
-                {{ formatExecutionPct(opts.executionRules.exchangeFeePct) }}
-              </span>
-            </div>
-            <div class="kv">
-              <span class="muted">Спред и проскальзывание</span>
-              <span class="num">
-                {{ formatExecutionPct(opts.executionRules.spreadPct) }}, κ =
-                {{ formatDecimalRu(opts.executionRules.slippageKappa) }}
-              </span>
-            </div>
-            <div class="kv">
-              <span class="muted">Лимит ликвидности</span>
-              <span class="num">до {{ opts.executionRules.liquidityLimitPct }} % объёма</span>
-            </div>
-            <div class="kv">
-              <span class="muted">Исполнение</span>
-              <span>по open следующей свечи</span>
-            </div>
+            @if (uiMode.isBasic()) {
+              <div class="rules-summary-row">
+                <span class="tui-text_body-s muted">Реальные правила и комиссии биржи</span>
+                <button
+                  id="launch-rules-toggle"
+                  type="button"
+                  class="rules-disclosure-btn"
+                  [attr.aria-expanded]="rulesExpanded()"
+                  (click)="toggleExecutionRules()"
+                >
+                  {{ rulesExpanded() ? 'Скрыть подробности' : 'Правила биржи (подробнее)' }}
+                </button>
+              </div>
+            }
+
+            @if (showExecutionRules()) {
+              <div class="kv">
+                <span class="muted">Комиссия и сбор</span>
+                <span class="num">
+                  {{ formatExecutionPct(opts.executionRules.commissionPct) }} +
+                  {{ formatExecutionPct(opts.executionRules.exchangeFeePct) }}
+                </span>
+              </div>
+              <div class="kv">
+                <span class="muted kv-label-with-hint">
+                  <span>Спред и проскальзывание</span>
+                  <app-term-hint
+                    term="Спред и проскальзывание"
+                    text="Разница между ценой покупки и продажи плюс небольшое отклонение цены на крупных объёмах."
+                  />
+                </span>
+                <span class="num">
+                  {{ formatExecutionPct(opts.executionRules.spreadPct) }}, κ =
+                  {{ formatDecimalRu(opts.executionRules.slippageKappa) }}
+                </span>
+              </div>
+              <div class="kv">
+                <span class="muted kv-label-with-hint">
+                  <span>Лимит ликвидности</span>
+                  <app-term-hint
+                    term="Лимит ликвидности"
+                    text="Максимальная доля объёма торгов за свечу, которую можно выкупить одной заявкой."
+                  />
+                </span>
+                <span class="num">до {{ opts.executionRules.liquidityLimitPct }} % объёма</span>
+              </div>
+              <div class="kv">
+                <span class="muted">Исполнение</span>
+                <span>по цене открытия следующей свечи</span>
+              </div>
+            }
 
             @if (store.isBlind()) {
               <div class="blind-note">

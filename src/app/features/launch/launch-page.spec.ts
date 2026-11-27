@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { WORKSHOP_API } from '../workshop/data/workshop.models';
 import { StubWorkshopApi } from '../workshop/data/stub-workshop.api';
 import { LAUNCH_API } from './data/launch.models';
@@ -15,6 +16,7 @@ describe('LaunchPage', () => {
   let router: Router;
 
   beforeEach(async () => {
+    localStorage.clear();
     stubApi = new StubLaunchApi();
     stubWorkshopApi = new StubWorkshopApi();
 
@@ -43,7 +45,7 @@ describe('LaunchPage', () => {
     router = TestBed.inject(Router);
   });
 
-  it('INV-7: в слепом режиме не запрашивает бумаги и не выводит тикеры и названия, показывает κ = 0,1', async () => {
+  it('INV-7: в слепом режиме не запрашивает бумаги и не выводит тикеры и названия, в Базовом скрывает детали правил до раскрытия', async () => {
     const papersSpy = vi.spyOn(stubApi, 'getAvailablePapers');
     const fixture = TestBed.createComponent(LaunchPage);
     fixture.detectChanges();
@@ -62,9 +64,11 @@ describe('LaunchPage', () => {
     expect(text).toContain('Торгуйте на Арене');
     expect(text).toContain('Разберите ошибки с алгоритмом');
     expect(text).toContain('Быстрый старт');
+    expect(text).toContain('Начать первую тренировку');
     expect(text).toContain('Быстрая тренировка');
     expect(text).toContain('Полноценный квартал');
     expect(text).toContain('Стресс-тест рынка');
+    expect(text).toContain('1 свеча = 1 день');
     expect(text).toContain('В слепом режиме названия бумаг и даты скрыты до конца сессии');
     expect(root.querySelector('#launch-advanced-toggle')?.getAttribute('aria-expanded')).toBe(
       'false',
@@ -73,12 +77,73 @@ describe('LaunchPage', () => {
     expect(text).toContain('60 дн.');
     expect(text).toContain('1 д');
     expect(text).toContain('Эталон платформы');
-    expect(text).toContain('κ = 0,1');
+    expect(text).toContain('Реальные правила и комиссии биржи');
+    expect(text).not.toContain('κ = 0,1');
     expect(papersSpy).not.toHaveBeenCalled();
 
-    expect(text).not.toContain('SBER');
-    expect(text).not.toContain('GAZP');
-    expect(text).not.toContain('Сбербанк');
+    // Раскрытие подробностей правил биржи в Базовом режиме показывает κ = 0,1 и человекочитаемое исполнение.
+    root.querySelector<HTMLButtonElement>('#launch-rules-toggle')?.click();
+    fixture.detectChanges();
+    const expandedText = root.textContent ?? '';
+    expect(expandedText).toContain('κ = 0,1');
+    expect(expandedText).toContain('по цене открытия следующей свечи');
+
+    expect(expandedText).not.toContain('SBER');
+    expect(expandedText).not.toContain('GAZP');
+    expect(expandedText).not.toContain('Сбербанк');
+  });
+
+  it('кнопка «Начать первую тренировку» применяет пресет quick и сразу запускает сессию', async () => {
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi.spyOn(stubApi, 'startSession').mockResolvedValueOnce({
+      accepted: true,
+      sessionId: 'S-QUICK',
+    });
+
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const quickBtn = root.querySelector<HTMLButtonElement>('#launch-quick-start-btn');
+    expect(quickBtn?.textContent?.trim()).toBe('Начать первую тренировку');
+
+    quickBtn?.click();
+    await fixture.whenStable();
+
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationDays: 20,
+        timeframe: '1d',
+        regime: 'medium',
+        startMode: 'random',
+        paperCount: 3,
+      }),
+    );
+    expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-QUICK']);
+  });
+
+  it('в Базовом режиме скрывает P33/P80 в подсказку TermHint, а в Профи показывает напрямую и раскрывает правила', async () => {
+    const uiMode = TestBed.inject(UiModeService);
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const store = fixture.debugElement.injector.get(LaunchStore);
+    root.querySelector<HTMLButtonElement>('#launch-advanced-toggle')!.click();
+    store.setRegime('stress');
+    fixture.detectChanges();
+
+    expect(root.textContent ?? '').not.toContain('P80');
+    expect(root.querySelector('.regime-hint-row app-term-hint')).not.toBeNull();
+
+    uiMode.setMode('pro');
+    fixture.detectChanges();
+    expect(root.textContent ?? '').toContain('P80');
+    expect(root.textContent ?? '').toContain('κ = 0,1');
   });
 
   it('пресеты «Быстрый старт» в 1 клик применяют параметры и подсвечивают активную карточку', async () => {

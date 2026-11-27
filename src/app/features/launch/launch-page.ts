@@ -27,12 +27,16 @@ import {
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
   REGIME_HINTS,
+  REGIME_HINTS_BASIC,
   REGIME_LABELS,
   SessionDurationDays,
+  TIMEFRAME_HUMAN_HINTS,
   TIMEFRAME_LABELS,
 } from './data/launch.models';
 import { LAUNCH_API_IMPL, WORKSHOP_API_IMPL } from '../../api-impls';
 import { PaperPicker } from '../../shared/paper-picker/paper-picker';
+import { TermHint } from '../../shared/term-hint/term-hint';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { WORKSHOP_API } from '../workshop/data/workshop.models';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
@@ -56,6 +60,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
     FormsModule,
     PaperPicker,
     RouterLink,
+    TermHint,
     TuiButton,
     TuiBadge,
     TuiChevron,
@@ -77,6 +82,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
 })
 export class LaunchPage implements OnInit {
   protected readonly store = inject(LaunchStore);
+  protected readonly uiMode = inject(UiModeService);
 
   protected readonly customStartDay = computed<TuiDay | null>(() =>
     parseIsoDay(this.store.customStartDate()),
@@ -103,12 +109,18 @@ export class LaunchPage implements OnInit {
 
   protected readonly presets = LAUNCH_PRESETS;
   protected readonly advancedOpen = signal(false);
+  protected readonly rulesExpanded = signal(false);
+  protected readonly showExecutionRules = computed(
+    () => this.uiMode.isPro() || this.rulesExpanded(),
+  );
 
   protected readonly minCapital = MIN_INITIAL_CAPITAL_RUB;
   protected readonly maxCapital = MAX_INITIAL_CAPITAL_RUB;
   protected readonly timeframeLabels = TIMEFRAME_LABELS;
+  protected readonly timeframeHumanHints = TIMEFRAME_HUMAN_HINTS;
   protected readonly regimeLabels = REGIME_LABELS;
   protected readonly regimeHints = REGIME_HINTS;
+  protected readonly regimeHintsBasic = REGIME_HINTS_BASIC;
   protected readonly formatRub = formatRub;
   protected readonly formatExecutionPct = formatExecutionPct;
   protected readonly formatDecimalRu = formatDecimalRu;
@@ -126,8 +138,20 @@ export class LaunchPage implements OnInit {
     this.store.applyPreset(preset);
   }
 
+  protected startFirstTraining(): void {
+    const quick = this.presets.find((preset) => preset.id === 'quick');
+    if (quick) {
+      this.store.applyPreset(quick);
+    }
+    void this.store.launch();
+  }
+
   protected toggleAdvanced(): void {
     this.advancedOpen.update((open) => !open);
+  }
+
+  protected toggleExecutionRules(): void {
+    this.rulesExpanded.update((open) => !open);
   }
 
   protected disabledDurations(durations: readonly SessionDurationDays[]): SessionDurationDays[] {

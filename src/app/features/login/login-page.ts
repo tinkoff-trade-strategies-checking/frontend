@@ -43,14 +43,15 @@ export function safeReturnUrl(value: string | null): string {
           />
           <path d="M13 49H51" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" />
         </svg>
+        <span class="login-safe-badge">Учебный счёт · Виртуальные деньги, без риска</span>
         <h1>Честная проверка стратегий</h1>
         <p class="login-subtitle">
-          Тренажёр ручной торговли и лаборатория алгоритмов на данных MOEX
+          Учитесь покупать и продавать акции на реальной истории российского рынка — шаг за шагом
         </p>
         <ul class="login-chips" aria-label="Преимущества тренажёра">
           <li>Без заглядывания в будущее</li>
-          <li>Реальные комиссии и ликвидность MOEX</li>
-          <li>Разбор ошибок по шагам</li>
+          <li>Реальные правила и комиссии биржи</li>
+          <li>Понятный разбор решений по шагам</li>
         </ul>
       </div>
 
@@ -128,6 +129,18 @@ export function safeReturnUrl(value: string | null): string {
       width: 3.5rem;
       height: 3.5rem;
       display: block;
+    }
+
+    .login-safe-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      background: var(--tui-status-positive-pale);
+      color: var(--tui-text-positive);
+      border: 1px solid color-mix(in srgb, var(--tui-status-positive) 35%, transparent);
     }
 
     .login-subtitle {

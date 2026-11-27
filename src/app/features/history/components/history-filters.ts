@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { FormsModule } from '@angular/forms';
 import { TuiButton, TuiTextfield } from '@taiga-ui/core';
 import { TuiChevron, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import { TermHint } from '../../../shared/term-hint/term-hint';
 import {
   HistoryKindFilter,
   HistoryRegimeFilter,
@@ -15,7 +16,7 @@ export interface FilterOption<T extends string> {
 
 @Component({
   selector: 'app-history-filters',
-  imports: [FormsModule, TuiButton, TuiChevron, TuiSegmented, TuiSelect, TuiTextfield],
+  imports: [FormsModule, TermHint, TuiButton, TuiChevron, TuiSegmented, TuiSelect, TuiTextfield],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="filters-bar">
@@ -71,16 +72,22 @@ export interface FilterOption<T extends string> {
       </div>
 
       <div class="filter-actions">
-        <button
-          tuiButton
-          type="button"
-          size="s"
-          [appearance]="blindOnly() ? 'primary' : 'outline'"
-          [attr.aria-pressed]="blindOnly()"
-          (click)="blindToggle.emit()"
-        >
-          Только слепые
-        </button>
+        <div class="blind-filter-wrap">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            [appearance]="blindOnly() ? 'primary' : 'outline'"
+            [attr.aria-pressed]="blindOnly()"
+            (click)="blindToggle.emit()"
+          >
+            Только слепые
+          </button>
+          <app-term-hint
+            term="Слепой режим"
+            text="В слепом режиме названия компаний и реальные даты скрыты до конца сессии — вы тренируете стратегию, а не память."
+          />
+        </div>
         <span class="tui-text_body-s muted count-label">Всего: {{ total() }}</span>
       </div>
     </div>
@@ -110,6 +117,12 @@ export interface FilterOption<T extends string> {
       align-items: center;
       gap: 0.75rem;
       margin-left: auto;
+    }
+
+    .blind-filter-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
     }
 
     .muted {

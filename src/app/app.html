@@ -50,6 +50,31 @@
     }
 
     <div class="header-actions">
+      <tui-segmented
+        size="s"
+        class="mode-switcher"
+        aria-label="Режим интерфейса"
+        [activeItemIndex]="uiMode() === 'pro' ? 1 : 0"
+        (activeItemIndexChange)="onUiModeIndexChange($event)"
+      >
+        <button id="mode-basic" type="button">Базовый</button>
+        <button id="mode-pro" type="button">Профи</button>
+      </tui-segmented>
+
+      <button
+        id="glossary-toggle"
+        tuiButton
+        type="button"
+        size="s"
+        appearance="outline"
+        class="glossary-toggle"
+        aria-label="Открыть словарь инвестора"
+        (click)="openGlossary()"
+      >
+        <span class="glossary-icon" aria-hidden="true">?</span>
+        <span>Словарь</span>
+      </button>
+
       <button
         id="theme-toggle"
         tuiButton
@@ -80,4 +105,6 @@
   <main class="content">
     <router-outlet />
   </main>
+
+  <app-beginner-glossary [open]="glossaryOpen()" (closed)="closeGlossary()" />
 </tui-root>

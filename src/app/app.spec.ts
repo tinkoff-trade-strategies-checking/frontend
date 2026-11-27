@@ -11,6 +11,7 @@ import { STUB_MODE } from './core/api-mode';
 import { AuthService } from './core/auth/auth.service';
 import { routes } from './app.routes';
 import { StubSessionRegistry } from './shared/stub-session-registry';
+import { UiModeService } from './shared/ui-mode.service';
 
 @Component({
   selector: 'app-dummy-route',
@@ -212,5 +213,38 @@ describe('App', () => {
 
     expect(tuiRoot?.getAttribute('tuiTheme')).toBe('light');
     expect(toggleBtn?.textContent).toContain('Тёмная');
+  });
+
+  it('переключает режим Базовый / Профи и открывает словарь инвестора из шапки', () => {
+    localStorage.clear();
+    const fixture = TestBed.createComponent(App);
+    const uiMode = TestBed.inject(UiModeService);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const basicBtn = root.querySelector<HTMLButtonElement>('#mode-basic');
+    const proBtn = root.querySelector<HTMLButtonElement>('#mode-pro');
+    const glossaryBtn = root.querySelector<HTMLButtonElement>('#glossary-toggle');
+
+    expect(basicBtn?.textContent?.trim()).toBe('Базовый');
+    expect(proBtn?.textContent?.trim()).toBe('Профи');
+    expect(uiMode.mode()).toBe('basic');
+
+    proBtn?.click();
+    fixture.detectChanges();
+    expect(uiMode.mode()).toBe('pro');
+
+    basicBtn?.click();
+    fixture.detectChanges();
+    expect(uiMode.mode()).toBe('basic');
+
+    expect(root.querySelector('[role="dialog"]')).toBeNull();
+    glossaryBtn?.click();
+    fixture.detectChanges();
+    expect(root.querySelector('[role="dialog"]')?.textContent).toContain('Словарь инвестора');
+
+    root.querySelector<HTMLButtonElement>('button[aria-label="Закрыть словарь"]')?.click();
+    fixture.detectChanges();
+    expect(root.querySelector('[role="dialog"]')).toBeNull();
   });
 });

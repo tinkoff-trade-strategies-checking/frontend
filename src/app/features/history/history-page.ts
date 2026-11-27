@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge } from '@taiga-ui/kit';
@@ -68,6 +75,13 @@ export class HistoryPage implements OnInit {
   protected readonly store = inject(HistoryStore);
   protected readonly repeatingId = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
+  protected readonly showFilters = computed(() => {
+    if (this.store.hasActiveFilters()) {
+      return true;
+    }
+    const baseline = this.store.unfilteredTotal() ?? this.store.total();
+    return baseline >= 5;
+  });
 
   protected readonly kindFilters = KIND_FILTERS;
   protected readonly statusFilters = STATUS_FILTERS;
