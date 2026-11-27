@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { TuiButton, TuiDialogService, TuiNotification } from '@taiga-ui/core';
+import { TuiButton, TuiDialogService, TuiHint, TuiNotification } from '@taiga-ui/core';
 import { TUI_CONFIRM, TuiBadge } from '@taiga-ui/kit';
 import { formatPct, formatPrice } from './arena.format';
 import { ArenaStore } from './arena.store';
@@ -22,12 +22,36 @@ import { ArenaPortfolioPanel } from './components/arena-portfolio-panel';
 import { ARENA_API, ArenaApi } from './data/arena.models';
 import { ARENA_API_IMPL } from '../../api-impls';
 
+const ONBOARDING_STORAGE_KEY = 'ttsc_arena_onboarding_dismissed';
+
+function readOnboardingDismissed(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') {
+      return false;
+    }
+    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeOnboardingDismissed(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(ONBOARDING_STORAGE_KEY, '1');
+    }
+  } catch {
+    // ignore storage errors in restricted environments
+  }
+}
+
 @Component({
   selector: 'app-arena-page',
   imports: [
     RouterLink,
     TuiButton,
     TuiBadge,
+    TuiHint,
     TuiNotification,
     ArenaPlayer,
     ArenaChart,
@@ -54,6 +78,7 @@ export class ArenaPage implements OnInit {
 
   protected readonly showSma20 = signal(false);
   protected readonly showSma50 = signal(false);
+  protected readonly onboardingDismissed = signal(readOnboardingDismissed());
   protected readonly formatPct = formatPct;
   protected readonly formatPrice = formatPrice;
 
@@ -80,17 +105,28 @@ export class ArenaPage implements OnInit {
     });
   }
 
+  protected dismissOnboarding(): void {
+    this.onboardingDismissed.set(true);
+    writeOnboardingDismissed();
+  }
+
   protected confirmFinish(): void {
     this.store.pause();
     const day = this.store.day();
     const totalDays = this.store.totalDays();
+    const remaining = Math.max(0, totalDays - day);
+    const baseText = `Осталось дней: ${remaining}. После завершения новые заявки принимать нельзя.`;
+    const content =
+      this.store.fills().length === 0
+        ? `${baseText} Вы пока не совершили ни одной сделки — отчёт будет без результатов торговли.`
+        : baseText;
 
     this.dialogs
       .open<boolean>(TUI_CONFIRM, {
         label: `Завершить сессию на дне ${day}?`,
         size: 's',
         data: {
-          content: `Осталось дней: ${Math.max(0, totalDays - day)}. После завершения новые заявки принимать нельзя.`,
+          content,
           yes: 'Завершить сессию',
           no: 'Продолжить торговлю',
         },

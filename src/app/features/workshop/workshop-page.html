@@ -9,6 +9,13 @@
     </div>
   </header>
 
+  @if (uiMode.isBeginner()) {
+    <div tuiNotification appearance="info" size="s">
+      Демонстрационный каталог примеров стратегий. Здесь можно посмотреть, по каким правилам
+      работают готовые алгоритмы и как устроены их версии.
+    </div>
+  }
+
   @if (store.error()) {
     <div tuiNotification appearance="negative" size="s" class="error-row">
       <span>{{ store.error() }}</span>
@@ -308,32 +315,36 @@
                 {{ store.isInCompare(algo.id) ? 'Убрать из сравнения' : 'Добавить в сравнение' }}
               </button>
 
-              <button
-                tuiButton
-                type="button"
-                size="s"
-                appearance="outline"
-                disabled
-                [title]="dslPendingHint"
-              >
-                Форк
-              </button>
+              @if (uiMode.isPro()) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  disabled
+                  [title]="dslPendingHint"
+                >
+                  Форк
+                </button>
 
-              <button
-                tuiButton
-                type="button"
-                size="s"
-                appearance="outline"
-                disabled
-                [title]="dslPendingHint"
-              >
-                Запустить прогон
-              </button>
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="outline"
+                  disabled
+                  [title]="dslPendingHint"
+                >
+                  Запустить прогон
+                </button>
+              }
             </div>
 
-            <p class="tui-text_body-xs muted">
-              Действия «Форк» и «Запустить прогон» пока недоступны.
-            </p>
+            @if (uiMode.isPro()) {
+              <p class="tui-text_body-xs muted">
+                Действия «Форк» и «Запустить прогон» пока недоступны.
+              </p>
+            }
 
             <section class="detail-section">
               <div class="section-head">

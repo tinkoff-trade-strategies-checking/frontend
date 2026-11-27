@@ -31,6 +31,13 @@ export class HistoryStore {
   readonly totalPages = computed(() => this.pageData()?.totalPages ?? 1);
   readonly hasPrevPage = computed(() => this.currentPage() > 1);
   readonly hasNextPage = computed(() => this.currentPage() < this.totalPages());
+  readonly hasActiveFilters = computed(
+    () =>
+      this.kind() !== 'all' ||
+      this.blindOnly() ||
+      this.status() !== 'all' ||
+      this.regime() !== 'all',
+  );
 
   async load(): Promise<void> {
     const seq = ++this.loadSeq;

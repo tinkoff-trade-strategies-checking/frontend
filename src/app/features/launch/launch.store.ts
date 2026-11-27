@@ -5,6 +5,7 @@ import {
   LAUNCH_API,
   LaunchCustomPaper,
   LaunchOptions,
+  LaunchScenarioPreset,
   MarketRegime,
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
@@ -244,6 +245,24 @@ export class LaunchStore {
       this.selectedPaperIds.set([...current, paperId]);
     }
     this.rejection.set(null);
+  }
+
+  async launchPreset(preset: LaunchScenarioPreset): Promise<boolean> {
+    if (this.submitting() || !this.options()) {
+      return false;
+    }
+    this.customPapersLoadSeq++;
+    this.loadingCustomPapers.set(false);
+    this.startMode.set('random');
+    this.selectedPaperIds.set([]);
+    this.customPapers.set([]);
+    this.durationDays.set(preset.durationDays);
+    this.timeframe.set(preset.timeframe);
+    this.regime.set(preset.regime);
+    this.paperCount.set(preset.paperCount);
+    this.initialCapitalRub.set(preset.initialCapitalRub);
+    this.rejection.set(null);
+    return this.launch();
   }
 
   async launch(): Promise<boolean> {

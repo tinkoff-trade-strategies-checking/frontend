@@ -6,6 +6,7 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await page.goto('/report/S-0103');
 
   await expect(page.locator('.report-header').getByText('S-0103', { exact: true })).toBeVisible();
+  await expect(page.locator('section.executive-summary')).toContainText('Главный итог');
 
   // Открываем вкладку «Расхождения».
   await page.getByRole('button', { name: 'Расхождения' }).click();
@@ -23,11 +24,14 @@ test('report/S-0103: разбор расхождений, обратная пр�
   await expect(rows.first()).toContainText('GAZP');
   await expect(rows.first()).toContainText('День 19 (23.03)');
 
-  // Проверяем вкладку «Обратная проверка» и неактивную кнопку «Написать правило».
+  // Проверяем вкладку «Обратная проверка»: в Базовом режиме «Написать правило» скрыта, в Профи — disabled.
   await page.getByRole('button', { name: 'Обратная проверка' }).click();
   await expect(page.locator('tbody tr')).toHaveCount(1);
   await expect(page.locator('tbody tr').first()).toContainText('GAZP');
   await expect(page.locator('tbody tr').first()).toContainText('+7 470,00 ₽');
+  await expect(page.getByRole('button', { name: 'Написать правило' })).toHaveCount(0);
+
+  await page.locator('header').getByRole('button', { name: 'Профи', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Написать правило' })).toBeDisabled();
 
   // Возвращаемся на «Расхождения» и переходим в воспроизведение на шаг расхождения (шаг 18 -> День 19).

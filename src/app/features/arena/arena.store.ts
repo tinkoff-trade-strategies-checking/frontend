@@ -97,6 +97,7 @@ export class ArenaStore {
   readonly editingOrder = signal<ArenaOrder | null>(null);
   readonly estimate = signal<OrderEstimateResult | null>(null);
   readonly estimatedPct = computed(() => this.estimate()?.amountPct ?? null);
+  private readonly orderPlacedWhilePaused = signal(false);
 
   readonly selectedPaper = computed<ArenaPaper | null>(() => {
     const id = this.selectedPaperId();
@@ -117,6 +118,15 @@ export class ArenaStore {
 
   readonly canStep = computed(() => !this.finished() && this.step() < this.totalSteps());
 
+  /** Подсказка: заявка выставлена на паузе и сработает только после шага вперёд (INV-2). */
+  readonly pausedOrderHint = computed(
+    () =>
+      this.orderPlacedWhilePaused() &&
+      !this.playing() &&
+      this.canStep() &&
+      this.activeOrders().length > 0,
+  );
+
   constructor() {
     this.destroyRef.onDestroy(() => {
       this.stopTimer();
@@ -130,6 +140,7 @@ export class ArenaStore {
       this.loading.set(true);
       this.error.set(null);
       this.notice.set(null);
+      this.orderPlacedWhilePaused.set(false);
       this.reportReady.set(false);
       this.stopLocal();
       this.closeEvents();
@@ -215,6 +226,7 @@ export class ArenaStore {
     if (this.playing()) {
       this.pause();
     } else if (this.canStep()) {
+      this.orderPlacedWhilePaused.set(false);
       if (this.serverDriven) {
         void this.command('play');
         return;
@@ -264,6 +276,7 @@ export class ArenaStore {
       this.stepping = true;
       this.error.set(null);
       this.notice.set(null);
+      this.orderPlacedWhilePaused.set(false);
 
       try {
         const res = await this.api.step(this.stepsPerTick());
@@ -303,6 +316,9 @@ export class ArenaStore {
           trailingPct: draft.trailingPct,
         });
         this.applyCommandResult(result, 'Заявка выставлена.');
+        if (result.accepted && !this.playing() && this.canStep()) {
+          this.orderPlacedWhilePaused.set(true);
+        }
         return result;
       } catch (err) {
         this.error.set(messageOf(err, 'Не удалось выставить заявку.'));
@@ -382,6 +398,7 @@ export class ArenaStore {
   finishSession(): Promise<void> {
     return this.enqueue(async () => {
       this.stopLocal();
+      this.orderPlacedWhilePaused.set(false);
       this.error.set(null);
       try {
         const res = await this.api.finishSession();

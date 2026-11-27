@@ -38,8 +38,14 @@ test('фильтры, карточка алгоритма, неизменяем�
   await expect(detail).toContainText('Breakout ATR');
   await expect(detail).toContainText('MAGIC_CONST');
   await expect(detail).toContainText('неизменяема');
-  await expect(detail).toContainText('пока недоступны');
+  // В режиме по умолчанию («Базовый») неактивные кнопки «Форк» и «Запустить прогон» скрыты.
+  await expect(page.getByText('Демонстрационный каталог примеров стратегий.')).toBeVisible();
+  await expect(detail.getByRole('button', { name: 'Форк' })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toHaveCount(0);
 
+  // В режиме «Профи» кнопки отображаются в состоянии disabled с пояснением.
+  await page.locator('header').getByRole('button', { name: 'Профи', exact: true }).click();
+  await expect(detail).toContainText('пока недоступны');
   await expect(detail.getByRole('button', { name: 'Форк' })).toBeDisabled();
   await expect(detail.getByRole('button', { name: 'Запустить прогон' })).toBeDisabled();
 

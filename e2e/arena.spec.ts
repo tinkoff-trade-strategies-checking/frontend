@@ -120,6 +120,7 @@ test('запуск слепой сессии на «Новая сессия» �
   await page.goto('/new');
 
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await page.getByRole('button', { name: 'Настроить вручную' }).click();
   await expect(page.getByText('Случайная закрытая дата').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Запустить' }).click();
@@ -168,7 +169,7 @@ test('рыночная заявка → после следующей свечи
   await expect(activeBadge).toHaveText('0');
   await expect(fillsBadge).toHaveText('0');
 
-  await page.getByRole('button', { name: 'Выставить заявку' }).click();
+  await page.getByRole('button', { name: 'Купить (на след. шаге)' }).click();
   await expect(activeBadge).toHaveText('1');
 
   await page.getByRole('button', { name: 'Следующая свеча' }).click();
@@ -191,10 +192,14 @@ test('INV-7: в DOM экрана запуска (слепой режим), ар�
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Первая тренировка (1 клик)' })).toBeVisible();
+  // На /new символ «₽» разрешён (пользователь выбирает начальный капитал сессии).
+  await assertNoBlindLeaks(page, { forbidRub: false });
+
+  await page.getByRole('button', { name: 'Настроить вручную' }).click();
   // Ждём загрузки опций формы запуска перед проверкой DOM.
   await expect(page.getByText('Случайная закрытая дата').first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
-  // На /new символ «₽» разрешён (пользователь выбирает начальный капитал сессии).
   await assertNoBlindLeaks(page, { forbidRub: false });
 
   await page.getByRole('button', { name: 'Запустить' }).click();
@@ -281,6 +286,7 @@ test('F1: Новая сессия → Запустить → /arena/:id → За
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await page.getByRole('button', { name: 'Настроить вручную' }).click();
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
 
   await page.getByRole('button', { name: 'Запустить' }).click();
@@ -327,4 +333,73 @@ test('Арена в навигации (S-0104) → Завершить → От�
   await expect(page).toHaveURL(/\/report\/S-0104$/);
   await expect(page.locator('.report-header').getByText('S-0104', { exact: true })).toBeVisible();
   await expect(page.getByText('Период раскрыт')).toBeVisible();
+});
+
+test('путь новичка: Словарь → Первая тренировка (1 клик) → заявка на паузе → Сделать шаг вперёд → Главный итог', async ({
+  page,
+}) => {
+  await page.goto('/new');
+
+  await expect(page.getByText('Учебный счёт · Виртуальные деньги')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+
+  // Открываем и закрываем мини-глоссарий «Словарь».
+  await page.getByRole('button', { name: 'Словарь' }).click();
+  const glossary = page.getByRole('dialog', { name: 'Словарь терминов' });
+  await expect(glossary).toBeVisible();
+  await expect(glossary).toContainText('Свеча');
+  await glossary.getByRole('button', { name: 'Заявки' }).click();
+  await expect(glossary).toContainText('Рыночная заявка');
+  await glossary.getByRole('button', { name: 'Отчёт' }).click();
+  await expect(glossary).toContainText('Итог чистыми');
+  await page.keyboard.press('Escape');
+  await expect(glossary).toHaveCount(0);
+
+  // Запускаем тренировку в 1 клик.
+  await page.getByRole('button', { name: 'Первая тренировка (1 клик)' }).click();
+  await expect(page).toHaveURL(/\/arena\/S-\d+$/);
+  await expect(page.getByText('Слепая сессия')).toBeVisible();
+  await expect(page.locator('.day-counter')).toHaveText('День 1 из 20');
+
+  // Проверяем, что микро-подсказка видна и закрывается, а INV-7 соблюдён даже с открытым словарём.
+  const onboarding = page.locator('.onboarding-card');
+  await expect(onboarding).toBeVisible();
+  await page.getByRole('button', { name: 'Словарь' }).click();
+  await expect(glossary).toBeVisible();
+  await assertNoBlindLeaks(page, { forbidRub: true });
+  await glossary.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await expect(glossary).toHaveCount(0);
+
+  await onboarding.getByRole('button', { name: 'Понятно' }).click();
+  await expect(onboarding).toHaveCount(0);
+
+  // Заявка на паузе → баннер «Сделать шаг вперёд» → исполнение на следующем шаге.
+  await page.getByRole('button', { name: 'Купить (на след. шаге)' }).click();
+  const pausedBanner = page.locator('.paused-order-banner');
+  await expect(pausedBanner).toBeVisible();
+  await expect(pausedBanner).toContainText('Заявка принята и сработает на следующем шаге.');
+
+  await pausedBanner.getByRole('button', { name: 'Сделать шаг вперёд' }).click();
+  await expect(pausedBanner).toHaveCount(0);
+  await expect(page.locator('.day-counter')).toHaveText('День 2 из 20');
+
+  const fillsTab = page.locator('app-arena-orders-panel button', { hasText: 'Сделки' });
+  await expect(fillsTab.locator('.tab-badge')).toHaveText('1');
+
+  // Завершаем сессию и проверяем карточку «Главный итог» в отчёте.
+  await page.getByRole('button', { name: 'Завершить сессию' }).click();
+  await page.locator('tui-dialog').getByRole('button', { name: 'Завершить сессию' }).click();
+  await page.locator('main').getByRole('link', { name: 'Открыть отчёт' }).click();
+
+  await expect(page).toHaveURL(/\/report\/S-\d+$/);
+  const summaryCard = page.locator('section.executive-summary');
+  await expect(summaryCard).toBeVisible();
+  await expect(summaryCard).toContainText('Главный итог');
+  await expect(summaryCard).toContainText('До комиссий → Чистыми');
+
+  const proToggle = page.locator('button.pro-details-toggle');
+  await expect(proToggle).toHaveAttribute('aria-expanded', 'false');
+  await proToggle.click();
+  await expect(proToggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByText('Показатели эффективности')).toBeVisible();
 });

@@ -4,6 +4,7 @@ import { provideTaiga } from '@taiga-ui/core';
 import { vi } from 'vitest';
 import { LAUNCH_API } from './data/launch.models';
 import { StubLaunchApi } from './data/stub-launch.api';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { LaunchPage } from './launch-page';
 import { LaunchStore } from './launch.store';
 
@@ -13,6 +14,7 @@ describe('LaunchPage', () => {
 
   beforeEach(async () => {
     stubApi = new StubLaunchApi();
+    localStorage.removeItem('ttsc_ui_mode');
 
     await TestBed.configureTestingModule({
       imports: [LaunchPage],
@@ -29,6 +31,11 @@ describe('LaunchPage', () => {
       .compileComponents();
 
     router = TestBed.inject(Router);
+    TestBed.inject(UiModeService).setMode('pro');
+  });
+
+  afterEach(() => {
+    localStorage.removeItem('ttsc_ui_mode');
   });
 
   it('INV-7: в слепом режиме не запрашивает бумаги и не выводит тикеры и названия, показывает κ = 0,1', async () => {
@@ -186,8 +193,8 @@ describe('LaunchPage', () => {
     const root = fixture.nativeElement as HTMLElement;
 
     const button = (label: string): HTMLButtonElement => {
-      const btn = Array.from(root.querySelectorAll('button')).find(
-        (b) => b.textContent?.trim() === label,
+      const btn = Array.from(root.querySelectorAll('button')).find((b) =>
+        b.textContent?.trim().includes(label),
       );
       if (!btn) {
         throw new Error(`Нет кнопки ${label}`);
@@ -295,5 +302,62 @@ describe('LaunchPage', () => {
     await fixture.whenStable();
 
     expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-0105']);
+  });
+
+  it('в Базовом режиме показывает 3 карточки сценариев, кнопку «Первая тренировка (1 клик)» и скрывает «Кто торгует»', async () => {
+    TestBed.inject(UiModeService).setMode('beginner');
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi.spyOn(stubApi, 'startSession').mockResolvedValue({
+      accepted: true,
+      sessionId: 'S-QUICK',
+    });
+
+    const fixture = TestBed.createComponent(LaunchPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = root.textContent ?? '';
+    expect(text).toContain('Спокойный старт');
+    expect(text).toContain('Собери портфель');
+    expect(text).toContain('Испытание кризисом');
+    expect(text).toContain('Первая тренировка (1 клик)');
+    expect(text).not.toContain('Кто торгует');
+    expect(text).not.toContain('P33');
+    expect(text).not.toContain('P80');
+
+    const manualBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Настроить вручную'),
+    );
+    expect(manualBtn).toBeDefined();
+    manualBtn!.click();
+    fixture.detectChanges();
+
+    const expandedText = root.textContent ?? '';
+    expect(expandedText).toContain('1 месяц');
+    expect(expandedText).toContain('3 месяца');
+    expect(expandedText).toContain('полгода');
+    expect(expandedText).toContain('1 год');
+    expect(expandedText).toContain('Условия как на реальной бирже · Подробнее');
+    expect(expandedText).not.toContain('Кто торгует');
+
+    const quickBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Первая тренировка (1 клик)'),
+    );
+    quickBtn!.click();
+    await fixture.whenStable();
+
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        durationDays: 20,
+        timeframe: '1d',
+        regime: 'calm',
+        startMode: 'random',
+        paperCount: 1,
+        initialCapital: '100000.00',
+      }),
+    );
+    expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-QUICK']);
   });
 });

@@ -4,6 +4,7 @@ import { TuiButton, TuiInput, TuiNotification, TuiTextfield } from '@taiga-ui/co
 import { TuiBadge, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
 import { StubWorkshopApi } from './data/stub-workshop.api';
 import { WORKSHOP_API, WORKSHOP_COMPARE_LIMIT, WorkshopSortField } from './data/workshop.models';
+import { UiModeService } from '../../shared/ui-mode.service';
 import {
   formatLinterSummary,
   formatWorkshopDateTime,
@@ -36,6 +37,7 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
 })
 export class WorkshopPage implements OnInit {
   protected readonly store = inject(WorkshopStore);
+  protected readonly uiMode = inject(UiModeService);
 
   protected readonly sortOptions = SORT_OPTIONS;
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;

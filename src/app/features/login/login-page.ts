@@ -18,6 +18,16 @@ export function safeReturnUrl(value: string | null): string {
   template: `
     <section class="login-page">
       <h1>Вход</h1>
+      <div class="login-intro">
+        <p class="tui-text_body-m">
+          Безопасный тренажёр инвестиций на реальной истории биржи. Вы тренируетесь на виртуальные
+          деньги и ничем не рискуете.
+        </p>
+        <p class="tui-text_body-s muted">
+          Попробуйте покупать и продавать бумаги шаг за шагом, а после тренировки посмотрите
+          подробный разбор своих решений.
+        </p>
+      </div>
       @if (error(); as message) {
         <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
       }
@@ -68,6 +78,20 @@ export function safeReturnUrl(value: string | null): string {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+    }
+    .login-intro {
+      display: flex;
+      flex-direction: column;
+      gap: 0.375rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--tui-radius-m);
+      background: var(--tui-background-neutral-1);
+    }
+    .login-intro p {
+      margin: 0;
+    }
+    .muted {
+      color: var(--tui-text-secondary);
     }
   `,
 })

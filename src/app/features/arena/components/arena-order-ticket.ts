@@ -3,13 +3,15 @@ import {
   Component,
   computed,
   effect,
+  inject,
   input,
   output,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiHint, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiInputNumber, TuiSegmented, TuiSelect } from '@taiga-ui/kit';
+import { UiModeService } from '../../../shared/ui-mode.service';
 import { formatPct, formatPrice, formatRejectReason } from '../arena.format';
 import { OrderDraft } from '../arena.store';
 import {
@@ -40,6 +42,17 @@ const ORDER_TYPES: readonly OrderType[] = [
 
 const SELL_ONLY_TYPES = new Set<OrderType>(['take_profit', 'trailing', 'oco']);
 
+const ORDER_TYPE_HINTS: Readonly<Record<OrderType, string>> = {
+  market: 'Исполняется на открытии следующей свечи по рыночной цене.',
+  limit: 'Исполняется только по указанной цене или выгоднее для вас.',
+  stop: 'Активируется как рыночная заявка, когда цена дойдёт до уровня стопа.',
+  stop_limit: 'При достижении стоп-цены выставляет лимитную заявку по указанной цене.',
+  take_profit: 'Автоматически продаёт бумагу при росте до целевой цены прибыли.',
+  trailing:
+    'Стоп-цена подтягивается вслед за ростом и срабатывает при откате от пика на указанный %.',
+  oco: 'Две связанные заявки на продажу: стоп ограничивает убыток, тейк фиксирует прибыль. Срабатывает только одна.',
+};
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -49,6 +62,7 @@ function round2(value: number): number {
   imports: [
     FormsModule,
     TuiButton,
+    TuiHint,
     TuiNotification,
     TuiTextfield,
     TuiSelect,
@@ -65,6 +79,13 @@ function round2(value: number): number {
       </div>
 
       <div class="ticket-body">
+        @if (blind() && !finished()) {
+          <p class="tui-text_body-xs blind-note">
+            В слепом режиме цены условные (старт = 100), а суммы — в % от счёта, чтобы нельзя было
+            угадать компанию.
+          </p>
+        }
+
         <label tuiLabel for="arena-paper">
           Бумага
           <tui-textfield tuiTextfieldSize="s" [stringify]="paperStringify">
@@ -79,29 +100,46 @@ function round2(value: number): number {
           </tui-textfield>
         </label>
 
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="side() === 'buy' ? 0 : 1"
-          [disabled]="Boolean(editingOrder())"
-          (activeItemIndexChange)="onSideIndexChange($event)"
-        >
-          <button type="button" [disabled]="isSellOnly()">Купить</button>
-          <button type="button">Продать</button>
-        </tui-segmented>
+        @if (!showProOrderControls() && selectedPositionLots() > 0) {
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="orderType() === 'oco' ? 1 : 0"
+            (activeItemIndexChange)="onBeginnerModeIndexChange($event)"
+          >
+            <button type="button" [tuiHint]="orderTypeHints.market">По рынку</button>
+            <button type="button" [tuiHint]="orderTypeHints.oco">
+              Защита позиции (Стоп / Тейк)
+            </button>
+          </tui-segmented>
+        }
 
-        <label tuiLabel for="arena-order-type">
-          Тип заявки
-          <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
-            <select
-              id="arena-order-type"
-              tuiSelect
-              [items]="orderTypes"
-              [disabled]="Boolean(editingOrder())"
-              [ngModel]="orderType()"
-              (ngModelChange)="onOrderTypeChange($event)"
-            ></select>
-          </tui-textfield>
-        </label>
+        @if (showProOrderControls() || orderType() !== 'oco') {
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="side() === 'buy' ? 0 : 1"
+            [disabled]="Boolean(editingOrder())"
+            (activeItemIndexChange)="onSideIndexChange($event)"
+          >
+            <button type="button" [disabled]="isSellOnly()">Купить</button>
+            <button type="button">Продать</button>
+          </tui-segmented>
+        }
+
+        @if (showProOrderControls()) {
+          <label tuiLabel for="arena-order-type" [tuiHint]="orderTypeHint()">
+            Тип заявки
+            <tui-textfield tuiTextfieldSize="s" [stringify]="orderTypeStringify">
+              <select
+                id="arena-order-type"
+                tuiSelect
+                [items]="availableOrderTypes()"
+                [disabled]="Boolean(editingOrder())"
+                [ngModel]="orderType()"
+                (ngModelChange)="onOrderTypeChange($event)"
+              ></select>
+            </tui-textfield>
+          </label>
+        }
 
         @if (orderType() === 'limit') {
           <label tuiLabel for="arena-limit-price">
@@ -195,7 +233,11 @@ function round2(value: number): number {
 
         @if (orderType() === 'oco') {
           <div class="grid-2">
-            <label tuiLabel for="arena-oco-stop">
+            <label
+              tuiLabel
+              for="arena-oco-stop"
+              tuiHint="Если цена упадёт до этого уровня, позиция продастся, чтобы ограничить убыток."
+            >
               Стоп
               <tui-textfield tuiTextfieldSize="s">
                 <input
@@ -207,7 +249,11 @@ function round2(value: number): number {
                 />
               </tui-textfield>
             </label>
-            <label tuiLabel for="arena-oco-tp">
+            <label
+              tuiLabel
+              for="arena-oco-tp"
+              tuiHint="Если цена вырастет до этого уровня, позиция продастся с фиксацией прибыли."
+            >
               Тейк-профит
               <tui-textfield tuiTextfieldSize="s">
                 <input
@@ -235,6 +281,38 @@ function round2(value: number): number {
           </tui-textfield>
         </label>
 
+        @if (side() === 'sell' && selectedPositionLots() > 0) {
+          <div class="sell-chips" role="group" aria-label="Быстрый выбор объёма продажи">
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="setSellFraction(0.25)"
+            >
+              25%
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="setSellFraction(0.5)"
+            >
+              50%
+            </button>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="outline"
+              (click)="setSellFraction(1)"
+            >
+              Всё
+            </button>
+          </div>
+        }
+
         <div class="hint-row tui-text_body-xs">
           <span>Цена: {{ lastPrice() !== null ? formatPrice(lastPrice()!) : '—' }}</span>
           <span>Оценка: {{ estimatedPct() !== null ? formatPct(estimatedPct()!) : '—' }}</span>
@@ -259,14 +337,26 @@ function round2(value: number): number {
           }
         }
 
-        <tui-segmented
-          size="s"
-          [activeItemIndex]="tif() === 'day' ? 0 : 1"
-          (activeItemIndexChange)="tif.set($event === 0 ? 'day' : 'gtc')"
-        >
-          <button type="button">На день</button>
-          <button type="button">До отмены</button>
-        </tui-segmented>
+        @if (showProOrderControls()) {
+          <tui-segmented
+            size="s"
+            [activeItemIndex]="tif() === 'day' ? 0 : 1"
+            (activeItemIndexChange)="tif.set($event === 0 ? 'day' : 'gtc')"
+          >
+            <button
+              type="button"
+              tuiHint="Заявка действует до конца текущего торгового дня и снимается автоматически."
+            >
+              На день
+            </button>
+            <button
+              type="button"
+              tuiHint="Заявка остаётся активной, пока не исполнится или вы её не отмените."
+            >
+              До отмены
+            </button>
+          </tui-segmented>
+        }
 
         @if (validationError()) {
           <div tuiNotification appearance="warning" size="s">
@@ -290,7 +380,7 @@ function round2(value: number): number {
             [disabled]="finished() || Boolean(validationError())"
             (click)="onSubmit()"
           >
-            {{ editingOrder() ? 'Заменить заявку' : 'Выставить заявку' }}
+            {{ submitLabel() }}
           </button>
 
           @if (editingOrder()) {
@@ -324,10 +414,28 @@ function round2(value: number): number {
       gap: 0.75rem;
     }
 
+    .blind-note {
+      margin: 0;
+      padding: 0.5rem 0.65rem;
+      border-radius: var(--tui-radius-m);
+      background: var(--tui-background-neutral-1);
+      color: var(--tui-text-secondary);
+      line-height: 1.35;
+    }
+
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.5rem;
+    }
+
+    .sell-chips {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .sell-chips button {
+      flex: 1;
     }
 
     .estimate-warning {
@@ -358,11 +466,14 @@ function round2(value: number): number {
   `,
 })
 export class ArenaOrderTicket {
+  protected readonly uiMode = inject(UiModeService);
+
   readonly papers = input.required<readonly ArenaPaper[]>();
   readonly selectedPaperId = input.required<string>();
   readonly step = input<number>(0);
   readonly portfolio = input.required<ArenaPortfolio>();
   readonly finished = input.required<boolean>();
+  readonly blind = input(false);
   readonly editingOrder = input<ArenaOrder | null>(null);
   readonly estimate = input<OrderEstimateResult | null>(null);
   protected readonly estimatedPct = computed(() => this.estimate()?.amountPct ?? null);
@@ -381,7 +492,7 @@ export class ArenaOrderTicket {
   }>();
   readonly cancelEdit = output<void>();
 
-  protected readonly orderTypes = ORDER_TYPES;
+  protected readonly orderTypeHints = ORDER_TYPE_HINTS;
   protected readonly orderTypeStringify = (type: OrderType): string => ORDER_TYPE_LABELS[type];
   protected readonly paperStringify = (id: string): string =>
     this.papers().find((p) => p.id === id)?.label ?? `Бумага ${id}`;
@@ -402,10 +513,33 @@ export class ArenaOrderTicket {
   private estimateRequested = false;
 
   protected readonly paperIds = computed(() => this.papers().map((p) => p.id));
+  protected readonly selectedPositionLots = computed(
+    () => this.portfolio().positions[this.selectedPaperId()]?.lots ?? 0,
+  );
+  protected readonly showProOrderControls = computed(
+    () => this.uiMode.isPro() || Boolean(this.editingOrder()),
+  );
+  protected readonly availableOrderTypes = computed<readonly OrderType[]>(() => {
+    if (this.editingOrder() || this.selectedPositionLots() > 0) {
+      return ORDER_TYPES;
+    }
+    return ORDER_TYPES.filter((type) => !SELL_ONLY_TYPES.has(type));
+  });
   protected readonly isSellOnly = computed(() => SELL_ONLY_TYPES.has(this.orderType()));
+  protected readonly orderTypeHint = computed(() => ORDER_TYPE_HINTS[this.orderType()]);
   protected readonly lastPrice = computed<number | null>(() => {
     const found = this.papers().find((p) => p.id === this.selectedPaperId());
     return found ? found.lastPrice : null;
+  });
+
+  protected readonly submitLabel = computed(() => {
+    if (this.editingOrder()) {
+      return 'Заменить заявку';
+    }
+    if (this.orderType() === 'market') {
+      return this.side() === 'buy' ? 'Купить (на след. шаге)' : 'Продать (на след. шаге)';
+    }
+    return 'Выставить заявку';
   });
 
   protected readonly validationError = computed<string | null>(() => {
@@ -466,6 +600,23 @@ export class ArenaOrderTicket {
       }
     });
 
+    effect(() => {
+      if (this.editingOrder()) {
+        return;
+      }
+      const posLots = this.selectedPositionLots();
+      const type = this.orderType();
+      if (posLots === 0 && SELL_ONLY_TYPES.has(type)) {
+        this.orderType.set('market');
+        this.tif.set('day');
+        return;
+      }
+      if (this.uiMode.isBeginner() && type !== 'market' && !(type === 'oco' && posLots > 0)) {
+        this.orderType.set('market');
+        this.tif.set('day');
+      }
+    });
+
     effect((onCleanup) => {
       // INV-6: оценка запрашивается у источника по параметрам формы (сторона, тип, цены), клиент не считает.
       const type = this.orderType();
@@ -507,6 +658,19 @@ export class ArenaOrderTicket {
     return formatRejectReason(leg.reason, leg.field);
   }
 
+  protected onBeginnerModeIndexChange(index: number): void {
+    if (index === 1) {
+      this.orderType.set('oco');
+      this.side.set('sell');
+      this.tif.set('gtc');
+      this.syncDefaultPrices('oco', 'sell');
+    } else {
+      this.orderType.set('market');
+      this.tif.set('day');
+      this.syncDefaultPrices('market', this.side());
+    }
+  }
+
   protected onSideIndexChange(index: number): void {
     const next: OrderSide = index === 0 ? 'buy' : 'sell';
     if (next === 'buy' && this.isSellOnly()) {
@@ -525,6 +689,15 @@ export class ArenaOrderTicket {
       this.tif.set('gtc');
     }
     this.syncDefaultPrices(type, this.side());
+  }
+
+  protected setSellFraction(fraction: 0.25 | 0.5 | 1): void {
+    const posLots = this.selectedPositionLots();
+    if (posLots <= 0) {
+      return;
+    }
+    const nextLots = fraction === 1 ? posLots : Math.max(1, Math.floor(posLots * fraction));
+    this.lots.set(nextLots);
   }
 
   /** Предзаполненное значение выделяем при фокусе: ввод «5» заменяет его, а не даёт «55». */

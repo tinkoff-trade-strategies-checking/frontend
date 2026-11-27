@@ -1,9 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { BehaviorSubject } from 'rxjs';
 import { vi } from 'vitest';
+import { UiModeService } from '../../shared/ui-mode.service';
+import { LAUNCH_API } from '../launch/data/launch.models';
+import { StubLaunchApi } from '../launch/data/stub-launch.api';
 import { ReportEquityChart } from './components/report-equity-chart';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import {
@@ -37,10 +40,13 @@ class StubUnderwaterChart {
 
 describe('ReportPage', () => {
   let stubApi: StubReportApi;
+  let stubLaunchApi: StubLaunchApi;
   let paramMap$: BehaviorSubject<ReturnType<typeof convertToParamMap>>;
+  let uiMode: UiModeService;
 
   beforeEach(async () => {
     stubApi = new StubReportApi();
+    stubLaunchApi = new StubLaunchApi();
     paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'S-0103' }));
 
     await TestBed.configureTestingModule({
@@ -54,17 +60,27 @@ describe('ReportPage', () => {
       .overrideComponent(ReportPage, {
         remove: {
           imports: [ReportEquityChart, ReportUnderwaterChart],
-          providers: [{ provide: REPORT_API, useClass: StubReportApi }],
+          providers: [
+            { provide: REPORT_API, useClass: StubReportApi },
+            { provide: LAUNCH_API, useClass: StubLaunchApi },
+          ],
         },
         add: {
           imports: [StubEquityChart, StubUnderwaterChart],
-          providers: [{ provide: REPORT_API, useValue: stubApi }],
+          providers: [
+            { provide: REPORT_API, useValue: stubApi },
+            { provide: LAUNCH_API, useValue: stubLaunchApi },
+          ],
         },
       })
       .compileComponents();
+
+    uiMode = TestBed.inject(UiModeService);
+    uiMode.setMode('beginner');
   });
 
   it('INV-6: отображает метрики и подпись сравнения из источника без пересчёта (даже если подпись расходится с числами)', async () => {
+    uiMode.setMode('pro');
     const base = await stubApi.getReport('S-0103');
     if (base.status !== 'READY') {
       throw new Error('Ожидался готовый отчёт S-0103');
@@ -121,7 +137,56 @@ describe('ReportPage', () => {
     expect(csvBtn?.disabled).toBe(true);
   });
 
+  it('карточка «Главный итог» и простая подпись графика падений показаны сверху без жаргона', async () => {
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const text = (root.textContent ?? '').replace(/\u00a0/g, ' ');
+
+    expect(root.querySelector('.executive-summary')).not.toBeNull();
+    expect(text).toContain('Главный итог');
+    expect(text).toContain('До комиссий → Чистыми (после комиссий и проскальзывания)');
+    expect(text).toContain('Глубина падений от максимума');
+    expect(text).toContain(
+      'Показывает, на сколько процентов ваш счёт проседал от лучшего результата',
+    );
+    expect(text).not.toContain('Underwater-просадка');
+  });
+
+  it('Базовый режим сворачивает профи-метрики по умолчанию, Профи — раскрывает; ручное переключение работает', async () => {
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    // В Базовом режиме ключевые карточки видны, а Sharpe / HHI скрыты под сворачиваемым блоком.
+    expect(root.querySelectorAll('.key-metric-card').length).toBe(6);
+    expect(root.textContent).not.toContain('Sharpe (rf = RUONIA)');
+    expect(root.textContent).not.toContain('HHI (концентрация)');
+
+    // Ручное раскрытие блока «Подробная статистика (для профи)».
+    const toggleBtn = root.querySelector<HTMLButtonElement>('.pro-details-toggle');
+    expect(toggleBtn).not.toBeNull();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('false');
+    toggleBtn?.click();
+    fixture.detectChanges();
+
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.textContent).toContain('Sharpe (rf = RUONIA)');
+    expect(root.textContent).toContain('HHI (концентрация)');
+
+    // Переключение в Профи держит блок раскрытым.
+    uiMode.setMode('pro');
+    fixture.detectChanges();
+    expect(toggleBtn?.getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('период показан один раз (ДД.ММ.ГГГГ) с днями, заголовок — «бумаги · период», подпись сделок — про закрытые пары', async () => {
+    uiMode.setMode('pro');
     const fixture = TestBed.createComponent(ReportPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -134,6 +199,63 @@ describe('ReportPage', () => {
     expect(text).not.toContain(rep.report.period.startDate + ' —');
     expect(text).not.toContain('день 1 — день');
     expect(text).toContain('Закрытых сделок (пары FIFO)');
+  });
+
+  it('кнопка «Пройти этот же период ещё раз» запускает неслепую сессию с параметрами отчёта и ведёт на /arena/:id', async () => {
+    const router = TestBed.inject(Router);
+    const navSpy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    const startSpy = vi
+      .spyOn(stubLaunchApi, 'startSession')
+      .mockResolvedValueOnce({ accepted: true, sessionId: 'S-REPEAT-1' });
+
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const repeatBtn = root.querySelector<HTMLButtonElement>('.repeat-period-btn');
+    expect(repeatBtn).not.toBeNull();
+    expect(repeatBtn?.textContent).toContain('Пройти этот же период ещё раз');
+
+    repeatBtn?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(startSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        traderKind: 'human',
+        startMode: 'custom',
+        customStartDate: '2020-02-26',
+        paperCount: null,
+        paperIds: ['SBER', 'GAZP', 'YDEX'],
+        durationDays: 60,
+        timeframe: '1d',
+      }),
+    );
+    expect(navSpy).toHaveBeenCalledWith(['/arena', 'S-REPEAT-1']);
+  });
+
+  it('кнопка «Пройти этот же период ещё раз» показывает ошибку при отказе LaunchApi', async () => {
+    vi.spyOn(stubLaunchApi, 'startSession').mockResolvedValueOnce({
+      accepted: false,
+      reason: 'CORPORATE_ACTION_ON_PERIOD',
+      field: 'customStartDate',
+      barsCount: null,
+      maxBars: null,
+    });
+
+    const fixture = TestBed.createComponent(ReportPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('.repeat-period-btn')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(root.textContent).toContain('корпоративное событие');
   });
 
   it('stopTakeSameBarCount > 0 — предупреждение; 0 или нет поля — без предупреждения', async () => {
@@ -426,7 +548,7 @@ describe('ReportPage', () => {
     expect(replayLink?.getAttribute('href')).toContain('/replay/S-0103?step=5');
   });
 
-  it('вкладка «Обратная проверка» показывает прибыльные сделки со входом «лишнее действие» и неактивную кнопку', async () => {
+  it('вкладка «Обратная проверка»: скрывает кнопку «Написать правило» в Базовом режиме и показывает неактивной в Профи', async () => {
     const fixture = TestBed.createComponent(ReportPage);
     const store = fixture.debugElement.injector.get(ReportStore);
     fixture.detectChanges();
@@ -439,10 +561,19 @@ describe('ReportPage', () => {
     expect(text).toContain('GAZP');
     expect(text).toContain('+7 470,00 ₽');
 
-    const ruleBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+    // В Базовом режиме кнопка «Написать правило» скрыта.
+    const ruleBtnBeginner = Array.from(root.querySelectorAll('button')).find((b) =>
       b.textContent?.includes('Написать правило'),
     );
-    expect(ruleBtn?.disabled).toBe(true);
+    expect(ruleBtnBeginner).toBeUndefined();
+
+    // В Профи-режиме кнопка «Написать правило» показана и неактивна.
+    uiMode.setMode('pro');
+    fixture.detectChanges();
+    const ruleBtnPro = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('Написать правило'),
+    );
+    expect(ruleBtnPro?.disabled).toBe(true);
   });
 
   it('для S-0105 кнопка «Посмотреть в воспроизведении» неактивна, а обратная проверка содержит SBER', async () => {

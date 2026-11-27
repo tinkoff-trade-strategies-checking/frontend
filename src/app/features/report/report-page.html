@@ -75,6 +75,9 @@
       </div>
     } @else {
       @let rep = res.report;
+      @let hm = rep.humanMetrics;
+      @let am = rep.algoMetrics;
+      @let execSummary = buildExecutiveSummary(hm);
 
       <header class="report-header">
         <div class="title-group">
@@ -90,68 +93,166 @@
               Завершена досрочно: {{ rep.playedDays }} из {{ rep.totalDays }} дн.
             </span>
           }
-          @if (rep.humanMetrics.bankrupt) {
+          @if (hm.bankrupt) {
             <span tuiBadge size="s" appearance="negative">Банкротство</span>
           }
         </div>
 
-        <div class="export-group">
-          @if (stubMode) {
-            <button
-              tuiButton
-              type="button"
-              size="s"
-              appearance="outline"
-              [disabled]="true"
-              title="Выгрузка отчёта пока недоступна"
-            >
-              Скачать XLSX
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="s"
-              appearance="outline"
-              [disabled]="true"
-              title="Выгрузка отчёта пока недоступна"
-            >
-              Скачать CSV
-            </button>
-            <span class="tui-text_body-xs muted">Выгрузка отчёта пока недоступна</span>
-          } @else {
-            <button
-              tuiButton
-              type="button"
-              size="s"
-              appearance="outline"
-              [disabled]="exporting()"
-              (click)="download(rep.sessionId, 'xlsx')"
-            >
-              Скачать XLSX
-            </button>
-            <button
-              tuiButton
-              type="button"
-              size="s"
-              appearance="outline"
-              [disabled]="exporting()"
-              (click)="download(rep.sessionId, 'csv')"
-            >
-              Скачать CSV
-            </button>
-            @if (exportError(); as message) {
-              <span class="tui-text_body-xs export-error" role="alert">{{ message }}</span>
+        <div class="header-actions">
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="primary"
+            class="repeat-period-btn"
+            [disabled]="replayingPeriod() || !canRepeatPeriod(rep)"
+            (click)="repeatPeriod(rep)"
+          >
+            {{ replayingPeriod() ? 'Запускаем…' : 'Пройти этот же период ещё раз' }}
+          </button>
+
+          <div class="export-group">
+            @if (stubMode) {
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                [disabled]="true"
+                title="Выгрузка отчёта пока недоступна"
+              >
+                Скачать XLSX
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                [disabled]="true"
+                title="Выгрузка отчёта пока недоступна"
+              >
+                Скачать CSV
+              </button>
+              <span class="tui-text_body-xs muted">Выгрузка отчёта пока недоступна</span>
+            } @else {
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                [disabled]="exporting()"
+                (click)="download(rep.sessionId, 'xlsx')"
+              >
+                Скачать XLSX
+              </button>
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="outline"
+                [disabled]="exporting()"
+                (click)="download(rep.sessionId, 'csv')"
+              >
+                Скачать CSV
+              </button>
+              @if (exportError(); as message) {
+                <span class="tui-text_body-xs export-error" role="alert">{{ message }}</span>
+              }
             }
-          }
+          </div>
         </div>
       </header>
 
-      @if ((rep.humanMetrics.stopTakeSameBarCount ?? 0) > 0) {
+      @if (replayPeriodError(); as message) {
+        <div tuiNotification appearance="negative" size="s" role="alert">{{ message }}</div>
+      }
+
+      @if ((hm.stopTakeSameBarCount ?? 0) > 0) {
         <div tuiNotification appearance="warning" size="s" class="same-bar-warning">
-          В {{ rep.humanMetrics.stopTakeSameBarCount }} случаях стоп и тейк сработали на одном баре
-          — исполнение пессимистичное: сначала стоп, сделка помечена.
+          В {{ hm.stopTakeSameBarCount }} случаях стоп и тейк сработали на одном баре — исполнение
+          пессимистичное: сначала стоп, сделка помечена.
         </div>
       }
+
+      <section class="panel executive-summary" aria-label="Главный итог">
+        <div class="panel-header">
+          <h2 class="tui-text_h6">Главный итог</h2>
+          <span
+            tuiBadge
+            size="m"
+            [appearance]="
+              execSummary.tone === 'positive'
+                ? 'positive'
+                : execSummary.tone === 'negative'
+                  ? 'negative'
+                  : 'neutral'
+            "
+          >
+            {{ execSummary.headline }}
+          </span>
+        </div>
+
+        <div class="summary-body">
+          <div class="summary-verdict">
+            @for (sentence of execSummary.sentences; track $index) {
+              <p class="tui-text_body-m summary-sentence">{{ sentence }}</p>
+            }
+          </div>
+
+          <div class="gross-net-compare">
+            <div class="compare-header">
+              <span class="tui-text_body-s compare-title">
+                До комиссий → Чистыми (после комиссий и проскальзывания)
+              </span>
+              @if (hm.costsRub.totalRub !== null) {
+                <span class="tui-text_body-xs muted num">
+                  Издержки: {{ formatRub(hm.costsRub.totalRub) }}
+                </span>
+              }
+            </div>
+
+            <div class="compare-rows">
+              <div class="compare-row">
+                <span class="tui-text_body-xs muted compare-label">До комиссий</span>
+                <div class="bar-track" aria-hidden="true">
+                  <div
+                    class="bar-fill"
+                    [class.bar-fill--pos]="hm.grossReturnPct > 0"
+                    [class.bar-fill--neg]="hm.grossReturnPct < 0"
+                    [style.width.%]="execSummary.grossBarWidthPct"
+                  ></div>
+                </div>
+                <strong
+                  class="tui-text_body-s num compare-val"
+                  [class.pos]="hm.grossReturnPct > 0"
+                  [class.neg]="hm.grossReturnPct < 0"
+                >
+                  {{ formatPct(hm.grossReturnPct, true) }}
+                </strong>
+              </div>
+
+              <div class="compare-row">
+                <span class="tui-text_body-xs muted compare-label">Чистыми</span>
+                <div class="bar-track" aria-hidden="true">
+                  <div
+                    class="bar-fill"
+                    [class.bar-fill--pos]="hm.netReturnPct > 0"
+                    [class.bar-fill--neg]="hm.netReturnPct < 0"
+                    [style.width.%]="execSummary.netBarWidthPct"
+                  ></div>
+                </div>
+                <strong
+                  class="tui-text_body-s num compare-val"
+                  [class.pos]="hm.netReturnPct > 0"
+                  [class.neg]="hm.netReturnPct < 0"
+                >
+                  {{ formatPct(hm.netReturnPct, true) }}
+                </strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="panel">
         <div class="panel-header">
@@ -246,7 +347,7 @@
             </div>
 
             <div class="cmp-card">
-              <span class="tui-text_body-xs muted">Максимальная просадка</span>
+              <span class="tui-text_body-xs muted">Максимальное падение от пика</span>
               <div class="cmp-values">
                 <div>
                   <span class="tui-text_body-xs muted">Вы</span>
@@ -273,7 +374,7 @@
       <div class="charts-grid">
         <section class="panel">
           <div class="panel-header">
-            <h2 class="tui-text_h6">Кривая капитала</h2>
+            <h2 class="tui-text_h6 hint-label" [tuiHint]="hints.equityCurve">Кривая капитала</h2>
             <span class="tui-text_body-xs muted">{{ equityCurveSubtitle(rep.equityCurve) }}</span>
           </div>
           <div class="chart-pad">
@@ -282,9 +383,14 @@
         </section>
 
         <section class="panel">
-          <div class="panel-header">
-            <h2 class="tui-text_h6">Underwater-просадка</h2>
-            <span class="tui-text_body-xs muted">Отставание от пика, %</span>
+          <div class="panel-header chart-header-stack">
+            <div class="chart-header-top">
+              <h2 class="tui-text_h6">Глубина падений от максимума</h2>
+              <span class="tui-text_body-xs muted">Отставание от пика, %</span>
+            </div>
+            <span class="tui-text_body-xs muted">
+              Показывает, на сколько процентов ваш счёт проседал от лучшего результата
+            </span>
           </div>
           <div class="chart-pad">
             @if (rep.underwaterCurve; as underwater) {
@@ -310,205 +416,373 @@
         </div>
 
         @if (store.activeTab() === 'metrics') {
-          @let hm = rep.humanMetrics;
-          @let am = rep.algoMetrics;
-          <div class="metrics-grid">
-            <div class="metrics-col">
-              <h3 class="tui-text_body-m subheading">Показатели эффективности</h3>
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Показатель</th>
-                    <th class="num">Вы</th>
-                    @if (am) {
-                      <th class="num">Алгоритм</th>
-                    }
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Total (итоговая доходность)</td>
-                    <td class="num">{{ formatPct(hm.totalReturnPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>CAGR (годовая)</td>
-                    <td class="num">{{ formatPct(hm.cagrPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Gross (до комиссий и сбора)</td>
-                    <td class="num">{{ formatPct(hm.grossReturnPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Net (после издержек)</td>
-                    <td class="num">{{ formatPct(hm.netReturnPct, true) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.netReturnPct, true) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Макс. просадка</td>
-                    <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
-                    @if (am) {
-                      <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Длительность просадки</td>
-                    <td class="num">
-                      {{
-                        formatDrawdownDuration(
-                          hm.maxDrawdownDurationDays,
-                          hm.maxDrawdownDurationSteps
-                        )
-                      }}
-                    </td>
-                    @if (am) {
-                      <td class="num">
-                        {{
-                          formatDrawdownDuration(
-                            am.maxDrawdownDurationDays,
-                            am.maxDrawdownDurationSteps
-                          )
-                        }}
-                      </td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Волатильность (год.)</td>
-                    <td class="num">{{ formatPct(hm.volatilityPct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.volatilityPct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Sharpe (rf = RUONIA)</td>
-                    <td class="num">{{ formatRatio(hm.sharpe) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.sharpe) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Sortino (rf = RUONIA)</td>
-                    <td class="num">{{ formatRatio(hm.sortino) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.sortino) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Бенчмарк IMOEX</td>
-                    <td class="num" [attr.colspan]="am ? 2 : 1">
-                      {{ formatPct(hm.benchmarkImoexPct, true) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="tab-body">
+            <div class="key-metrics-grid">
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.netReturn">
+                  Итог чистыми
+                </span>
+                <strong
+                  class="tui-text_h5 num"
+                  [class.pos]="hm.netReturnPct > 0"
+                  [class.neg]="hm.netReturnPct < 0"
+                >
+                  {{ formatPct(hm.netReturnPct, true) }}
+                </strong>
+                @if (am) {
+                  <span class="tui-text_body-xs muted num">
+                    Алгоритм: {{ formatPct(am.netReturnPct, true) }}
+                  </span>
+                }
+              </div>
+
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.finalCapital">
+                  Итоговый капитал
+                </span>
+                <strong class="tui-text_h5 num">{{ formatRub(hm.finalCapitalRub) }}</strong>
+                <span class="tui-text_body-xs muted num">
+                  Старт: {{ formatRub(hm.initialCapitalRub) }}
+                </span>
+              </div>
+
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.benchmark">
+                  Сравнение с рынком
+                </span>
+                <strong
+                  class="tui-text_h5 num"
+                  [class.pos]="(hm.benchmarkImoexPct ?? 0) > 0"
+                  [class.neg]="(hm.benchmarkImoexPct ?? 0) < 0"
+                >
+                  {{ formatPct(hm.benchmarkImoexPct, true) }}
+                </strong>
+                <span class="tui-text_body-xs muted">
+                  {{ hm.benchmarkImoexPct !== null ? 'Индекс IMOEX за период' : 'Нет данных' }}
+                </span>
+              </div>
+
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.maxDrawdown">
+                  Максимальное падение от пика
+                </span>
+                <strong class="tui-text_h5 num neg">−{{ formatPct(hm.maxDrawdownPct) }}</strong>
+                @if (am) {
+                  <span class="tui-text_body-xs muted num">
+                    Алгоритм: −{{ formatPct(am.maxDrawdownPct) }}
+                  </span>
+                }
+              </div>
+
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.costsTotal">
+                  Затраты на комиссии
+                </span>
+                <strong class="tui-text_h5 num">{{ formatRub(hm.costsRub.totalRub) }}</strong>
+                @if (am) {
+                  <span class="tui-text_body-xs muted num">
+                    Алгоритм: {{ formatRub(am.costsRub.totalRub) }}
+                  </span>
+                }
+              </div>
+
+              <div class="key-metric-card">
+                <span class="tui-text_body-xs muted hint-label" [tuiHint]="hints.tradesCount">
+                  Закрытых сделок
+                </span>
+                <strong class="tui-text_h5 num">{{ hm.tradesCount }}</strong>
+                @if (am) {
+                  <span class="tui-text_body-xs muted num"> Алгоритм: {{ am.tradesCount }} </span>
+                }
+              </div>
             </div>
 
-            <div class="metrics-col">
-              <h3 class="tui-text_body-m subheading">Активность, концентрация и издержки</h3>
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Показатель</th>
-                    <th class="num">Вы</th>
-                    @if (am) {
-                      <th class="num">Алгоритм</th>
-                    }
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Оборот</td>
-                    <td class="num">{{ formatRatio(hm.turnover) }}×</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.turnover) }}×</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Закрытых сделок (пары FIFO)</td>
-                    <td class="num">{{ hm.tradesCount }}</td>
-                    @if (am) {
-                      <td class="num">{{ am.tradesCount }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Win rate</td>
-                    <td class="num">{{ formatPct(hm.winRatePct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.winRatePct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Отказов / частичных исполнений</td>
-                    <td class="num">{{ hm.rejectedOrdersCount }} / {{ hm.partialFillsCount }}</td>
-                    @if (am) {
-                      <td class="num">{{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>HHI (концентрация)</td>
-                    <td class="num">{{ formatRatio(hm.hhi) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRatio(am.hhi) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Крупнейшая позиция</td>
-                    <td class="num">{{ formatPct(hm.largestPositionPct) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: комиссия брокера</td>
-                    <td class="num">{{ formatRub(hm.costsRub.commissionRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: биржевой сбор</td>
-                    <td class="num">{{ formatRub(hm.costsRub.exchangeFeeRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: спред</td>
-                    <td class="num">{{ formatRub(hm.costsRub.spreadRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td>Издержки: проскальзывание</td>
-                    <td class="num">{{ formatRub(hm.costsRub.slippageRub) }}</td>
-                    @if (am) {
-                      <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
-                    }
-                  </tr>
-                  <tr>
-                    <td><strong>Издержки всего</strong></td>
-                    <td class="num">
-                      <strong>{{ formatRub(hm.costsRub.totalRub) }}</strong>
-                    </td>
-                    @if (am) {
-                      <td class="num">
-                        <strong>{{ formatRub(am.costsRub.totalRub) }}</strong>
-                      </td>
-                    }
-                  </tr>
-                </tbody>
-              </table>
+            <div class="pro-details">
+              <button
+                tuiButton
+                type="button"
+                size="s"
+                appearance="flat"
+                class="pro-details-toggle"
+                [attr.aria-expanded]="proDetailsOpen()"
+                (click)="toggleProDetails()"
+              >
+                {{
+                  proDetailsOpen()
+                    ? 'Скрыть подробную статистику (для профи)'
+                    : 'Подробная статистика (для профи)'
+                }}
+              </button>
+
+              @if (proDetailsOpen()) {
+                <div class="metrics-grid">
+                  <div class="metrics-col">
+                    <h3 class="tui-text_body-m subheading">Показатели эффективности</h3>
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Показатель</th>
+                          <th class="num">Вы</th>
+                          @if (am) {
+                            <th class="num">Алгоритм</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.totalReturn">
+                              Total (итоговая доходность)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.totalReturnPct, true) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.totalReturnPct, true) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.cagr">CAGR (годовая)</span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.cagrPct, true) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.cagrPct, true) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.grossReturn">
+                              Gross (до комиссий и сбора)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.grossReturnPct, true) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.grossReturnPct, true) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.netReturn">
+                              Net (после издержек)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.netReturnPct, true) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.netReturnPct, true) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.maxDrawdown">
+                              Макс. просадка
+                            </span>
+                          </td>
+                          <td class="num neg">−{{ formatPct(hm.maxDrawdownPct) }}</td>
+                          @if (am) {
+                            <td class="num neg">−{{ formatPct(am.maxDrawdownPct) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.drawdownDuration">
+                              Длительность просадки
+                            </span>
+                          </td>
+                          <td class="num">
+                            {{
+                              formatDrawdownDuration(
+                                hm.maxDrawdownDurationDays,
+                                hm.maxDrawdownDurationSteps
+                              )
+                            }}
+                          </td>
+                          @if (am) {
+                            <td class="num">
+                              {{
+                                formatDrawdownDuration(
+                                  am.maxDrawdownDurationDays,
+                                  am.maxDrawdownDurationSteps
+                                )
+                              }}
+                            </td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.volatility">
+                              Волатильность (год.)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.volatilityPct) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.volatilityPct) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.sharpe">
+                              Sharpe (rf = RUONIA)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatRatio(hm.sharpe) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRatio(am.sharpe) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.sortino">
+                              Sortino (rf = RUONIA)
+                            </span>
+                          </td>
+                          <td class="num">{{ formatRatio(hm.sortino) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRatio(am.sortino) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.benchmark">
+                              Бенчмарк IMOEX
+                            </span>
+                          </td>
+                          <td class="num" [attr.colspan]="am ? 2 : 1">
+                            {{ formatPct(hm.benchmarkImoexPct, true) }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="metrics-col">
+                    <h3 class="tui-text_body-m subheading">Активность, концентрация и издержки</h3>
+                    <table class="data-table">
+                      <thead>
+                        <tr>
+                          <th>Показатель</th>
+                          <th class="num">Вы</th>
+                          @if (am) {
+                            <th class="num">Алгоритм</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.turnover">Оборот</span>
+                          </td>
+                          <td class="num">{{ formatRatio(hm.turnover) }}×</td>
+                          @if (am) {
+                            <td class="num">{{ formatRatio(am.turnover) }}×</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.fifoTrades">
+                              Закрытых сделок (пары FIFO)
+                            </span>
+                          </td>
+                          <td class="num">{{ hm.tradesCount }}</td>
+                          @if (am) {
+                            <td class="num">{{ am.tradesCount }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.winRate">Win rate</span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.winRatePct) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.winRatePct) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.rejectsPartials">
+                              Отказов / частичных исполнений
+                            </span>
+                          </td>
+                          <td class="num">
+                            {{ hm.rejectedOrdersCount }} / {{ hm.partialFillsCount }}
+                          </td>
+                          @if (am) {
+                            <td class="num">
+                              {{ am.rejectedOrdersCount }} / {{ am.partialFillsCount }}
+                            </td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.hhi">HHI (концентрация)</span>
+                          </td>
+                          <td class="num">{{ formatRatio(hm.hhi) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRatio(am.hhi) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.largestPosition">
+                              Крупнейшая позиция
+                            </span>
+                          </td>
+                          <td class="num">{{ formatPct(hm.largestPositionPct) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatPct(am.largestPositionPct) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>Издержки: комиссия брокера</td>
+                          <td class="num">{{ formatRub(hm.costsRub.commissionRub) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRub(am.costsRub.commissionRub) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>Издержки: биржевой сбор</td>
+                          <td class="num">{{ formatRub(hm.costsRub.exchangeFeeRub) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRub(am.costsRub.exchangeFeeRub) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.spreadCost">
+                              Издержки: спред
+                            </span>
+                          </td>
+                          <td class="num">{{ formatRub(hm.costsRub.spreadRub) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRub(am.costsRub.spreadRub) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td>
+                            <span class="hint-label" [tuiHint]="hints.slippageCost">
+                              Издержки: проскальзывание
+                            </span>
+                          </td>
+                          <td class="num">{{ formatRub(hm.costsRub.slippageRub) }}</td>
+                          @if (am) {
+                            <td class="num">{{ formatRub(am.costsRub.slippageRub) }}</td>
+                          }
+                        </tr>
+                        <tr>
+                          <td><strong>Издержки всего</strong></td>
+                          <td class="num">
+                            <strong>{{ formatRub(hm.costsRub.totalRub) }}</strong>
+                          </td>
+                          @if (am) {
+                            <td class="num">
+                              <strong>{{ formatRub(am.costsRub.totalRub) }}</strong>
+                            </td>
+                          }
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
             </div>
           </div>
         } @else if (store.activeTab() === 'divergences') {
@@ -614,9 +888,17 @@
                         <th>Тип</th>
                         <th>Вы</th>
                         <th>Алгоритм</th>
-                        <th class="num">Цена ошибки</th>
-                        <th class="num col-horizon">Горизонт e</th>
-                        <th>Причина (because)</th>
+                        <th class="num">
+                          <span class="hint-label" [tuiHint]="hints.errorCost">Цена ошибки</span>
+                        </th>
+                        <th class="num col-horizon">
+                          <span class="hint-label" [tuiHint]="hints.horizon">Горизонт e</span>
+                        </th>
+                        <th>
+                          <span class="hint-label" [tuiHint]="hints.because">
+                            Причина (because)
+                          </span>
+                        </th>
                         <th></th>
                       </tr>
                     </thead>
@@ -718,11 +1000,15 @@
                       <th>Бумага</th>
                       <th>Вход</th>
                       <th>Выход</th>
-                      <th class="num">Лоты</th>
+                      <th class="num">
+                        <span class="hint-label" [tuiHint]="hints.lots">Лоты</span>
+                      </th>
                       <th class="num">Цена входа</th>
                       <th class="num">Цена выхода</th>
                       <th class="num">Прибыль (после издержек)</th>
-                      <th></th>
+                      @if (uiMode.isPro()) {
+                        <th></th>
+                      }
                     </tr>
                   </thead>
                   <tbody>
@@ -743,18 +1029,20 @@
                         <td class="num pos">
                           <strong>{{ formatRubExact(trade.netProfitRub, true) }}</strong>
                         </td>
-                        <td class="num">
-                          <button
-                            tuiButton
-                            type="button"
-                            size="xs"
-                            appearance="outline"
-                            [disabled]="true"
-                            title="Редактор правил пока недоступен"
-                          >
-                            Написать правило
-                          </button>
-                        </td>
+                        @if (uiMode.isPro()) {
+                          <td class="num">
+                            <button
+                              tuiButton
+                              type="button"
+                              size="xs"
+                              appearance="outline"
+                              [disabled]="true"
+                              title="Редактор правил пока недоступен"
+                            >
+                              Написать правило
+                            </button>
+                          </td>
+                        }
                       </tr>
                     }
                   </tbody>
@@ -772,9 +1060,13 @@
                     <th>Бумага</th>
                     <th>Сторона</th>
                     <th>Тип</th>
-                    <th class="num">Лоты</th>
+                    <th class="num">
+                      <span class="hint-label" [tuiHint]="hints.lots">Лоты</span>
+                    </th>
                     <th class="num">Цена</th>
-                    <th class="num">Издержки</th>
+                    <th class="num">
+                      <span class="hint-label" [tuiHint]="hints.fillCost">Издержки</span>
+                    </th>
                     <th>Пометка</th>
                   </tr>
                 </thead>
@@ -805,7 +1097,7 @@
             @if (rep.roundTrips; as trips) {
               <h3 class="tui-text_h6">Результаты сделок</h3>
               <p class="tui-text_body-s muted">
-                Покупки сопоставлены с продажами по FIFO; издержки распределены по парам с
+                Покупки сопоставлены с продажами по очереди (FIFO); издержки распределены по парам с
                 округлением, поэтому сумма может отличаться от общего результата на копейки.
               </p>
               @if (trips.length === 0) {
@@ -818,11 +1110,19 @@
                         <th>Бумага</th>
                         <th>Вход</th>
                         <th>Выход</th>
-                        <th class="num">Лоты</th>
+                        <th class="num">
+                          <span class="hint-label" [tuiHint]="hints.lots">Лоты</span>
+                        </th>
                         <th class="num">Цена входа</th>
                         <th class="num">Цена выхода</th>
-                        <th class="num">Результат до издержек</th>
-                        <th class="num">Издержки</th>
+                        <th class="num">
+                          <span class="hint-label" [tuiHint]="hints.grossPnl">
+                            Результат до издержек
+                          </span>
+                        </th>
+                        <th class="num">
+                          <span class="hint-label" [tuiHint]="hints.fillCost">Издержки</span>
+                        </th>
                         <th class="num">Результат</th>
                       </tr>
                     </thead>

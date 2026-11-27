@@ -5,6 +5,12 @@
 }
 
 .launch-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+
   h1 {
     margin: 0 0 0.25rem;
   }
@@ -12,6 +18,95 @@
   p {
     margin: 0;
   }
+}
+
+.quick-start-btn {
+  white-space: nowrap;
+}
+
+.scenarios-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.scenario-card {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scenario-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.scenario-desc {
+  margin: 0;
+}
+
+.scenario-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.scenario-btn {
+  margin-top: auto;
+  width: 100%;
+}
+
+.manual-toggle-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.duration-days {
+  font-size: 0.75em;
+  opacity: 0.75;
+}
+
+.hint-label {
+  text-decoration: underline dotted var(--tui-text-tertiary);
+  text-underline-offset: 0.2rem;
+  cursor: help;
+}
+
+.rules-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rules-summary {
+  cursor: pointer;
+  color: var(--tui-text-secondary);
+  font-weight: 500;
+  user-select: none;
+}
+
+.rules-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .muted {
@@ -126,6 +221,10 @@
 }
 
 @media (max-width: 960px) {
+  .scenarios-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .launch-grid {
     grid-template-columns: minmax(0, 1fr);
   }

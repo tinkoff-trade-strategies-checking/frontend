@@ -1,19 +1,31 @@
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  OnInit,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TuiDay } from '@taiga-ui/cdk';
-import { TuiButton, TuiNotification, TuiTextfield } from '@taiga-ui/core';
+import { TuiButton, TuiHint, TuiNotification, TuiTextfield } from '@taiga-ui/core';
 import { TuiBadge, TuiInputDate, TuiInputNumber, TuiSegmented } from '@taiga-ui/kit';
 import {
+  BEGINNER_SCENARIOS,
   CandleTimeframe,
+  DURATION_LABELS,
   LAUNCH_API,
+  LaunchScenarioPreset,
   MAX_INITIAL_CAPITAL_RUB,
   MIN_INITIAL_CAPITAL_RUB,
+  QUICK_START_PRESET,
   REGIME_HINTS,
   REGIME_LABELS,
   SessionDurationDays,
   TIMEFRAME_LABELS,
 } from './data/launch.models';
 import { LAUNCH_API_IMPL } from '../../api-impls';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { formatDecimalRu, formatDisplayDate, formatExecutionPct, formatRub } from './launch.format';
 import { LaunchStore } from './launch.store';
 
@@ -36,6 +48,7 @@ function parseIsoDay(isoDate: string): TuiDay | null {
     FormsModule,
     TuiButton,
     TuiBadge,
+    TuiHint,
     TuiInputDate,
     TuiInputNumber,
     TuiNotification,
@@ -49,13 +62,20 @@ function parseIsoDay(isoDate: string): TuiDay | null {
 })
 export class LaunchPage implements OnInit {
   protected readonly store = inject(LaunchStore);
+  protected readonly uiMode = inject(UiModeService);
+
+  protected readonly manualExpanded = signal(false);
+  protected readonly showManualForm = computed(() => this.uiMode.isPro() || this.manualExpanded());
 
   protected readonly customStartDay = computed<TuiDay | null>(() =>
     parseIsoDay(this.store.customStartDate()),
   );
 
+  protected readonly quickStartPreset = QUICK_START_PRESET;
+  protected readonly scenarios = BEGINNER_SCENARIOS;
   protected readonly minCapital = MIN_INITIAL_CAPITAL_RUB;
   protected readonly maxCapital = MAX_INITIAL_CAPITAL_RUB;
+  protected readonly durationLabels = DURATION_LABELS;
   protected readonly timeframeLabels = TIMEFRAME_LABELS;
   protected readonly regimeLabels = REGIME_LABELS;
   protected readonly regimeHints = REGIME_HINTS;
@@ -63,6 +83,14 @@ export class LaunchPage implements OnInit {
   protected readonly formatExecutionPct = formatExecutionPct;
   protected readonly formatDecimalRu = formatDecimalRu;
   protected readonly formatDisplayDate = formatDisplayDate;
+
+  protected launchScenario(preset: LaunchScenarioPreset): void {
+    void this.store.launchPreset(preset);
+  }
+
+  protected toggleManualForm(): void {
+    this.manualExpanded.update((open) => !open);
+  }
 
   protected disabledDurations(durations: readonly SessionDurationDays[]): SessionDurationDays[] {
     return durations.filter((d) => this.store.isPairDisabled(d, this.store.timeframe()));

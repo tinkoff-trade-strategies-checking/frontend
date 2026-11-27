@@ -11,6 +11,7 @@ import { STUB_MODE } from './core/api-mode';
 import { AuthService } from './core/auth/auth.service';
 import { routes } from './app.routes';
 import { StubSessionRegistry } from './shared/stub-session-registry';
+import { UiModeService } from './shared/ui-mode.service';
 
 @Component({
   selector: 'app-dummy-route',
@@ -163,5 +164,34 @@ describe('App', () => {
     expect(links).toEqual(['Новая сессия', 'Мастерская', 'История']);
     expect(root.querySelector('.user')?.textContent).toContain('a@b.c');
     expect(root.querySelector('.user button')?.textContent).toContain('Выйти');
+  });
+
+  it('показывает бейдж учебного счёта, переключает режим «Базовый / Профи» и открывает «Словарь»', () => {
+    localStorage.removeItem('ttsc_ui_mode');
+    const fixture = TestBed.createComponent(App);
+    const uiMode = TestBed.inject(UiModeService);
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain('Учебный счёт · Виртуальные деньги');
+    expect(uiMode.isBeginner()).toBe(true);
+
+    const proBtn = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Профи',
+    );
+    proBtn?.click();
+    fixture.detectChanges();
+    expect(uiMode.isPro()).toBe(true);
+
+    const glossaryBtn = Array.from(root.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Словарь',
+    );
+    expect(root.querySelector('app-beginner-glossary')).toBeNull();
+    glossaryBtn?.click();
+    fixture.detectChanges();
+    expect(root.querySelector('app-beginner-glossary')).not.toBeNull();
+    expect(root.textContent).toContain('Словарь терминов');
+
+    localStorage.removeItem('ttsc_ui_mode');
   });
 });

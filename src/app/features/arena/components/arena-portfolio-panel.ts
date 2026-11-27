@@ -1,9 +1,11 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { TuiHint } from '@taiga-ui/core';
 import { formatLots, formatPct, formatPrice, formatRub } from '../arena.format';
 import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models';
 
 @Component({
   selector: 'app-arena-portfolio-panel',
+  imports: [TuiHint],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="panel">
@@ -17,7 +19,12 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
       <div class="summary">
         <div class="equity-row">
           <div class="metric-item">
-            <span class="tui-text_body-xs muted">Стоимость портфеля</span>
+            <span
+              class="tui-text_body-xs muted hint-label"
+              tuiHint="Общая оценка счёта: свободные деньги плюс текущая стоимость всех купленных бумаг."
+            >
+              Стоимость портфеля
+            </span>
             @let equityRub = portfolio().equityRub;
             @if (equityRub !== undefined && equityRub !== null) {
               <span class="tui-text_h5 num">{{ formatRub(equityRub) }}</span>
@@ -27,7 +34,12 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
             }
           </div>
           <div class="metric-item">
-            <span class="tui-text_body-xs muted">P&amp;L</span>
+            <span
+              class="tui-text_body-xs muted hint-label"
+              tuiHint="На сколько изменился ваш счёт по сравнению со стартом сессии."
+            >
+              Прибыль / убыток
+            </span>
             @if (portfolio().pnlRub !== undefined) {
               <span
                 class="tui-text_h5 num"
@@ -56,7 +68,12 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
         </div>
 
         <div class="kv">
-          <span>Свободные деньги</span>
+          <span
+            class="hint-label"
+            tuiHint="Доступные средства для новых покупок (за вычетом зарезервированных под активные заявки)."
+          >
+            Свободные деньги
+          </span>
           <span class="num">
             {{
               portfolio().cashRub !== undefined
@@ -66,7 +83,9 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
           </span>
         </div>
         <div class="kv">
-          <span>В бумагах</span>
+          <span class="hint-label" tuiHint="Текущая стоимость всех открытых позиций в бумагах.">
+            В бумагах
+          </span>
           <span class="num">
             {{
               portfolio().investedRub !== undefined
@@ -76,7 +95,12 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
           </span>
         </div>
         <div class="kv">
-          <span>Издержки</span>
+          <span
+            class="hint-label"
+            tuiHint="Суммарные комиссии и проскальзывание по всем совершённым сделкам."
+          >
+            Издержки
+          </span>
           <span class="num">
             {{
               portfolio().costsRub !== undefined
@@ -92,14 +116,32 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
           <tr>
             <th>Бумага</th>
             <th class="num">Лоты</th>
-            <th class="num">Средняя</th>
-            <th class="num">P&amp;L</th>
+            <th class="num">
+              <span class="hint-label" tuiHint="Средняя цена покупки лотов в вашей позиции.">
+                Средняя
+              </span>
+            </th>
+            <th class="num">
+              <span
+                class="hint-label"
+                tuiHint="Текущий результат по этой бумаге относительно средней цены покупки."
+              >
+                Прибыль / убыток
+              </span>
+            </th>
           </tr>
         </thead>
         <tbody>
           @for (paper of papers(); track paper.id) {
             @let pos = positionOf(paper.id);
-            <tr>
+            <tr
+              class="pos-row"
+              tabindex="0"
+              [class.selected]="paper.id === selectedPaperId()"
+              (click)="paperSelect.emit(paper.id)"
+              (keydown.enter)="paperSelect.emit(paper.id)"
+              (keydown.space)="$event.preventDefault(); paperSelect.emit(paper.id)"
+            >
               <td>{{ paper.label }}</td>
               <td class="num">{{ pos ? formatLots(pos.lots) : '0 лот.' }}</td>
               <td class="num">
@@ -139,6 +181,12 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
 
     .muted {
       color: var(--tui-text-secondary);
+    }
+
+    .hint-label {
+      cursor: help;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
     }
 
     .summary {
@@ -198,6 +246,22 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
       border-bottom: 0;
     }
 
+    .pos-row {
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .pos-row:hover,
+    .pos-row:focus-visible {
+      background: var(--tui-background-neutral-1);
+      outline: none;
+    }
+
+    .pos-row.selected {
+      background: var(--tui-background-neutral-1);
+      font-weight: 600;
+    }
+
     .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
@@ -215,6 +279,9 @@ import { ArenaPaper, ArenaPortfolio, ArenaPosition } from '../data/arena.models'
 export class ArenaPortfolioPanel {
   readonly papers = input.required<readonly ArenaPaper[]>();
   readonly portfolio = input.required<ArenaPortfolio>();
+  readonly selectedPaperId = input<string | null>(null);
+
+  readonly paperSelect = output<string>();
 
   protected readonly formatLots = formatLots;
   protected readonly formatPrice = formatPrice;

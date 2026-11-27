@@ -5,6 +5,7 @@ test('launch: своё значение начального капитала п
 }) => {
   await page.goto('/new');
   await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+  await page.getByRole('button', { name: 'Настроить вручную' }).click();
 
   const capital = page.getByLabel('Своё значение, ₽');
   await expect(capital).toBeVisible();
@@ -28,4 +29,31 @@ test('launch: своё значение начального капитала п
   await page.getByRole('button', { name: /5\s000\s000\s₽/ }).click();
   await expect(summary).toContainText(/5\s000\s000\s₽/);
   await expect(page.getByRole('button', { name: 'Запустить' })).toBeEnabled();
+});
+
+test('launch: карточки сценариев в Базовом режиме и автоматическое раскрытие полной формы в Профи', async ({
+  page,
+}) => {
+  await page.goto('/new');
+  await expect(page.getByRole('heading', { name: 'Новая сессия' })).toBeVisible();
+
+  const scenarios = page.locator('article.scenario-card');
+  await expect(scenarios).toHaveCount(3);
+  await expect(page.locator('aside.summary-col')).toHaveCount(0);
+
+  // Переключаемся в «Профи» — карточки скрываются, полная форма с «Кто торгует» открыта сразу.
+  await page.locator('header').getByRole('button', { name: 'Профи', exact: true }).click();
+  await expect(scenarios).toHaveCount(0);
+  await expect(page.locator('aside.summary-col')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Кто торгует' })).toBeVisible();
+
+  // Возвращаемся в «Базовый» и запускаем карточку «Собери портфель».
+  await page.locator('header').getByRole('button', { name: 'Базовый', exact: true }).click();
+  const portfolioCard = page.locator('article.scenario-card[data-scenario-id="portfolio"]');
+  await expect(portfolioCard).toBeVisible();
+  await portfolioCard.getByRole('button', { name: 'Начать сценарий' }).click();
+
+  await expect(page).toHaveURL(/\/arena\/S-\d+$/);
+  await expect(page.locator('.day-counter')).toHaveText('День 1 из 60');
+  await expect(page.getByRole('tab')).toHaveCount(3);
 });

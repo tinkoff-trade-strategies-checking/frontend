@@ -8,6 +8,7 @@ import {
   WorkshopDetailResult,
   WorkshopPage as WorkshopPageData,
 } from './data/workshop.models';
+import { UiModeService } from '../../shared/ui-mode.service';
 import { WorkshopPage } from './workshop-page';
 import { WorkshopStore } from './workshop.store';
 
@@ -88,7 +89,8 @@ describe('WorkshopPage', () => {
     expect(el.querySelectorAll('tbody tr').length).toBe(5);
   });
 
-  it('открывает карточку алгоритма с версиями (INV-5), предупреждениями линтера и неактивными действиями «Форк» и «Запустить прогон»', async () => {
+  it('в Профи-режиме открывает карточку алгоритма с версиями (INV-5), предупреждениями линтера и неактивными действиями «Форк» и «Запустить прогон»', async () => {
+    TestBed.inject(UiModeService).setMode('pro');
     const fixture = TestBed.createComponent(WorkshopPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -125,6 +127,31 @@ describe('WorkshopPage', () => {
     expect(forkBtn?.title).toContain('Пока недоступно');
     expect(runBtn?.disabled).toBe(true);
     expect(runBtn?.title).toContain('Пока недоступно');
+  });
+
+  it('в Базовом режиме показывает плашку демо-каталога и скрывает неработающие кнопки «Форк» и «Запустить прогон»', async () => {
+    TestBed.inject(UiModeService).setMode('beginner');
+    const fixture = TestBed.createComponent(WorkshopPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Демонстрационный каталог примеров стратегий');
+
+    const rowA3 = el.querySelector('tr[data-algo-id="A-0003"]');
+    rowA3?.querySelector('button')?.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const detail = el.querySelector('.detail-panel');
+    expect(detail).not.toBeNull();
+    const buttonTexts = Array.from(detail?.querySelectorAll('button') ?? []).map((b) =>
+      b.textContent?.trim(),
+    );
+    expect(buttonTexts).not.toContain('Форк');
+    expect(buttonTexts).not.toContain('Запустить прогон');
+    expect(detail?.textContent).not.toContain('пока недоступны');
   });
 
   it('ограничивает добавление в сравнение максимум 5 алгоритмами', async () => {

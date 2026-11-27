@@ -78,18 +78,29 @@
     @if (store.loading() && store.items().length === 0) {
       <div class="empty-state tui-text_body-m muted">Загрузка истории…</div>
     } @else if (store.items().length === 0 && !store.error()) {
-      <div class="empty-state">
-        <span class="tui-text_body-m muted">Сессий и прогонов под выбранные фильтры нет.</span>
-        <button
-          tuiButton
-          type="button"
-          size="s"
-          appearance="outline"
-          (click)="store.resetFilters()"
-        >
-          Сбросить фильтры
-        </button>
-      </div>
+      @if (!store.hasActiveFilters()) {
+        <div class="empty-state welcome-empty">
+          <h2 class="tui-text_h5">Здесь появятся ваши тренировки</h2>
+          <p class="tui-text_body-m muted welcome-text">
+            Пройдите первую учебную сессию на виртуальные деньги — после завершения вы сможете
+            открыть подробный отчёт и разобрать свои решения шаг за шагом.
+          </p>
+          <a tuiButton size="m" appearance="primary" routerLink="/new">Начать первую тренировку</a>
+        </div>
+      } @else {
+        <div class="empty-state">
+          <span class="tui-text_body-m muted">Сессий и прогонов под выбранные фильтры нет.</span>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            appearance="outline"
+            (click)="store.resetFilters()"
+          >
+            Сбросить фильтры
+          </button>
+        </div>
+      }
     } @else {
       <div class="table-scroll">
         <table class="history-table">

@@ -93,7 +93,7 @@ export function formatBlindCandleLabel(day: number, candleInDay: number): string
 
 export function formatBlindAxisTick(step: number, day: number): string {
   if (day <= 0) {
-    return `п−${Math.abs(step)}`;
+    return `До старта −${Math.abs(step)}`;
   }
-  return `д${day}`;
+  return `День ${day}`;
 }

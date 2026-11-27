@@ -1,16 +1,19 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TuiButton, TuiRoot } from '@taiga-ui/core';
+import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { filter, map, startWith } from 'rxjs';
 import { STUB_MODE } from './core/api-mode';
 import { AuthService } from './core/auth/auth.service';
+import { BeginnerGlossary } from './shared/beginner-glossary/beginner-glossary';
 import { DEFAULT_REPORT_SESSION_ID } from './shared/default-report-session';
 import { StubSessionRegistry } from './shared/stub-session-registry';
+import { UiModeService } from './shared/ui-mode.service';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, TuiRoot, TuiButton],
+  imports: [RouterOutlet, RouterLink, TuiRoot, TuiButton, TuiBadge, TuiSegmented, BeginnerGlossary],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './app.html',
   styleUrl: './app.less',
@@ -20,6 +23,8 @@ export class App {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
+  protected readonly uiMode = inject(UiModeService);
+  protected readonly glossaryOpen = signal(false);
   protected readonly user = this.auth.user;
   protected readonly stubMode = inject(STUB_MODE);
 
@@ -66,5 +71,13 @@ export class App {
   protected isSectionActive(prefix: string): boolean {
     const cleanUrl = this.currentUrl().split(/[?#]/)[0];
     return cleanUrl === prefix || cleanUrl.startsWith(`${prefix}/`);
+  }
+
+  protected onModeIndexChange(index: number): void {
+    this.uiMode.setMode(index === 1 ? 'pro' : 'beginner');
+  }
+
+  protected toggleGlossary(): void {
+    this.glossaryOpen.update((open) => !open);
   }
 }

@@ -55,6 +55,22 @@
     <div tuiNotification appearance="info" size="s">Загрузка сессии…</div>
   }
 
+  @if (!readOnly() && !store.finished() && !onboardingDismissed()) {
+    <section class="onboarding-card" aria-label="Как устроена Арена">
+      <div class="onboarding-body">
+        <strong class="tui-text_body-s">Как начать тренировку:</strong>
+        <ol class="onboarding-steps tui-text_body-xs">
+          <li>Нажимайте «Следующая свеча» или «Пуск», чтобы двигать время.</li>
+          <li>Выставляйте заявки без риска — деньги виртуальные.</li>
+          <li>Нажмите «Завершить сессию», чтобы раскрыть компанию и увидеть итоги.</li>
+        </ol>
+      </div>
+      <button tuiButton type="button" size="xs" appearance="flat" (click)="dismissOnboarding()">
+        Понятно
+      </button>
+    </section>
+  }
+
   <app-arena-player
     [playing]="store.playing()"
     [canStep]="store.canStep()"
@@ -105,8 +121,10 @@
             type="button"
             size="xs"
             [appearance]="showSma20() ? 'accent' : 'outline'"
+            tuiHint="Средняя цена за 20 шагов — показывает общее направление движения"
             (click)="showSma20.set(!showSma20())"
           >
+            <span class="sma-dot sma-dot-20" aria-hidden="true"></span>
             SMA 20
           </button>
           <button
@@ -114,8 +132,10 @@
             type="button"
             size="xs"
             [appearance]="showSma50() ? 'accent' : 'outline'"
+            tuiHint="Средняя цена за 50 шагов — показывает общее направление движения"
             (click)="showSma50.set(!showSma50())"
           >
+            <span class="sma-dot sma-dot-50" aria-hidden="true"></span>
             SMA 50
           </button>
         </div>
@@ -147,6 +167,23 @@
     </div>
 
     <aside class="side-col">
+      @if (!readOnly() && store.pausedOrderHint()) {
+        <div tuiNotification appearance="info" size="s" class="paused-order-banner" role="status">
+          <div class="paused-order-content">
+            <span>Заявка принята и сработает на следующем шаге.</span>
+            <button
+              tuiButton
+              type="button"
+              size="xs"
+              appearance="primary"
+              (click)="store.stepOnce()"
+            >
+              Сделать шаг вперёд
+            </button>
+          </div>
+        </div>
+      }
+
       @if (!readOnly()) {
         <app-arena-order-ticket
           [papers]="store.papers()"
@@ -154,6 +191,7 @@
           [step]="store.step()"
           [portfolio]="store.portfolio()"
           [finished]="store.finished()"
+          [blind]="store.blind()"
           [editingOrder]="store.editingOrder()"
           [estimate]="store.estimate()"
           (paperSelect)="store.selectPaper($event)"
@@ -164,7 +202,12 @@
         />
       }
 
-      <app-arena-portfolio-panel [papers]="store.papers()" [portfolio]="store.portfolio()" />
+      <app-arena-portfolio-panel
+        [papers]="store.papers()"
+        [portfolio]="store.portfolio()"
+        [selectedPaperId]="store.selectedPaperId()"
+        (paperSelect)="store.selectPaper($event)"
+      />
     </aside>
   </div>
 </div>

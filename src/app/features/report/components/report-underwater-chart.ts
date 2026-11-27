@@ -42,7 +42,7 @@ function readCssColor(el: HTMLElement, name: string, fallback = 'currentColor'):
         <span class="legend-item"><span class="swatch swatch-algo"></span>Алгоритм, %</span>
       }
     </div>
-    <div #container class="chart-host" aria-label="Underwater-просадка"></div>
+    <div #container class="chart-host" aria-label="Глубина падений от максимума"></div>
   `,
   styles: `
     .chart-legend {

@@ -2,13 +2,38 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
   padding: 0.75rem 1.5rem;
   border-bottom: 1px solid var(--tui-border-normal);
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.brand-title {
+  font-weight: 600;
+}
+
+.demo-badge {
+  white-space: nowrap;
+}
+
 .nav {
   display: flex;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }
 
 .active {
@@ -22,5 +47,6 @@
 .user {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
 }

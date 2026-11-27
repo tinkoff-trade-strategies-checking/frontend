@@ -1,6 +1,13 @@
 <tui-root>
   <header class="header">
-    <span class="tui-text_body-l">Т-Инвестиции: тренажёр и лаборатория стратегий</span>
+    <div class="brand">
+      <span class="tui-text_body-l brand-title"
+        >Т-Инвестиции: тренажёр и лаборатория стратегий</span
+      >
+      <span tuiBadge size="s" appearance="info" class="demo-badge">
+        Учебный счёт · Виртуальные деньги
+      </span>
+    </div>
     <nav class="nav">
       @for (section of sections(); track section.title) {
         <a
@@ -15,16 +22,40 @@
         </a>
       }
     </nav>
-    @if (user(); as currentUser) {
-      <div class="user">
-        <span class="tui-text_body-s">{{ currentUser.email }}</span>
-        <button tuiButton type="button" size="s" appearance="outline" (click)="logout()">
-          Выйти
-        </button>
-      </div>
-    }
+    <div class="header-tools">
+      <tui-segmented
+        size="s"
+        aria-label="Режим интерфейса"
+        [activeItemIndex]="uiMode.isPro() ? 1 : 0"
+        (activeItemIndexChange)="onModeIndexChange($event)"
+      >
+        <button type="button">Базовый</button>
+        <button type="button">Профи</button>
+      </tui-segmented>
+      <button
+        tuiButton
+        type="button"
+        size="s"
+        [appearance]="glossaryOpen() ? 'primary' : 'outline'"
+        [attr.aria-expanded]="glossaryOpen()"
+        (click)="toggleGlossary()"
+      >
+        Словарь
+      </button>
+      @if (user(); as currentUser) {
+        <div class="user">
+          <span class="tui-text_body-s">{{ currentUser.email }}</span>
+          <button tuiButton type="button" size="s" appearance="outline" (click)="logout()">
+            Выйти
+          </button>
+        </div>
+      }
+    </div>
   </header>
   <main class="content">
     <router-outlet />
   </main>
+  @if (glossaryOpen()) {
+    <app-beginner-glossary (closed)="glossaryOpen.set(false)" />
+  }
 </tui-root>

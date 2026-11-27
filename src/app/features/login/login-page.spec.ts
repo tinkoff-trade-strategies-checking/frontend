@@ -110,4 +110,16 @@ describe('LoginPage', () => {
     controller.expectOne('/api/v1/me').flush({ id: 'u', email: 'a@b.c', role: 'USER' });
     await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/new'));
   });
+
+  it('показывает вводный блок про безопасный тренажёр на виртуальные деньги', async () => {
+    await setup(false);
+    const fixture = TestBed.createComponent(LoginPage);
+    fixture.detectChanges();
+    controller.expectOne('/api/v1/me').flush({}, { status: 401, statusText: 'Unauthorized' });
+    await fixture.whenStable();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('виртуальные деньги');
+    expect(text).not.toContain('сравнение с алгоритмом');
+  });
 });

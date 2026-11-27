@@ -329,4 +329,34 @@ describe('HistoryPage: ошибка и утечки', () => {
     expect(text).toContain('Не удалось загрузить историю сессий.');
     expect(text).not.toContain('под выбранные фильтры нет');
   });
+
+  it('разделяет пустое состояние: без фильтров — приветствие и кнопка на /new, с фильтрами — «Сбросить фильтры»', async () => {
+    TestBed.overrideComponent(HistoryPage, {
+      set: {
+        providers: [
+          { provide: HISTORY_API, useValue: { list: async () => emptyPage() } },
+          HistoryStore,
+        ],
+      },
+    });
+    const fixture = TestBed.createComponent(HistoryPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Здесь появятся ваши тренировки');
+    const startLink = el.querySelector('.welcome-empty a[href="/new"]');
+    expect(startLink?.textContent?.trim()).toBe('Начать первую тренировку');
+    expect(el.textContent).not.toContain('Сбросить фильтры');
+
+    const store = fixture.debugElement.injector.get(HistoryStore);
+    store.toggleBlindOnly();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('Сессий и прогонов под выбранные фильтры нет.');
+    expect(el.textContent).toContain('Сбросить фильтры');
+    expect(el.textContent).not.toContain('Начать первую тренировку');
+  });
 });

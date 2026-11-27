@@ -84,6 +84,13 @@ export interface LaunchApi {
 
 export const LAUNCH_API = new InjectionToken<LaunchApi>('LAUNCH_API');
 
+export const DURATION_LABELS: Readonly<Record<SessionDurationDays, string>> = {
+  20: '1 месяц',
+  60: '3 месяца',
+  120: 'полгода',
+  250: '1 год',
+};
+
 export const TIMEFRAME_LABELS: Readonly<Record<CandleTimeframe, string>> = {
   '1m': '1 мин',
   '5m': '5 мин',
@@ -100,7 +107,58 @@ export const REGIME_LABELS: Readonly<Record<MarketRegime, string>> = {
 };
 
 export const REGIME_HINTS: Readonly<Record<MarketRegime, string>> = {
-  calm: 'Низкая волатильность IMOEX (≤ P33) и просадка < 10 %',
-  medium: 'Умеренные колебания рынка между спокойным и стрессовым',
-  stress: 'Высокая волатильность (≥ P80) или просадка IMOEX ≥ 20 %',
+  calm: 'Спокойный рынок без резких скачков и глубоких падений',
+  medium: 'Обычный рынок с умеренными взлётами и падениями',
+  stress: 'Период сильных колебаний или кризисного падения рынка',
 };
+
+export interface LaunchScenarioPreset {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly badge: string;
+  readonly durationDays: SessionDurationDays;
+  readonly timeframe: CandleTimeframe;
+  readonly regime: MarketRegime;
+  readonly paperCount: number;
+  readonly initialCapitalRub: number;
+}
+
+export const QUICK_START_PRESET: LaunchScenarioPreset = {
+  id: 'calm-start',
+  title: 'Спокойный старт',
+  description:
+    'Одна бумага, спокойный рынок и понятный дневной график — идеально для первого раза.',
+  badge: 'Для первого раза',
+  durationDays: 20,
+  timeframe: '1d',
+  regime: 'calm',
+  paperCount: 1,
+  initialCapitalRub: 100_000,
+};
+
+export const BEGINNER_SCENARIOS: readonly LaunchScenarioPreset[] = [
+  QUICK_START_PRESET,
+  {
+    id: 'portfolio',
+    title: 'Собери портфель',
+    description: 'Три бумаги на три месяца — попробуйте распределить виртуальный капитал.',
+    badge: '3 бумаги',
+    durationDays: 60,
+    timeframe: '1d',
+    regime: 'medium',
+    paperCount: 3,
+    initialCapitalRub: 100_000,
+  },
+  {
+    id: 'crisis',
+    title: 'Испытание кризисом',
+    description: 'Стрессовый отрезок рынка: проверьте, как вы держите удар при сильных колебаниях.',
+    badge: 'Повышенный риск',
+    durationDays: 60,
+    timeframe: '1d',
+    regime: 'stress',
+    paperCount: 1,
+    initialCapitalRub: 100_000,
+  },
+];
