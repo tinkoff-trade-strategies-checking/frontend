@@ -14,6 +14,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiNotification } from '@taiga-ui/core';
 import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { ReportEquityChart } from './components/report-equity-chart';
+import { ReportRiskPanel } from './components/report-risk-panel';
 import { ReportUnderwaterChart } from './components/report-underwater-chart';
 import { PapersReveal } from '../../shared/papers-reveal/papers-reveal';
 import { TermHint } from '../../shared/term-hint/term-hint';
@@ -69,6 +70,7 @@ const DIVERGENCE_SORTS: readonly { readonly id: DivergenceSort; readonly label: 
     TuiNotification,
     TuiSegmented,
     ReportEquityChart,
+    ReportRiskPanel,
     ReportUnderwaterChart,
     PapersReveal,
     TermHint,

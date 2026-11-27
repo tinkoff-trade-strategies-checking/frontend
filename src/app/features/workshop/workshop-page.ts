@@ -19,10 +19,12 @@ import { RUNS_API } from '../runs/data/runs.models';
 import { WorkshopCodeViewer } from './components/workshop-code-viewer';
 import { WorkshopDraftEditor } from './components/workshop-draft-editor';
 import { WorkshopDslGuide } from './components/workshop-dsl-guide';
+import { WorkshopOptimizer } from './components/workshop-optimizer';
 import { WorkshopRunForm } from './components/workshop-run-form';
 import {
   WORKSHOP_API,
   WORKSHOP_COMPARE_LIMIT,
+  WorkshopAlgorithmDetail,
   WorkshopAlgorithmSummary,
   WorkshopSortField,
   WorkshopVisibility,
@@ -59,6 +61,7 @@ const SORT_OPTIONS: readonly { readonly id: WorkshopSortField; readonly label: s
     WorkshopCodeViewer,
     WorkshopDraftEditor,
     WorkshopDslGuide,
+    WorkshopOptimizer,
     WorkshopRunForm,
   ],
   providers: [
@@ -85,6 +88,8 @@ export class WorkshopPage implements OnInit {
   );
   protected readonly compareLimit = WORKSHOP_COMPARE_LIMIT;
   protected readonly dslGuideOpen = signal(false);
+  protected readonly optimizerOpen = signal(false);
+  protected readonly pendingRunParams = signal<Readonly<Record<string, number>> | null>(null);
   protected readonly showSidePanel = computed(
     () =>
       this.store.selectedId() !== null ||
@@ -168,6 +173,35 @@ export class WorkshopPage implements OnInit {
     this.dslGuideOpen.set(false);
   }
 
+  protected hasOptimizableParams(algo: WorkshopAlgorithmDetail): boolean {
+    if (algo.latestVersion <= 0) {
+      return false;
+    }
+    const ver =
+      algo.versions.find((v) => v.version === algo.latestVersion) ??
+      algo.versions.find((v) => v.version > 0);
+    return (ver?.params?.length ?? 0) > 0;
+  }
+
+  protected openOptimizer(): void {
+    this.optimizerOpen.set(true);
+  }
+
+  protected closeOptimizer(): void {
+    this.optimizerOpen.set(false);
+  }
+
+  protected onApplyOptimizedParams(params: Readonly<Record<string, number>>): void {
+    this.pendingRunParams.set(params);
+    this.optimizerOpen.set(false);
+    this.store.openRunForm();
+  }
+
+  protected onCloseRunForm(): void {
+    this.pendingRunParams.set(null);
+    this.store.closeRunForm();
+  }
+
   protected onInsertDslExample(code: string): void {
     this.store.setDraftSource(code);
     this.dslGuideOpen.set(false);
@@ -179,6 +213,10 @@ export class WorkshopPage implements OnInit {
 
   protected onEscapeKey(event: Event): void {
     if (event.defaultPrevented || this.document.querySelector('tui-dropdown')) {
+      return;
+    }
+    if (this.optimizerOpen()) {
+      this.closeOptimizer();
       return;
     }
     if (this.dslGuideOpen()) {

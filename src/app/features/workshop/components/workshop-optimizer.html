@@ -1,0 +1,322 @@
+<div class="optimizer-backdrop" aria-hidden="true" (click)="close()"></div>
+<section
+  class="optimizer-dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="optimizer-title"
+  data-testid="workshop-optimizer-dialog"
+>
+  <header class="optimizer-header">
+    <div>
+      <h2 id="optimizer-title" class="tui-text_h5">
+        Подбор параметров: {{ algorithm().name }}
+        @if (latestVersion(); as ver) {
+          <span tuiBadge size="s" appearance="info">v{{ ver.version }}</span>
+        }
+      </h2>
+      <p class="tui-text_body-xs muted">
+        Сетка до {{ maxCombinations }} комбинаций на фиксированном окне рынка для честного сравнения
+      </p>
+    </div>
+    <button tuiButton type="button" size="xs" appearance="flat" (click)="close()">Закрыть</button>
+  </header>
+
+  <div class="optimizer-content">
+    @if (error(); as err) {
+      <div tuiNotification appearance="negative" size="s" role="alert">{{ err }}</div>
+    }
+
+    @if (loading() && !options()) {
+      <div class="tui-text_body-m muted">Загрузка параметров подбора…</div>
+    } @else if (options(); as opts) {
+      <section class="opt-section">
+        <div class="section-head">
+          <h3 class="tui-text_h6">1. Выберите 1 или 2 параметра</h3>
+          <span class="tui-text_body-xs muted" data-testid="optimizer-combo-count">
+            Комбинаций: <strong>{{ previewGrid().length }}</strong> из {{ maxCombinations }} макс.
+          </span>
+        </div>
+
+        <div class="param-chips">
+          @for (param of availableParams(); track param.name) {
+            @let selected = isParamSelected(param.name);
+            @let disabled = running() || (!selected && selectedParamNames().length >= 2);
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              [appearance]="selected ? 'secondary' : 'outline'"
+              [disabled]="disabled"
+              [attr.aria-pressed]="selected"
+              [attr.data-param]="param.name"
+              (click)="toggleParam(param.name)"
+            >
+              {{ param.name }} (по умолч. {{ param.defaultValue }})
+            </button>
+          }
+        </div>
+
+        @if (selectedParamNames().length > 0) {
+          <div class="points-row">
+            <span class="tui-text_body-xs muted">Точек на параметр:</span>
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="optionIndex(pointsOptions, pointsPerParam())"
+              (activeItemIndexChange)="onPointsIndexChange($event)"
+            >
+              @for (pts of pointsOptions; track pts) {
+                <button type="button" [disabled]="running()">{{ pts }}</button>
+              }
+            </tui-segmented>
+          </div>
+
+          <div class="preview-values tui-text_body-xs muted">
+            @for (param of availableParams(); track param.name) {
+              @if (isParamSelected(param.name)) {
+                <div>
+                  <strong>{{ param.name }}</strong>: [{{ paramPreviewText(param) }}]
+                </div>
+              }
+            }
+          </div>
+        }
+      </section>
+
+      <section class="opt-section">
+        <h3 class="tui-text_h6">2. Фиксированное окно сравнения</h3>
+        <div class="window-grid">
+          <div class="field-block">
+            <span class="tui-text_body-xs muted">Длительность</span>
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="optionIndex(opts.durations, durationDays())"
+              (activeItemIndexChange)="onDurationIndexChange(opts.durations, $event)"
+            >
+              @for (days of opts.durations; track days) {
+                <button type="button" [disabled]="running()">{{ days }} дн.</button>
+              }
+            </tui-segmented>
+          </div>
+
+          <div class="field-block">
+            <span class="tui-text_body-xs muted">Шаг свечей</span>
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="optionIndex(opts.availableTimeframes, timeframe())"
+              (activeItemIndexChange)="onTimeframeIndexChange(opts.availableTimeframes, $event)"
+            >
+              @for (tf of opts.availableTimeframes; track tf) {
+                <button type="button" [disabled]="running()">{{ timeframeLabels[tf] }}</button>
+              }
+            </tui-segmented>
+          </div>
+
+          <div class="field-block">
+            <span class="tui-text_body-xs muted">Тип периода</span>
+            <tui-segmented
+              size="s"
+              [activeItemIndex]="optionIndex(opts.regimes, regime())"
+              (activeItemIndexChange)="onRegimeIndexChange(opts.regimes, $event)"
+            >
+              @for (item of opts.regimes; track item) {
+                <button type="button" [disabled]="running()">{{ regimeLabels[item] }}</button>
+              }
+            </tui-segmented>
+          </div>
+
+          <label tuiLabel for="opt-start-date" class="field-block">
+            Дата начала
+            <tui-textfield tuiTextfieldSize="s">
+              <input
+                id="opt-start-date"
+                tuiInputDate
+                [disabled]="running()"
+                [ngModel]="customStartDay()"
+                (ngModelChange)="onCustomStartDayChange($event)"
+              />
+              <tui-calendar *tuiDropdown />
+            </tui-textfield>
+          </label>
+        </div>
+
+        <div class="field-block">
+          <span class="tui-text_body-xs muted">Бумаги</span>
+          <app-paper-picker
+            [papers]="availablePapers()"
+            [selectedIds]="selectedPaperIds()"
+            [loading]="loadingPapers()"
+            [compact]="true"
+            [minSelected]="opts.minPapers"
+            inputId="opt-papers-search"
+            (selectedIdsChange)="onSelectedPaperIdsChange($event)"
+          />
+        </div>
+      </section>
+
+      <div class="run-controls">
+        @if (!running()) {
+          <button
+            tuiButton
+            type="button"
+            size="m"
+            appearance="primary"
+            data-testid="optimizer-start-btn"
+            [disabled]="!canStart()"
+            (click)="startOptimization()"
+          >
+            Запустить подбор ({{ previewGrid().length }})
+          </button>
+        } @else {
+          <button
+            tuiButton
+            type="button"
+            size="m"
+            appearance="outline-destructive"
+            data-testid="optimizer-cancel-btn"
+            (click)="cancelRun()"
+          >
+            Отменить
+          </button>
+        }
+
+        @if (totalCount() > 0) {
+          <div class="progress-wrap" data-testid="optimizer-progress">
+            <span class="tui-text_body-s">
+              Выполнено {{ completedCount() }} из {{ totalCount() }}
+              @if (cancelled()) {
+                <span class="muted">(отменено)</span>
+              }
+            </span>
+            <div
+              class="progress-bar"
+              role="progressbar"
+              [attr.aria-valuenow]="progressPct()"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <div class="progress-fill" [style.width.%]="progressPct()"></div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (sortedResults().length > 0) {
+        <section class="opt-section" data-testid="optimizer-results">
+          <div class="section-head">
+            <h3 class="tui-text_h6">Результаты подбора</h3>
+            @if (bestResult(); as best) {
+              <div class="best-actions">
+                <span tuiBadge size="s" appearance="positive">
+                  Лучший: {{ formatRowParams(best) }} ({{ formatPct(best.netReturnPct, true) }})
+                </span>
+                <button
+                  tuiButton
+                  type="button"
+                  size="xs"
+                  appearance="primary"
+                  data-testid="optimizer-apply-best"
+                  (click)="onApply(best)"
+                >
+                  Применить в запуск
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="table-wrap">
+            <table class="opt-table">
+              <thead>
+                <tr>
+                  <th>Параметры</th>
+                  <th class="num">
+                    <button type="button" class="sort-btn" (click)="setSort('netReturnPct')">
+                      Доходность %
+                      @if (sortKey() === 'netReturnPct') {
+                        {{ sortDir() === 'desc' ? '↓' : '↑' }}
+                      }
+                    </button>
+                  </th>
+                  <th class="num">
+                    <button type="button" class="sort-btn" (click)="setSort('maxDrawdownPct')">
+                      Макс. просадка %
+                      @if (sortKey() === 'maxDrawdownPct') {
+                        {{ sortDir() === 'desc' ? '↓' : '↑' }}
+                      }
+                    </button>
+                  </th>
+                  <th class="num">
+                    <button type="button" class="sort-btn" (click)="setSort('sharpe')">
+                      Шарп
+                      @if (sortKey() === 'sharpe') {
+                        {{ sortDir() === 'desc' ? '↓' : '↑' }}
+                      }
+                    </button>
+                  </th>
+                  <th class="num">
+                    <button type="button" class="sort-btn" (click)="setSort('tradesCount')">
+                      Сделки
+                      @if (sortKey() === 'tradesCount') {
+                        {{ sortDir() === 'desc' ? '↓' : '↑' }}
+                      }
+                    </button>
+                  </th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of sortedResults(); track row.id) {
+                  @let isBest = bestResult()?.id === row.id;
+                  <tr [class.best-row]="isBest" [attr.data-best]="isBest ? 'true' : null">
+                    <td>
+                      <div class="param-cell">
+                        <strong>{{ formatRowParams(row) }}</strong>
+                        @if (isBest) {
+                          <span tuiBadge size="s" appearance="positive">Лучший</span>
+                        }
+                        @if (row.error) {
+                          <span class="tui-text_body-xs err-text">{{ row.error }}</span>
+                        }
+                      </div>
+                    </td>
+                    <td
+                      class="num"
+                      [class.pos]="row.netReturnPct !== null && row.netReturnPct > 0.005"
+                      [class.neg]="row.netReturnPct !== null && row.netReturnPct < -0.005"
+                    >
+                      {{ formatPct(row.netReturnPct, true) }}
+                    </td>
+                    <td class="num neg">{{ formatDrawdown(row.maxDrawdownPct) }}</td>
+                    <td class="num">{{ formatRatio(row.sharpe) }}</td>
+                    <td class="num">{{ row.tradesCount ?? '—' }}</td>
+                    <td>
+                      <div class="row-actions">
+                        <button
+                          tuiButton
+                          type="button"
+                          size="xs"
+                          appearance="outline"
+                          (click)="copyParams(row)"
+                        >
+                          {{ copiedRowId() === row.id ? 'Скопировано' : 'Скопировать' }}
+                        </button>
+                        <button
+                          tuiButton
+                          type="button"
+                          size="xs"
+                          appearance="secondary"
+                          (click)="onApply(row)"
+                        >
+                          Применить
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  </div>
+</section>

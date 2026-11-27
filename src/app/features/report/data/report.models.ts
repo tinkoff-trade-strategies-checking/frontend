@@ -169,6 +169,12 @@ export interface ReportRoundTrip {
   readonly netPnlRub: number;
 }
 
+/** Ряд цен закрытия свечей бумаги для расчёта матрицы корреляций. */
+export interface ReportPaperCandleSeries {
+  readonly paperId: string;
+  readonly closes: readonly number[];
+}
+
 export interface SessionReport {
   readonly sessionId: string;
   readonly blind: boolean;
@@ -194,6 +200,8 @@ export interface SessionReport {
   readonly fills: readonly ReportFill[];
   /** Закрытые сделки; у заглушек не задано. */
   readonly roundTrips?: readonly ReportRoundTrip[];
+  /** Ряды цен закрытия по бумагам (если переданы отчётом) для матрицы корреляций. */
+  readonly paperCandles?: readonly ReportPaperCandleSeries[];
 }
 
 export type SessionReportResult =

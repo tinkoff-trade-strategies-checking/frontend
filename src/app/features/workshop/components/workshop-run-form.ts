@@ -80,6 +80,7 @@ export class WorkshopRunForm implements OnInit {
   private papersLoadSeq = 0;
 
   readonly algorithm = input.required<WorkshopAlgorithmDetail>();
+  readonly initialParams = input<Readonly<Record<string, number>> | null>(null);
   readonly closed = output<void>();
 
   protected readonly loading = signal(false);
@@ -190,6 +191,7 @@ export class WorkshopRunForm implements OnInit {
   constructor() {
     effect(() => {
       const algo = this.algorithm();
+      const preset = this.initialParams();
       untracked(() => {
         const versions = algo.versions.filter((v) => v.version > 0);
         const defaultNum =
@@ -199,6 +201,7 @@ export class WorkshopRunForm implements OnInit {
         this.selectedVersionNumber.set(defaultNum);
         this.syncParamsFromVersion(
           versions.find((v) => v.version === defaultNum) ?? versions[0] ?? null,
+          preset,
         );
       });
     });
@@ -429,10 +432,14 @@ export class WorkshopRunForm implements OnInit {
     }
   }
 
-  private syncParamsFromVersion(version: WorkshopAlgorithmVersion | null): void {
+  private syncParamsFromVersion(
+    version: WorkshopAlgorithmVersion | null,
+    overrides: Readonly<Record<string, number>> | null = null,
+  ): void {
     const next: Record<string, number | null> = {};
     for (const param of version?.params ?? []) {
-      next[param.name] = param.defaultValue;
+      const overrideVal = overrides?.[param.name];
+      next[param.name] = overrideVal !== undefined ? overrideVal : param.defaultValue;
     }
     this.paramValues.set(next);
   }

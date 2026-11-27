@@ -1,0 +1,138 @@
+<section
+  class="panel risk-panel"
+  aria-label="Риск-аналитика портфеля"
+  data-testid="report-risk-panel"
+>
+  <div class="panel-header">
+    <div>
+      <h2 class="tui-text_h6">Риск-аналитика портфеля</h2>
+      <span class="tui-text_body-xs muted">
+        Исторические оценки по {{ risk().sampleSize }} шаговым доходностям
+        @if (risk().lowSample && risk().sampleSize > 0) {
+          · малая выборка
+        }
+      </span>
+    </div>
+  </div>
+
+  <div class="risk-cards-grid">
+    <div class="risk-card" data-testid="risk-var95">
+      <span class="tui-text_body-xs muted risk-label">
+        VaR (95%)
+        <app-term-hint
+          term="VaR (95%)"
+          text="Value at Risk — оценка максимального дневного убытка портфеля, который не превышается в 95 % исторических шагов."
+        />
+      </span>
+      <strong
+        class="tui-text_h5 num"
+        [class.neg]="risk().var95Pct !== null && risk().var95Pct! < -0.005"
+      >
+        {{ formatPct(risk().var95Pct, true) }}
+      </strong>
+      <span class="tui-text_body-xs muted">5-й процентиль доходностей</span>
+    </div>
+
+    <div class="risk-card" data-testid="risk-cvar95">
+      <span class="tui-text_body-xs muted risk-label">
+        CVaR (95%)
+        <app-term-hint
+          term="CVaR (Expected Shortfall)"
+          text="Средний убыток в 5 % худших дней (хвостовой риск) — показывает глубину самых тяжёлых просадок."
+        />
+      </span>
+      <strong
+        class="tui-text_h5 num"
+        [class.neg]="risk().cvar95Pct !== null && risk().cvar95Pct! < -0.005"
+      >
+        {{ formatPct(risk().cvar95Pct, true) }}
+      </strong>
+      <span class="tui-text_body-xs muted">Expected Shortfall</span>
+    </div>
+
+    <div class="risk-card" data-testid="risk-beta">
+      <span class="tui-text_body-xs muted risk-label">
+        Бета к IMOEX
+        <app-term-hint
+          term="Бета к IMOEX"
+          text="Чувствительность портфеля к движению индекса IMOEX: β = 1 — вровень с рынком, β > 1 — более резкие колебания, β < 1 — спокойнее рынка."
+        />
+      </span>
+      <strong class="tui-text_h5 num">{{ formatRatio(risk().betaToImoex) }}</strong>
+      <span class="tui-text_body-xs muted">
+        @if (risk().betaToImoex === null) {
+          Нет данных бенчмарка IMOEX
+        } @else {
+          Cov(Rp, Rm) / Var(Rm)
+        }
+      </span>
+    </div>
+
+    <div class="risk-card" data-testid="risk-corr">
+      <span class="tui-text_body-xs muted risk-label">
+        Корреляция с IMOEX
+        <app-term-hint
+          term="Корреляция с IMOEX"
+          text="Линейная связь доходностей портфеля и индекса IMOEX от −1 (противоположно) до +1 (синхронно)."
+        />
+      </span>
+      <strong class="tui-text_h5 num">{{ formatRatio(risk().correlationToImoex) }}</strong>
+      <span class="tui-text_body-xs muted">
+        @if (risk().correlationToImoex === null) {
+          Нет данных бенчмарка IMOEX
+        } @else {
+          Коэффициент Пирсона r
+        }
+      </span>
+    </div>
+  </div>
+
+  @if (correlationMatrix(); as matrix) {
+    <div class="corr-section" data-testid="risk-correlation-matrix">
+      <div class="corr-head">
+        <h3 class="tui-text_body-m subheading">
+          Матрица корреляций бумаг
+          <app-term-hint
+            term="Корреляция бумаг"
+            text="Показывает, насколько синхронно менялись цены закрытия бумаг в портфеле: близко к +1 — двигались вместе, ближе к 0 или ниже — лучше диверсификация."
+          />
+        </h3>
+        @if (matrix.truncatedCount > 0) {
+          <span class="tui-text_body-xs muted">
+            Показаны первые {{ maxPapers }} из {{ matrix.totalPapers }} бумаг
+          </span>
+        }
+      </div>
+
+      <div class="corr-scroll">
+        <table class="corr-table">
+          <thead>
+            <tr>
+              <th aria-label="Бумага"></th>
+              @for (label of matrix.labels; track label) {
+                <th scope="col" class="num">{{ label }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (rowLabel of matrix.labels; track rowLabel; let i = $index) {
+              <tr>
+                <th scope="row" class="row-label">{{ rowLabel }}</th>
+                @for (val of matrix.values[i]; track $index; let j = $index) {
+                  <td
+                    class="num corr-cell"
+                    [class.diag]="i === j"
+                    [style.background]="cellBackground(val, i === j)"
+                    [attr.title]="rowLabel + ' × ' + matrix.labels[j] + ': ' + formatRatio(val)"
+                  >
+                    {{ formatRatio(val) }}
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</section>
