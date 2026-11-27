@@ -443,4 +443,148 @@ describe('HttpInstrumentsApi', () => {
       cashflowsCount: 2,
     });
   });
+
+  it('загружает скринер акций и календарь событий с фильтрами', async () => {
+    const screenerPromise = api.listScreenerPapers();
+    const screenerReq = http.expectOne('/api/v1/instruments/screener');
+    expect(screenerReq.request.method).toBe('GET');
+    screenerReq.flush([
+      {
+        ticker: 'SBER',
+        name: 'Сбербанк',
+        sector: 'Финансы',
+        marketCapRub: '6650000000000.00',
+        peRatio: '4.20',
+        pbRatio: '0.95',
+        psRatio: '2.10',
+        evEbitda: null,
+        roe: '24.10',
+        netMargin: '36.50',
+        debtToEquity: '0.35',
+        dividendYield: '11.45',
+        beta: '0.96',
+        hasFundamentals: true,
+      },
+      {
+        ticker: 'ABRD',
+        name: 'Абрау-Дюрсо',
+        sector: 'Потребительский',
+        marketCapRub: null,
+        peRatio: null,
+        pbRatio: null,
+        psRatio: null,
+        evEbitda: null,
+        roe: null,
+        netMargin: null,
+        debtToEquity: null,
+        dividendYield: null,
+        beta: null,
+        hasFundamentals: false,
+      },
+    ]);
+
+    const papers = await screenerPromise;
+    expect(papers).toHaveLength(2);
+    expect(papers[0]).toMatchObject({
+      ticker: 'SBER',
+      peRatio: 4.2,
+      roe: 24.1,
+      evEbitda: null,
+      dividendYield: 11.45,
+      hasFundamentals: true,
+    });
+    expect(papers[1]).toMatchObject({
+      ticker: 'ABRD',
+      peRatio: null,
+      hasFundamentals: false,
+    });
+
+    const eventsPromise = api.listMarketEvents('EARNINGS', 'sber');
+    const eventsReq = http.expectOne('/api/v1/instruments/events?type=EARNINGS&ticker=SBER');
+    expect(eventsReq.request.method).toBe('GET');
+    eventsReq.flush([
+      {
+        id: 10,
+        eventDate: '2026-12-11',
+        eventType: 'EARNINGS',
+        ticker: 'SBER',
+        title: 'Отчёт Сбербанка за 11 мес.',
+        importance: 'HIGH',
+        description: 'Сокращённые результаты по РПБУ.',
+      },
+    ]);
+
+    const events = await eventsPromise;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      id: 10,
+      eventType: 'EARNINGS',
+      ticker: 'SBER',
+      importance: 'HIGH',
+    });
+  });
+
+  it('выполняет CRUD алертов через GET/POST/DELETE /api/v1/alerts', async () => {
+    const listPromise = api.listAlerts();
+    const listReq = http.expectOne('/api/v1/alerts');
+    expect(listReq.request.method).toBe('GET');
+    listReq.flush([
+      {
+        id: '019a-alert-1',
+        ticker: 'SBER',
+        conditionType: 'PRICE_ABOVE',
+        thresholdValue: '310.00',
+        active: true,
+        note: 'Пробой уровня',
+        createdAt: '2026-11-27T10:00:00Z',
+      },
+    ]);
+
+    const alerts = await listPromise;
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      id: '019a-alert-1',
+      ticker: 'SBER',
+      conditionType: 'PRICE_ABOVE',
+      thresholdValue: 310,
+    });
+
+    const createPromise = api.createAlert({
+      ticker: 'lkoh',
+      conditionType: 'RSI_BELOW',
+      thresholdValue: 30,
+      note: 'Перепроданность',
+    });
+    const createReq = http.expectOne('/api/v1/alerts');
+    expect(createReq.request.method).toBe('POST');
+    expect(createReq.request.body).toEqual({
+      ticker: 'LKOH',
+      conditionType: 'RSI_BELOW',
+      thresholdValue: '30.00',
+      note: 'Перепроданность',
+    });
+    createReq.flush({
+      id: '019a-alert-2',
+      ticker: 'LKOH',
+      conditionType: 'RSI_BELOW',
+      thresholdValue: '30.00',
+      active: true,
+      note: 'Перепроданность',
+      createdAt: '2026-11-27T12:00:00Z',
+    });
+
+    const created = await createPromise;
+    expect(created).toMatchObject({
+      id: '019a-alert-2',
+      ticker: 'LKOH',
+      conditionType: 'RSI_BELOW',
+      thresholdValue: 30,
+    });
+
+    const deletePromise = api.deleteAlert('019a-alert-2');
+    const deleteReq = http.expectOne('/api/v1/alerts/019a-alert-2');
+    expect(deleteReq.request.method).toBe('DELETE');
+    deleteReq.flush(null, { status: 204, statusText: 'No Content' });
+    await deletePromise;
+  });
 });

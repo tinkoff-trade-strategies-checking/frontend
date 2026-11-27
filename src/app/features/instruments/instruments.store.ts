@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import {
   BondCalculation,
   BondSummary,
+  CreatePriceAlertParams,
   DcaCalculation,
   DcaCashflowItem,
   DividendEventSummary,
@@ -13,13 +14,21 @@ import {
   FuturesDirection,
   FuturesSummary,
   INSTRUMENTS_API,
+  MarketEventFilter,
+  MarketEventSummary,
   OptionGreeksCalculation,
   OptionSummary,
+  PriceAlert,
+  ScreenerPaper,
+  ScreenerPreset,
+  ScreenerSortField,
+  SortDirection,
   TaxAccountType,
   TaxCalculation,
 } from './data/instruments.models';
 
-export type InstrumentsTab = 'bonds' | 'etfs' | 'futures' | 'options' | 'dividends' | 'tax_dca';
+export type InstrumentsTab =
+  'bonds' | 'etfs' | 'futures' | 'options' | 'dividends' | 'tax_dca' | 'screener' | 'events_alerts';
 export type BondFilter = 'all' | 'ofz' | 'corporate' | 'amortized';
 export type EtfFilter = EtfFilterGroup;
 export type FuturesFilter = 'all' | 'cash' | 'delivery';
@@ -45,6 +54,9 @@ export class InstrumentsStore {
   readonly futures = signal<readonly FuturesSummary[]>([]);
   readonly options = signal<readonly OptionSummary[]>([]);
   readonly dividends = signal<readonly DividendEventSummary[]>([]);
+  readonly screenerPapers = signal<readonly ScreenerPaper[]>([]);
+  readonly marketEvents = signal<readonly MarketEventSummary[]>([]);
+  readonly alerts = signal<readonly PriceAlert[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
@@ -61,6 +73,26 @@ export class InstrumentsStore {
   readonly optionQuery = signal('');
 
   readonly dividendQuery = signal('');
+
+  // Screener state
+  readonly screenerQuery = signal('');
+  readonly screenerSector = signal<string>('all');
+  readonly screenerPreset = signal<ScreenerPreset>('all');
+  readonly screenerMaxPe = signal<number | null>(null);
+  readonly screenerMinRoe = signal<number | null>(null);
+  readonly screenerMinDivYield = signal<number | null>(null);
+  readonly screenerSortField = signal<ScreenerSortField>('marketCapRub');
+  readonly screenerSortDir = signal<SortDirection>('desc');
+  readonly screenerVisibleLimit = signal<number>(50);
+  readonly selectedScreenerTicker = signal<string | null>(null);
+
+  // Market events & alerts state
+  readonly eventFilter = signal<MarketEventFilter>('all');
+  readonly eventQuery = signal('');
+  readonly alertDraftTicker = signal('SBER');
+  readonly alertSaving = signal(false);
+  readonly alertDeletingId = signal<string | null>(null);
+  readonly alertError = signal<string | null>(null);
 
   // Bond YTM calculator state
   readonly selectedBondTicker = signal<string | null>(null);
@@ -258,22 +290,141 @@ export class InstrumentsStore {
     return this.dividends().find((d) => d.id === id) ?? null;
   });
 
+  readonly screenerSectors = computed<readonly string[]>(() => {
+    const set = new Set<string>();
+    for (const paper of this.screenerPapers()) {
+      if (paper.sector) {
+        set.add(paper.sector);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+  });
+
+  readonly filteredScreenerPapers = computed<readonly ScreenerPaper[]>(() => {
+    const query = this.screenerQuery().trim().toLowerCase();
+    const sector = this.screenerSector();
+    const preset = this.screenerPreset();
+    const maxPe = this.screenerMaxPe();
+    const minRoe = this.screenerMinRoe();
+    const minDivYield = this.screenerMinDivYield();
+    const sortField = this.screenerSortField();
+    const sortDir = this.screenerSortDir();
+
+    const filtered = this.screenerPapers().filter((paper) => {
+      if (sector !== 'all' && paper.sector !== sector) {
+        return false;
+      }
+      if (
+        preset === 'dividend_gt_10' &&
+        !(paper.dividendYield !== null && paper.dividendYield > 10)
+      ) {
+        return false;
+      }
+      if (
+        preset === 'undervalued_pe_lt_6' &&
+        !(paper.peRatio !== null && paper.peRatio > 0 && paper.peRatio < 6)
+      ) {
+        return false;
+      }
+      if (preset === 'high_roe_gt_20' && !(paper.roe !== null && paper.roe > 20)) {
+        return false;
+      }
+      if (
+        preset === 'low_debt_lt_0_5' &&
+        !(paper.debtToEquity !== null && paper.debtToEquity < 0.5)
+      ) {
+        return false;
+      }
+      if (preset === 'with_fundamentals' && !paper.hasFundamentals) {
+        return false;
+      }
+      if (
+        maxPe !== null &&
+        !(paper.peRatio !== null && paper.peRatio > 0 && paper.peRatio <= maxPe)
+      ) {
+        return false;
+      }
+      if (minRoe !== null && !(paper.roe !== null && paper.roe >= minRoe)) {
+        return false;
+      }
+      if (
+        minDivYield !== null &&
+        !(paper.dividendYield !== null && paper.dividendYield >= minDivYield)
+      ) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return (
+        paper.ticker.toLowerCase().includes(query) ||
+        paper.name.toLowerCase().includes(query) ||
+        paper.sector.toLowerCase().includes(query)
+      );
+    });
+
+    const factor = sortDir === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => compareScreenerPapers(a, b, sortField, factor));
+  });
+
+  readonly visibleScreenerPapers = computed<readonly ScreenerPaper[]>(() =>
+    this.filteredScreenerPapers().slice(0, this.screenerVisibleLimit()),
+  );
+
+  readonly selectedScreenerPaper = computed<ScreenerPaper | null>(() => {
+    const ticker = this.selectedScreenerTicker();
+    if (!ticker) {
+      return null;
+    }
+    return this.screenerPapers().find((p) => p.ticker === ticker) ?? null;
+  });
+
+  readonly filteredMarketEvents = computed<readonly MarketEventSummary[]>(() => {
+    const filter = this.eventFilter();
+    const query = this.eventQuery().trim().toLowerCase();
+    return this.marketEvents().filter((ev) => {
+      if (filter !== 'all' && ev.eventType !== filter) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      return (
+        ev.title.toLowerCase().includes(query) ||
+        ev.description.toLowerCase().includes(query) ||
+        (ev.ticker ?? '').toLowerCase().includes(query)
+      );
+    });
+  });
+
   async init(): Promise<void> {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const [bonds, etfs, futures, options, dividends] = await Promise.all([
-        this.api.listBonds(),
-        this.api.listEtfs(),
-        this.api.listFutures(),
-        this.api.listOptions(),
-        this.api.listDividends(),
-      ]);
+      const [bonds, etfs, futures, options, dividends, screenerPapers, marketEvents, alerts] =
+        await Promise.all([
+          this.api.listBonds(),
+          this.api.listEtfs(),
+          this.api.listFutures(),
+          this.api.listOptions(),
+          this.api.listDividends(),
+          this.api.listScreenerPapers(),
+          this.api.listMarketEvents(),
+          this.api.listAlerts().catch(() => [] as readonly PriceAlert[]),
+        ]);
       this.bonds.set(bonds);
       this.etfs.set(etfs);
       this.futures.set(futures);
       this.options.set(options);
       this.dividends.set(dividends);
+      this.screenerPapers.set(screenerPapers);
+      this.marketEvents.set(marketEvents);
+      this.alerts.set(alerts);
+
+      if (screenerPapers.length > 0 && !this.selectedScreenerTicker()) {
+        const preferred = screenerPapers.find((p) => p.hasFundamentals) ?? screenerPapers[0];
+        this.selectedScreenerTicker.set(preferred.ticker);
+      }
 
       const initCalcs: Promise<void>[] = [];
       if (bonds.length > 0 && !this.selectedBondTicker()) {
@@ -538,6 +689,87 @@ export class InstrumentsStore {
     await this.recalculateDca();
   }
 
+  applyScreenerPreset(preset: ScreenerPreset): void {
+    this.screenerPreset.set(preset);
+    this.screenerVisibleLimit.set(50);
+  }
+
+  toggleScreenerSort(field: ScreenerSortField): void {
+    if (this.screenerSortField() === field) {
+      this.screenerSortDir.set(this.screenerSortDir() === 'asc' ? 'desc' : 'asc');
+      return;
+    }
+    this.screenerSortField.set(field);
+    const ascDefault =
+      field === 'ticker' ||
+      field === 'name' ||
+      field === 'sector' ||
+      field === 'peRatio' ||
+      field === 'pbRatio' ||
+      field === 'debtToEquity';
+    this.screenerSortDir.set(ascDefault ? 'asc' : 'desc');
+  }
+
+  resetScreenerFilters(): void {
+    this.screenerQuery.set('');
+    this.screenerSector.set('all');
+    this.screenerPreset.set('all');
+    this.screenerMaxPe.set(null);
+    this.screenerMinRoe.set(null);
+    this.screenerMinDivYield.set(null);
+    this.screenerVisibleLimit.set(50);
+  }
+
+  selectScreenerPaper(paper: ScreenerPaper): void {
+    this.selectedScreenerTicker.set(paper.ticker);
+  }
+
+  showMoreScreenerPapers(): void {
+    this.screenerVisibleLimit.update((limit) => limit + 50);
+  }
+
+  showAllScreenerPapers(): void {
+    this.screenerVisibleLimit.set(Math.max(50, this.filteredScreenerPapers().length));
+  }
+
+  openAlertForTicker(ticker: string): void {
+    this.alertDraftTicker.set(ticker.trim().toUpperCase());
+    this.activeTab.set('events_alerts');
+  }
+
+  async createAlert(params: CreatePriceAlertParams): Promise<boolean> {
+    this.alertSaving.set(true);
+    this.alertError.set(null);
+    try {
+      const created = await this.api.createAlert(params);
+      this.alerts.update((list) => [created, ...list]);
+      return true;
+    } catch (err: unknown) {
+      const status = (err as { readonly status?: number } | null)?.status;
+      if (status === 409) {
+        this.alertError.set('Достигнут лимит 50 активных алертов. Удалите ненужный и повторите.');
+      } else {
+        this.alertError.set('Не удалось создать алерт. Проверьте параметры и попробуйте снова.');
+      }
+      return false;
+    } finally {
+      this.alertSaving.set(false);
+    }
+  }
+
+  async deleteAlert(id: string): Promise<void> {
+    this.alertDeletingId.set(id);
+    this.alertError.set(null);
+    try {
+      await this.api.deleteAlert(id);
+      this.alerts.update((list) => list.filter((item) => item.id !== id));
+    } catch {
+      this.alertError.set('Не удалось удалить алерт. Попробуйте ещё раз.');
+    } finally {
+      this.alertDeletingId.set(null);
+    }
+  }
+
   private async recalculate(ticker: string, pricePct: number): Promise<void> {
     const reqId = ++this.calcRequestId;
     this.calcLoading.set(true);
@@ -705,4 +937,30 @@ function addMonthsIso(isoDate: string, months: number): string {
   }
   const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + months, Number(match[3])));
   return d.toISOString().slice(0, 10);
+}
+
+function compareScreenerPapers(
+  a: ScreenerPaper,
+  b: ScreenerPaper,
+  field: ScreenerSortField,
+  factor: 1 | -1,
+): number {
+  if (field === 'ticker' || field === 'name' || field === 'sector') {
+    return a[field].localeCompare(b[field], 'ru') * factor;
+  }
+  const av = a[field];
+  const bv = b[field];
+  if (av === null && bv === null) {
+    return a.ticker.localeCompare(b.ticker);
+  }
+  if (av === null) {
+    return 1;
+  }
+  if (bv === null) {
+    return -1;
+  }
+  if (av === bv) {
+    return a.ticker.localeCompare(b.ticker);
+  }
+  return (av - bv) * factor;
 }

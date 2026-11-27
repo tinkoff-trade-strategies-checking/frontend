@@ -9,9 +9,12 @@ import { DcaXirrCalculator } from './components/dca-xirr-calculator';
 import { DividendCalculator } from './components/dividend-calculator';
 import { FuturesCalculator } from './components/futures-calculator';
 import { OptionGreeksCalculator } from './components/option-greeks-calculator';
+import { ScreenerPanel } from './components/screener-panel';
 import { TaxIisCalculator } from './components/tax-iis-calculator';
+import { AlertsPanel } from './components/alerts-panel';
 import {
   BondSummary,
+  CreatePriceAlertParams,
   DcaCashflowItem,
   DividendEventSummary,
   DividendTaxRate,
@@ -20,7 +23,15 @@ import {
   FuturesDirection,
   FuturesSummary,
   INSTRUMENTS_API,
+  MARKET_EVENT_FILTER_LABELS,
+  MARKET_EVENT_IMPORTANCE_LABELS,
+  MARKET_EVENT_TYPE_LABELS,
+  MarketEventFilter,
+  MarketEventImportance,
   OptionSummary,
+  ScreenerPaper,
+  ScreenerPreset,
+  ScreenerSortField,
   TaxAccountType,
 } from './data/instruments.models';
 import {
@@ -46,6 +57,16 @@ const TAB_ORDER: readonly InstrumentsTab[] = [
   'options',
   'dividends',
   'tax_dca',
+  'screener',
+  'events_alerts',
+];
+
+const EVENT_FILTERS: readonly { readonly id: MarketEventFilter; readonly label: string }[] = [
+  { id: 'all', label: MARKET_EVENT_FILTER_LABELS.all },
+  { id: 'CBR_RATE', label: MARKET_EVENT_FILTER_LABELS.CBR_RATE },
+  { id: 'EARNINGS', label: MARKET_EVENT_FILTER_LABELS.EARNINGS },
+  { id: 'DIVIDEND', label: MARKET_EVENT_FILTER_LABELS.DIVIDEND },
+  { id: 'MACRO', label: MARKET_EVENT_FILTER_LABELS.MACRO },
 ];
 
 const BOND_FILTERS: readonly { readonly id: BondFilter; readonly label: string }[] = [
@@ -92,6 +113,8 @@ const OPTION_FILTERS: readonly { readonly id: OptionFilter; readonly label: stri
     DividendCalculator,
     TaxIisCalculator,
     DcaXirrCalculator,
+    ScreenerPanel,
+    AlertsPanel,
   ],
   providers: [{ provide: INSTRUMENTS_API, useClass: INSTRUMENTS_API_IMPL }, InstrumentsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -105,7 +128,10 @@ export class InstrumentsPage implements OnInit {
   protected readonly etfFilters = ETF_FILTERS;
   protected readonly futuresFilters = FUTURES_FILTERS;
   protected readonly optionFilters = OPTION_FILTERS;
+  protected readonly eventFilters = EVENT_FILTERS;
   protected readonly etfCategoryLabels = ETF_CATEGORY_LABELS;
+  protected readonly eventTypeLabels = MARKET_EVENT_TYPE_LABELS;
+  protected readonly eventImportanceLabels = MARKET_EVENT_IMPORTANCE_LABELS;
 
   protected readonly formatRub = formatRub;
   protected readonly formatPct = formatPct;
@@ -248,6 +274,46 @@ export class InstrumentsPage implements OnInit {
 
   protected onResetDcaParams(): void {
     void this.store.resetDcaParams();
+  }
+
+  protected onScreenerPresetChange(preset: ScreenerPreset): void {
+    this.store.applyScreenerPreset(preset);
+  }
+
+  protected onScreenerSortToggle(field: ScreenerSortField): void {
+    this.store.toggleScreenerSort(field);
+  }
+
+  protected onResetScreenerFilters(): void {
+    this.store.resetScreenerFilters();
+  }
+
+  protected onSelectScreenerPaper(paper: ScreenerPaper): void {
+    this.store.selectScreenerPaper(paper);
+  }
+
+  protected onOpenAlertForTicker(ticker: string): void {
+    this.store.openAlertForTicker(ticker);
+  }
+
+  protected onCreateAlert(params: CreatePriceAlertParams): void {
+    void this.store.createAlert(params);
+  }
+
+  protected onDeleteAlert(id: string): void {
+    void this.store.deleteAlert(id);
+  }
+
+  protected eventImportanceAppearance(
+    importance: MarketEventImportance,
+  ): 'negative' | 'warning' | 'neutral' {
+    if (importance === 'HIGH') {
+      return 'negative';
+    }
+    if (importance === 'MEDIUM') {
+      return 'warning';
+    }
+    return 'neutral';
   }
 
   protected retry(): void {

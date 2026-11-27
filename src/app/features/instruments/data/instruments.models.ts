@@ -18,6 +18,80 @@ export type DividendTaxRate = 13 | 15;
 
 export type TaxAccountType = 'BROKERAGE' | 'IIS_A' | 'IIS_B' | 'IIS_3';
 
+export type ScreenerPreset =
+  | 'all'
+  | 'dividend_gt_10'
+  | 'undervalued_pe_lt_6'
+  | 'high_roe_gt_20'
+  | 'low_debt_lt_0_5'
+  | 'with_fundamentals';
+
+export type ScreenerSortField =
+  | 'ticker'
+  | 'name'
+  | 'sector'
+  | 'marketCapRub'
+  | 'peRatio'
+  | 'pbRatio'
+  | 'roe'
+  | 'dividendYield'
+  | 'debtToEquity'
+  | 'beta';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface ScreenerPaper {
+  readonly ticker: string;
+  readonly name: string;
+  readonly sector: string;
+  readonly marketCapRub: number | null;
+  readonly peRatio: number | null;
+  readonly pbRatio: number | null;
+  readonly psRatio: number | null;
+  readonly evEbitda: number | null;
+  readonly roe: number | null;
+  readonly netMargin: number | null;
+  readonly debtToEquity: number | null;
+  readonly dividendYield: number | null;
+  readonly beta: number | null;
+  readonly hasFundamentals: boolean;
+}
+
+export type MarketEventType = 'CBR_RATE' | 'EARNINGS' | 'DIVIDEND' | 'MACRO';
+
+export type MarketEventFilter = 'all' | MarketEventType;
+
+export type MarketEventImportance = 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface MarketEventSummary {
+  readonly id: number;
+  readonly eventDate: string;
+  readonly eventType: MarketEventType;
+  readonly ticker: string | null;
+  readonly title: string;
+  readonly importance: MarketEventImportance;
+  readonly description: string;
+}
+
+export type PriceAlertConditionType = 'PRICE_ABOVE' | 'PRICE_BELOW' | 'RSI_BELOW' | 'RSI_ABOVE';
+
+export interface CreatePriceAlertParams {
+  readonly ticker: string;
+  readonly conditionType: PriceAlertConditionType;
+  readonly thresholdValue: number;
+  readonly note?: string | null;
+}
+
+export interface PriceAlert {
+  readonly id: string;
+  readonly ticker: string;
+  readonly conditionType: PriceAlertConditionType;
+  readonly thresholdValue: number;
+  readonly active: boolean;
+  readonly note: string | null;
+  readonly createdAt: string;
+}
+
 export interface DividendEventSummary {
   readonly id: number;
   readonly ticker: string;
@@ -241,9 +315,51 @@ export interface InstrumentsApi {
   ): Promise<DividendPayoutCalculation>;
   calculateTax(params: TaxCalcParams): Promise<TaxCalculation>;
   calculateDca(params: DcaCalcParams): Promise<DcaCalculation>;
+  listScreenerPapers(): Promise<readonly ScreenerPaper[]>;
+  listMarketEvents(type?: MarketEventType, ticker?: string): Promise<readonly MarketEventSummary[]>;
+  listAlerts(): Promise<readonly PriceAlert[]>;
+  createAlert(params: CreatePriceAlertParams): Promise<PriceAlert>;
+  deleteAlert(id: string): Promise<void>;
 }
 
 export const INSTRUMENTS_API = new InjectionToken<InstrumentsApi>('INSTRUMENTS_API');
+
+export const SCREENER_PRESET_LABELS: Readonly<Record<ScreenerPreset, string>> = {
+  all: 'Все бумаги',
+  dividend_gt_10: 'Дивидендные >10%',
+  undervalued_pe_lt_6: 'Недооценённые P/E < 6',
+  high_roe_gt_20: 'Высокий ROE > 20%',
+  low_debt_lt_0_5: 'Низкий долг D/E < 0.5',
+  with_fundamentals: 'С фундаменталом',
+};
+
+export const MARKET_EVENT_TYPE_LABELS: Readonly<Record<MarketEventType, string>> = {
+  CBR_RATE: 'ЦБ РФ',
+  EARNINGS: 'Отчёты',
+  DIVIDEND: 'Дивиденды',
+  MACRO: 'Макро',
+};
+
+export const MARKET_EVENT_FILTER_LABELS: Readonly<Record<MarketEventFilter, string>> = {
+  all: 'Все',
+  CBR_RATE: 'ЦБ РФ',
+  EARNINGS: 'Отчёты',
+  DIVIDEND: 'Дивиденды',
+  MACRO: 'Макро',
+};
+
+export const MARKET_EVENT_IMPORTANCE_LABELS: Readonly<Record<MarketEventImportance, string>> = {
+  HIGH: 'Высокая',
+  MEDIUM: 'Средняя',
+  LOW: 'Низкая',
+};
+
+export const ALERT_CONDITION_LABELS: Readonly<Record<PriceAlertConditionType, string>> = {
+  PRICE_ABOVE: 'Цена выше',
+  PRICE_BELOW: 'Цена ниже',
+  RSI_BELOW: 'RSI ниже',
+  RSI_ABOVE: 'RSI выше',
+};
 
 export const TAX_ACCOUNT_TYPE_LABELS: Readonly<Record<TaxAccountType, string>> = {
   BROKERAGE: 'Брокерский счёт',

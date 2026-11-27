@@ -4,7 +4,7 @@
       <h1 class="tui-text_h3">Инструменты</h1>
       <p class="tui-text_body-m muted">
         Справочник облигаций, БПИФ / ETF, срочного рынка ФОРТС, дивидендных отсечек (T+1), налогов
-        (ИИС) и доходности DCA / XIRR с серверными калькуляторами.
+        (ИИС), скринера акций MOEX, календаря событий и персональных алертов.
       </p>
     </div>
 
@@ -24,6 +24,12 @@
         Дивиденды (T+1) ({{ store.dividends().length }})
       </button>
       <button id="tab-tax-dca" type="button">Налоги (ИИС) и DCA</button>
+      <button id="tab-screener" type="button">
+        Скринер акций ({{ store.screenerPapers().length }})
+      </button>
+      <button id="tab-events-alerts" type="button">
+        События и Алерты ({{ store.alerts().length }})
+      </button>
     </tui-segmented>
   </header>
 
@@ -733,7 +739,7 @@
         />
       </aside>
     </div>
-  } @else {
+  } @else if (store.activeTab() === 'tax_dca') {
     <div class="tax-dca-layout">
       <app-tax-iis-calculator
         [accountType]="store.taxAccountType()"
@@ -766,6 +772,145 @@
         (finalDateChange)="onDcaFinalDateChange($event)"
         (resetParams)="onResetDcaParams()"
       />
+    </div>
+  } @else if (store.activeTab() === 'screener') {
+    <app-screener-panel
+      [papers]="store.visibleScreenerPapers()"
+      [totalCount]="store.screenerPapers().length"
+      [filteredCount]="store.filteredScreenerPapers().length"
+      [sectors]="store.screenerSectors()"
+      [query]="store.screenerQuery()"
+      [sector]="store.screenerSector()"
+      [activePreset]="store.screenerPreset()"
+      [maxPe]="store.screenerMaxPe()"
+      [minRoe]="store.screenerMinRoe()"
+      [minDivYield]="store.screenerMinDivYield()"
+      [sortField]="store.screenerSortField()"
+      [sortDir]="store.screenerSortDir()"
+      [selectedTicker]="store.selectedScreenerTicker()"
+      [selectedPaper]="store.selectedScreenerPaper()"
+      (queryChange)="store.screenerQuery.set($event)"
+      (sectorChange)="store.screenerSector.set($event)"
+      (presetChange)="onScreenerPresetChange($event)"
+      (maxPeChange)="store.screenerMaxPe.set($event)"
+      (minRoeChange)="store.screenerMinRoe.set($event)"
+      (minDivYieldChange)="store.screenerMinDivYield.set($event)"
+      (sortToggle)="onScreenerSortToggle($event)"
+      (resetFilters)="onResetScreenerFilters()"
+      (selectPaper)="onSelectScreenerPaper($event)"
+      (showMore)="store.showMoreScreenerPapers()"
+      (showAll)="store.showAllScreenerPapers()"
+      (createAlertForTicker)="onOpenAlertForTicker($event)"
+    />
+  } @else {
+    <div class="bonds-layout">
+      <section class="panel bonds-catalog" aria-label="Календарь рыночных событий">
+        <div class="catalog-toolbar">
+          <div class="toolbar-top">
+            <h2 class="tui-text_h6 toolbar-title">
+              Календарь событий
+              <app-term-hint
+                term="Календарь событий"
+                text="Ключевые даты рынка РФ: заседания ЦБ РФ по ставке, корпоративные отчёты, дивидендные отсечки и макростатистика."
+              />
+            </h2>
+            <span class="tui-text_body-xs muted num">
+              Показано: {{ store.filteredMarketEvents().length }} из
+              {{ store.marketEvents().length }}
+            </span>
+          </div>
+
+          <div class="toolbar-controls">
+            <div class="filter-pills" role="group" aria-label="Фильтр событий">
+              @for (f of eventFilters; track f.id) {
+                <button
+                  type="button"
+                  class="filter-pill"
+                  [class.active]="store.eventFilter() === f.id"
+                  [attr.aria-pressed]="store.eventFilter() === f.id"
+                  [attr.data-event-filter]="f.id"
+                  (click)="store.eventFilter.set(f.id)"
+                >
+                  {{ f.label }}
+                </button>
+              }
+            </div>
+
+            <tui-textfield tuiTextfieldSize="s" class="search-field">
+              <input
+                id="events-search"
+                tuiInput
+                type="search"
+                placeholder="Поиск по тикеру или событию…"
+                aria-label="Поиск событий"
+                [ngModel]="store.eventQuery()"
+                (ngModelChange)="store.eventQuery.set($event ?? '')"
+              />
+            </tui-textfield>
+          </div>
+        </div>
+
+        @if (store.filteredMarketEvents().length === 0) {
+          <div class="empty-state">
+            <p class="tui-text_body-m muted">По выбранным фильтрам события не найдены.</p>
+            <button
+              tuiButton
+              type="button"
+              size="s"
+              appearance="outline"
+              (click)="store.eventFilter.set('all'); store.eventQuery.set('')"
+            >
+              Сбросить фильтры
+            </button>
+          </div>
+        } @else {
+          <div class="events-list">
+            @for (ev of store.filteredMarketEvents(); track ev.id) {
+              <article class="event-card" [attr.data-event-type]="ev.eventType">
+                <div class="event-card-top">
+                  <div class="event-badges">
+                    <span class="tui-text_body-xs mono muted">
+                      {{ formatDateRu(ev.eventDate) }}
+                    </span>
+                    <span tuiBadge size="s" appearance="info">
+                      {{ eventTypeLabels[ev.eventType] }}
+                    </span>
+                    @if (ev.ticker) {
+                      <span tuiBadge size="s" appearance="neutral" class="mono">
+                        {{ ev.ticker }}
+                      </span>
+                    }
+                  </div>
+
+                  <span
+                    tuiBadge
+                    size="s"
+                    [attr.data-event-importance]="ev.importance"
+                    [appearance]="eventImportanceAppearance(ev.importance)"
+                  >
+                    {{ eventImportanceLabels[ev.importance] }}
+                  </span>
+                </div>
+
+                <h3 class="event-title">{{ ev.title }}</h3>
+                <p class="event-desc tui-text_body-s muted">{{ ev.description }}</p>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <aside class="calculator-col">
+        <app-alerts-panel
+          [alerts]="store.alerts()"
+          [draftTicker]="store.alertDraftTicker()"
+          [saving]="store.alertSaving()"
+          [deletingId]="store.alertDeletingId()"
+          [error]="store.alertError()"
+          (createAlert)="onCreateAlert($event)"
+          (deleteAlert)="onDeleteAlert($event)"
+        />
+      </aside>
     </div>
   }
 </section>

@@ -5,6 +5,7 @@ import {
   BondCalculation,
   BondKind,
   BondSummary,
+  CreatePriceAlertParams,
   DcaCalcParams,
   DcaCalculation,
   DividendEventSummary,
@@ -18,10 +19,16 @@ import {
   FuturesSettlementType,
   FuturesSummary,
   InstrumentsApi,
+  MarketEventImportance,
+  MarketEventSummary,
+  MarketEventType,
   OptionCalcParams,
   OptionGreeksCalculation,
   OptionSummary,
   OptionType,
+  PriceAlert,
+  PriceAlertConditionType,
+  ScreenerPaper,
   TaxAccountType,
   TaxCalcParams,
   TaxCalculation,
@@ -200,12 +207,65 @@ export interface DcaCalculationDto {
   readonly cashflowsCount?: number | null;
 }
 
+export interface ScreenerPaperDto {
+  readonly ticker: string;
+  readonly name?: string | null;
+  readonly sector?: string | null;
+  readonly marketCapRub?: DecimalWire;
+  readonly peRatio?: DecimalWire;
+  readonly pbRatio?: DecimalWire;
+  readonly psRatio?: DecimalWire;
+  readonly evEbitda?: DecimalWire;
+  readonly roe?: DecimalWire;
+  readonly netMargin?: DecimalWire;
+  readonly debtToEquity?: DecimalWire;
+  readonly dividendYield?: DecimalWire;
+  readonly beta?: DecimalWire;
+  readonly hasFundamentals?: boolean | null;
+}
+
+export interface MarketEventSummaryDto {
+  readonly id?: number | null;
+  readonly eventDate?: string | null;
+  readonly eventType?: string | null;
+  readonly ticker?: string | null;
+  readonly title?: string | null;
+  readonly importance?: string | null;
+  readonly description?: string | null;
+}
+
+export interface PriceAlertDto {
+  readonly id: string;
+  readonly ticker: string;
+  readonly conditionType?: string | null;
+  readonly thresholdValue?: DecimalWire;
+  readonly active?: boolean | null;
+  readonly note?: string | null;
+  readonly createdAt?: string | null;
+}
+
 function parseDecimal(value: DecimalWire, fallback = 0): number {
   if (value === null || value === undefined || value === '') {
     return fallback;
   }
   const num = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(num) ? num : fallback;
+}
+
+function parseNullableDecimal(value: DecimalWire): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const num = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function formatThresholdDecimal(value: number): string {
+  const fixed4 = value.toFixed(4);
+  if (fixed4.endsWith('00')) {
+    return value.toFixed(2);
+  }
+  return fixed4.replace(/0+$/, '');
 }
 
 function normalizeBondKind(dto: BondSummaryDto): BondKind {
@@ -468,6 +528,78 @@ export function mapDcaCalculationDto(dto: DcaCalculationDto): DcaCalculation {
   };
 }
 
+function normalizeMarketEventType(raw: string | null | undefined): MarketEventType {
+  const upper = (raw ?? '').toUpperCase();
+  if (upper === 'CBR_RATE' || upper === 'EARNINGS' || upper === 'DIVIDEND' || upper === 'MACRO') {
+    return upper;
+  }
+  return 'MACRO';
+}
+
+function normalizeMarketEventImportance(raw: string | null | undefined): MarketEventImportance {
+  const upper = (raw ?? '').toUpperCase();
+  if (upper === 'HIGH' || upper === 'MEDIUM' || upper === 'LOW') {
+    return upper;
+  }
+  return 'MEDIUM';
+}
+
+function normalizeAlertConditionType(raw: string | null | undefined): PriceAlertConditionType {
+  const upper = (raw ?? '').toUpperCase();
+  if (
+    upper === 'PRICE_ABOVE' ||
+    upper === 'PRICE_BELOW' ||
+    upper === 'RSI_BELOW' ||
+    upper === 'RSI_ABOVE'
+  ) {
+    return upper;
+  }
+  return 'PRICE_ABOVE';
+}
+
+export function mapScreenerPaperDto(dto: ScreenerPaperDto): ScreenerPaper {
+  return {
+    ticker: dto.ticker,
+    name: dto.name ?? dto.ticker,
+    sector: dto.sector ?? 'Прочее',
+    marketCapRub: parseNullableDecimal(dto.marketCapRub),
+    peRatio: parseNullableDecimal(dto.peRatio),
+    pbRatio: parseNullableDecimal(dto.pbRatio),
+    psRatio: parseNullableDecimal(dto.psRatio),
+    evEbitda: parseNullableDecimal(dto.evEbitda),
+    roe: parseNullableDecimal(dto.roe),
+    netMargin: parseNullableDecimal(dto.netMargin),
+    debtToEquity: parseNullableDecimal(dto.debtToEquity),
+    dividendYield: parseNullableDecimal(dto.dividendYield),
+    beta: parseNullableDecimal(dto.beta),
+    hasFundamentals: Boolean(dto.hasFundamentals),
+  };
+}
+
+export function mapMarketEventDto(dto: MarketEventSummaryDto): MarketEventSummary {
+  return {
+    id: dto.id ?? 0,
+    eventDate: dto.eventDate ?? '',
+    eventType: normalizeMarketEventType(dto.eventType),
+    ticker: dto.ticker ? dto.ticker.trim().toUpperCase() : null,
+    title: dto.title ?? '',
+    importance: normalizeMarketEventImportance(dto.importance),
+    description: dto.description ?? '',
+  };
+}
+
+export function mapPriceAlertDto(dto: PriceAlertDto): PriceAlert {
+  return {
+    id: dto.id,
+    ticker: dto.ticker,
+    conditionType: normalizeAlertConditionType(dto.conditionType),
+    thresholdValue: parseDecimal(dto.thresholdValue, 0),
+    active: dto.active ?? true,
+    note: dto.note ?? null,
+    createdAt: dto.createdAt ?? '',
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class HttpInstrumentsApi implements InstrumentsApi {
   private readonly http = inject(HttpClient);
@@ -597,5 +729,52 @@ export class HttpInstrumentsApi implements InstrumentsApi {
       this.http.post<DcaCalculationDto>('/api/v1/instruments/dca/calc', body),
     );
     return mapDcaCalculationDto(res);
+  }
+
+  async listScreenerPapers(): Promise<readonly ScreenerPaper[]> {
+    const res = await firstValueFrom(
+      this.http.get<readonly ScreenerPaperDto[]>('/api/v1/instruments/screener'),
+    );
+    return (res ?? []).map(mapScreenerPaperDto);
+  }
+
+  async listMarketEvents(
+    type?: MarketEventType,
+    ticker?: string,
+  ): Promise<readonly MarketEventSummary[]> {
+    let params = new HttpParams();
+    if (type) {
+      params = params.set('type', type);
+    }
+    const trimmed = ticker?.trim().toUpperCase();
+    if (trimmed) {
+      params = params.set('ticker', trimmed);
+    }
+    const res = await firstValueFrom(
+      this.http.get<readonly MarketEventSummaryDto[]>('/api/v1/instruments/events', { params }),
+    );
+    return (res ?? []).map(mapMarketEventDto);
+  }
+
+  async listAlerts(): Promise<readonly PriceAlert[]> {
+    const res = await firstValueFrom(this.http.get<readonly PriceAlertDto[]>('/api/v1/alerts'));
+    return (res ?? []).map(mapPriceAlertDto);
+  }
+
+  async createAlert(params: CreatePriceAlertParams): Promise<PriceAlert> {
+    const trimmedNote = params.note?.trim();
+    const body = {
+      ticker: params.ticker.trim().toUpperCase(),
+      conditionType: params.conditionType,
+      thresholdValue: formatThresholdDecimal(params.thresholdValue),
+      ...(trimmedNote ? { note: trimmedNote } : {}),
+    };
+    const res = await firstValueFrom(this.http.post<PriceAlertDto>('/api/v1/alerts', body));
+    return mapPriceAlertDto(res);
+  }
+
+  async deleteAlert(id: string): Promise<void> {
+    const encoded = encodeURIComponent(id);
+    await firstValueFrom(this.http.delete<void>(`/api/v1/alerts/${encoded}`));
   }
 }

@@ -23,6 +23,16 @@ const GREEK_FORMATTER = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 4,
 });
 
+const RATIO_FORMATTER = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const COMPACT_CAP_FORMATTER = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
 export function formatRub(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '—';
@@ -90,4 +100,27 @@ export function formatDateRu(isoDate: string | null | undefined): string {
     return isoDate;
   }
   return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+export function formatRatio(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return RATIO_FORMATTER.format(value);
+}
+
+export function formatMarketCapRub(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value) || value <= 0) {
+    return '—';
+  }
+  if (value >= 1e12) {
+    return `${COMPACT_CAP_FORMATTER.format(value / 1e12)} трлн ₽`;
+  }
+  if (value >= 1e9) {
+    return `${COMPACT_CAP_FORMATTER.format(value / 1e9)} млрд ₽`;
+  }
+  if (value >= 1e6) {
+    return `${COMPACT_CAP_FORMATTER.format(value / 1e6)} млн ₽`;
+  }
+  return `${RUB_FORMATTER.format(value)} ₽`;
 }
