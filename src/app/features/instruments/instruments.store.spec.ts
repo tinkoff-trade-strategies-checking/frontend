@@ -163,4 +163,68 @@ describe('InstrumentsStore', () => {
     await store.removeDcaCashflow(0);
     expect(store.dcaCashflows().length).toBe(initialLen);
   });
+
+  it('фильтрует и сортирует скринер акций по пресетам, сектору и числовым порогам', async () => {
+    await store.init();
+    expect(store.screenerPapers().length).toBeGreaterThanOrEqual(10);
+    expect(store.screenerSectors().length).toBeGreaterThanOrEqual(3);
+
+    store.applyScreenerPreset('dividend_gt_10');
+    expect(store.filteredScreenerPapers().length).toBeGreaterThan(0);
+    expect(
+      store.filteredScreenerPapers().every((p) => p.dividendYield !== null && p.dividendYield > 10),
+    ).toBe(true);
+
+    store.applyScreenerPreset('undervalued_pe_lt_6');
+    expect(
+      store
+        .filteredScreenerPapers()
+        .every((p) => p.peRatio !== null && p.peRatio > 0 && p.peRatio < 6),
+    ).toBe(true);
+
+    store.applyScreenerPreset('high_roe_gt_20');
+    expect(store.filteredScreenerPapers().every((p) => p.roe !== null && p.roe > 20)).toBe(true);
+
+    store.applyScreenerPreset('low_debt_lt_0_5');
+    expect(
+      store.filteredScreenerPapers().every((p) => p.debtToEquity !== null && p.debtToEquity < 0.5),
+    ).toBe(true);
+
+    store.resetScreenerFilters();
+    store.screenerMaxPe.set(5);
+    expect(store.filteredScreenerPapers().every((p) => p.peRatio !== null && p.peRatio <= 5)).toBe(
+      true,
+    );
+
+    store.resetScreenerFilters();
+    store.toggleScreenerSort('peRatio');
+    const sorted = store.filteredScreenerPapers();
+    const withPe = sorted.filter((p) => p.peRatio !== null);
+    for (let i = 1; i < withPe.length; i++) {
+      expect(withPe[i].peRatio!).toBeGreaterThanOrEqual(withPe[i - 1].peRatio!);
+    }
+    expect(sorted[sorted.length - 1].peRatio).toBeNull();
+  });
+
+  it('фильтрует события календаря и создаёт/удаляет алерты', async () => {
+    await store.init();
+    expect(store.marketEvents().length).toBeGreaterThan(0);
+
+    store.eventFilter.set('CBR_RATE');
+    expect(store.filteredMarketEvents().every((e) => e.eventType === 'CBR_RATE')).toBe(true);
+
+    const beforeCount = store.alerts().length;
+    const ok = await store.createAlert({
+      ticker: 'GAZP',
+      conditionType: 'RSI_BELOW',
+      thresholdValue: 28,
+      note: 'Перепроданность',
+    });
+    expect(ok).toBe(true);
+    expect(store.alerts().length).toBe(beforeCount + 1);
+    const createdId = store.alerts()[0].id;
+
+    await store.deleteAlert(createdId);
+    expect(store.alerts().length).toBe(beforeCount);
+  });
 });

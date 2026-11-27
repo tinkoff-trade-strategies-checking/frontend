@@ -139,4 +139,28 @@ describe('StubInstrumentsApi', () => {
     expect(dca.xirrPct).toBeGreaterThan(18);
     expect(dca.cashflowsCount).toBe(4);
   });
+
+  it('возвращает бумаги скринера, события календаря и поддерживает CRUD алертов', async () => {
+    const papers = await api.listScreenerPapers();
+    expect(papers.length).toBeGreaterThanOrEqual(10);
+    expect(papers.some((p) => p.hasFundamentals)).toBe(true);
+    expect(papers.some((p) => !p.hasFundamentals)).toBe(true);
+
+    const cbrEvents = await api.listMarketEvents('CBR_RATE');
+    expect(cbrEvents.length).toBeGreaterThan(0);
+    expect(cbrEvents.every((e) => e.eventType === 'CBR_RATE')).toBe(true);
+
+    const initialAlerts = await api.listAlerts();
+    const created = await api.createAlert({
+      ticker: 'ydex',
+      conditionType: 'PRICE_BELOW',
+      thresholdValue: 3800,
+      note: 'Тестовый алерт',
+    });
+    expect(created.ticker).toBe('YDEX');
+    expect((await api.listAlerts()).length).toBe(initialAlerts.length + 1);
+
+    await api.deleteAlert(created.id);
+    expect((await api.listAlerts()).length).toBe(initialAlerts.length);
+  });
 });

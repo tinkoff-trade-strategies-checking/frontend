@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import {
   BondCalculation,
   BondSummary,
+  CreatePriceAlertParams,
   DcaCalcParams,
   DcaCalculation,
   DividendEventSummary,
@@ -12,9 +13,13 @@ import {
   FuturesCalculation,
   FuturesSummary,
   InstrumentsApi,
+  MarketEventSummary,
+  MarketEventType,
   OptionCalcParams,
   OptionGreeksCalculation,
   OptionSummary,
+  PriceAlert,
+  ScreenerPaper,
   TaxCalcParams,
   TaxCalculation,
 } from './instruments.models';
@@ -277,6 +282,8 @@ const STUB_ETFS: readonly EtfSummary[] = [
 
 @Injectable({ providedIn: 'root' })
 export class StubInstrumentsApi implements InstrumentsApi {
+  private alertsState: PriceAlert[] = [...STUB_INITIAL_ALERTS];
+  private nextAlertSeq = 3;
   async listBonds(): Promise<readonly BondSummary[]> {
     return STUB_BONDS;
   }
@@ -586,6 +593,48 @@ export class StubInstrumentsApi implements InstrumentsApi {
       holdingDays,
       cashflowsCount: flows.length,
     };
+  }
+
+  async listScreenerPapers(): Promise<readonly ScreenerPaper[]> {
+    return STUB_SCREENER_PAPERS;
+  }
+
+  async listMarketEvents(
+    type?: MarketEventType,
+    ticker?: string,
+  ): Promise<readonly MarketEventSummary[]> {
+    const normalizedTicker = ticker?.trim().toUpperCase();
+    return STUB_MARKET_EVENTS.filter((ev) => {
+      if (type && ev.eventType !== type) {
+        return false;
+      }
+      if (normalizedTicker && (ev.ticker ?? '').toUpperCase() !== normalizedTicker) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  async listAlerts(): Promise<readonly PriceAlert[]> {
+    return [...this.alertsState];
+  }
+
+  async createAlert(params: CreatePriceAlertParams): Promise<PriceAlert> {
+    const created: PriceAlert = {
+      id: `stub-alert-${this.nextAlertSeq++}`,
+      ticker: params.ticker.trim().toUpperCase(),
+      conditionType: params.conditionType,
+      thresholdValue: Number(params.thresholdValue.toFixed(4)),
+      active: true,
+      note: params.note?.trim() ? params.note.trim() : null,
+      createdAt: new Date().toISOString(),
+    };
+    this.alertsState = [created, ...this.alertsState];
+    return created;
+  }
+
+  async deleteAlert(id: string): Promise<void> {
+    this.alertsState = this.alertsState.filter((a) => a.id !== id);
   }
 }
 
@@ -947,5 +996,281 @@ const STUB_DIVIDENDS: readonly DividendEventSummary[] = [
     yieldPct: 1.12,
     estimatedGapPct: 0.97,
     currency: 'RUB',
+  },
+];
+
+const STUB_SCREENER_PAPERS: readonly ScreenerPaper[] = [
+  {
+    ticker: 'SBER',
+    name: 'Сбербанк',
+    sector: 'Финансы',
+    marketCapRub: 6_650_000_000_000,
+    peRatio: 4.2,
+    pbRatio: 0.95,
+    psRatio: 2.1,
+    evEbitda: null,
+    roe: 24.1,
+    netMargin: 36.5,
+    debtToEquity: 0.35,
+    dividendYield: 11.45,
+    beta: 0.96,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'LKOH',
+    name: 'ЛУКОЙЛ',
+    sector: 'Нефть и газ',
+    marketCapRub: 4_920_000_000_000,
+    peRatio: 4.8,
+    pbRatio: 0.78,
+    psRatio: 0.62,
+    evEbitda: 2.7,
+    roe: 18.4,
+    netMargin: 13.8,
+    debtToEquity: 0.12,
+    dividendYield: 13.2,
+    beta: 0.89,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'YDEX',
+    name: 'Яндекс',
+    sector: 'ИТ и телеком',
+    marketCapRub: 1_580_000_000_000,
+    peRatio: 14.5,
+    pbRatio: 3.9,
+    psRatio: 1.55,
+    evEbitda: 8.2,
+    roe: 26.8,
+    netMargin: 10.6,
+    debtToEquity: 0.42,
+    dividendYield: 2.1,
+    beta: 1.28,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'T',
+    name: 'Т-Технологии',
+    sector: 'Финансы',
+    marketCapRub: 840_000_000_000,
+    peRatio: 6.4,
+    pbRatio: 1.75,
+    psRatio: 1.9,
+    evEbitda: null,
+    roe: 31.2,
+    netMargin: 21.4,
+    debtToEquity: 0.55,
+    dividendYield: 1.8,
+    beta: 1.34,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'ROSN',
+    name: 'Роснефть',
+    sector: 'Нефть и газ',
+    marketCapRub: 5_410_000_000_000,
+    peRatio: 4.5,
+    pbRatio: 0.64,
+    psRatio: 0.54,
+    evEbitda: 3.4,
+    roe: 15.2,
+    netMargin: 12.1,
+    debtToEquity: 0.72,
+    dividendYield: 7.4,
+    beta: 0.92,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'GAZP',
+    name: 'Газпром',
+    sector: 'Нефть и газ',
+    marketCapRub: 3_180_000_000_000,
+    peRatio: 3.9,
+    pbRatio: 0.22,
+    psRatio: 0.38,
+    evEbitda: 3.9,
+    roe: 6.1,
+    netMargin: 8.4,
+    debtToEquity: 0.48,
+    dividendYield: 0,
+    beta: 1.15,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'TATN',
+    name: 'Татнефть',
+    sector: 'Нефть и газ',
+    marketCapRub: 1_460_000_000_000,
+    peRatio: 5.1,
+    pbRatio: 1.12,
+    psRatio: 0.85,
+    evEbitda: 3.3,
+    roe: 22.9,
+    netMargin: 17.5,
+    debtToEquity: 0.08,
+    dividendYield: 11.8,
+    beta: 0.84,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'PLZL',
+    name: 'Полюс',
+    sector: 'Металлы и добыча',
+    marketCapRub: 1_920_000_000_000,
+    peRatio: 7.6,
+    pbRatio: 4.2,
+    psRatio: 3.1,
+    evEbitda: 5.4,
+    roe: 48.5,
+    netMargin: 38.2,
+    debtToEquity: 0.88,
+    dividendYield: 8.9,
+    beta: 0.72,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'MOEX',
+    name: 'Московская Биржа',
+    sector: 'Финансы',
+    marketCapRub: 510_000_000_000,
+    peRatio: 6.8,
+    pbRatio: 2.1,
+    psRatio: 4.1,
+    evEbitda: null,
+    roe: 32.4,
+    netMargin: 56.0,
+    debtToEquity: 0.05,
+    dividendYield: 11.8,
+    beta: 0.88,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'X5',
+    name: 'ИКС 5',
+    sector: 'Потребительский',
+    marketCapRub: 890_000_000_000,
+    peRatio: 7.9,
+    pbRatio: 3.4,
+    psRatio: 0.26,
+    evEbitda: 3.8,
+    roe: 41.2,
+    netMargin: 3.1,
+    debtToEquity: 0.95,
+    dividendYield: 11.2,
+    beta: 0.79,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'MTSS',
+    name: 'МТС',
+    sector: 'ИТ и телеком',
+    marketCapRub: 465_000_000_000,
+    peRatio: 8.4,
+    pbRatio: 5.6,
+    psRatio: 0.72,
+    evEbitda: 4.2,
+    roe: 28.0,
+    netMargin: 7.5,
+    debtToEquity: 2.4,
+    dividendYield: 14.2,
+    beta: 0.68,
+    hasFundamentals: true,
+  },
+  {
+    ticker: 'ABRD',
+    name: 'Абрау-Дюрсо',
+    sector: 'Потребительский',
+    marketCapRub: null,
+    peRatio: null,
+    pbRatio: null,
+    psRatio: null,
+    evEbitda: null,
+    roe: null,
+    netMargin: null,
+    debtToEquity: null,
+    dividendYield: null,
+    beta: null,
+    hasFundamentals: false,
+  },
+];
+
+const STUB_MARKET_EVENTS: readonly MarketEventSummary[] = [
+  {
+    id: 1,
+    eventDate: '2026-12-18',
+    eventType: 'CBR_RATE',
+    ticker: null,
+    title: 'Заседание Совета директоров Банка России по ключевой ставке',
+    importance: 'HIGH',
+    description:
+      'Решение ЦБ РФ по уровню ключевой ставки и публикация обновлённого среднесрочного прогноза по инфляции.',
+  },
+  {
+    id: 2,
+    eventDate: '2026-12-09',
+    eventType: 'MACRO',
+    ticker: null,
+    title: 'Росстат: данные по недельной и месячной инфляции (ИПЦ)',
+    importance: 'MEDIUM',
+    description:
+      'Публикация индекса потребительских цен за ноябрь — ключевой ориентир перед заседанием ЦБ РФ.',
+  },
+  {
+    id: 3,
+    eventDate: '2026-12-11',
+    eventType: 'EARNINGS',
+    ticker: 'SBER',
+    title: 'Сбербанк: сокращённые результаты по РПБУ за 11 месяцев',
+    importance: 'HIGH',
+    description: 'Ежемесячный отчёт Сбера по чистой прибыли, ROE и динамике кредитного портфеля.',
+  },
+  {
+    id: 4,
+    eventDate: '2026-12-15',
+    eventType: 'DIVIDEND',
+    ticker: 'LKOH',
+    title: 'ЛУКОЙЛ: последний день покупки под промежуточные дивиденды (T+1)',
+    importance: 'HIGH',
+    description:
+      'Финальный торговый день для попадания в реестр акционеров с учётом режима расчётов T+1.',
+  },
+  {
+    id: 5,
+    eventDate: '2026-12-22',
+    eventType: 'EARNINGS',
+    ticker: 'YDEX',
+    title: 'Яндекс: операционные метрики за 4 квартал',
+    importance: 'MEDIUM',
+    description: 'Предварительные данные по темпам роста выручки e-commerce и облачных сервисов.',
+  },
+  {
+    id: 6,
+    eventDate: '2026-12-25',
+    eventType: 'MACRO',
+    ticker: null,
+    title: 'Минфин РФ: публикация графика аукционов ОФЗ на 1 квартал',
+    importance: 'LOW',
+    description: 'Плановый объём размещений государственного долга на внутреннем рынке.',
+  },
+];
+
+const STUB_INITIAL_ALERTS: readonly PriceAlert[] = [
+  {
+    id: 'stub-alert-1',
+    ticker: 'SBER',
+    conditionType: 'PRICE_ABOVE',
+    thresholdValue: 310,
+    active: true,
+    note: 'Пробой локального сопротивления',
+    createdAt: '2026-11-26T10:15:00Z',
+  },
+  {
+    id: 'stub-alert-2',
+    ticker: 'LKOH',
+    conditionType: 'RSI_BELOW',
+    thresholdValue: 30,
+    active: true,
+    note: 'Зона перепроданности перед дивидендами',
+    createdAt: '2026-11-27T08:40:00Z',
   },
 ];

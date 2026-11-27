@@ -463,6 +463,115 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Problem' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /instruments/screener:
+    get:
+      tags: [marketdata]
+      operationId: listScreenerPapers
+      summary: Серверный скринер акций MOEX с фундаментальными мультипликаторами
+      description: |
+        Возвращает все доступные акции MOEX из активного каталога с левым объединением по последнему срезу
+        `security_fundamentals` (капитализация, P/E, P/B, P/S, EV/EBITDA, ROE, чистая маржа, Debt/Equity,
+        дивидендная доходность, Beta). Числовые значения передаются десятичными строками (INV-6).
+      responses:
+        '200':
+          description: Список бумаг для скринера
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ScreenerPaper' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /instruments/events:
+    get:
+      tags: [marketdata]
+      operationId: listMarketEvents
+      summary: Календарь рыночных событий MOEX и ЦБ РФ
+      description: |
+        Возвращает календарь ключевых событий 2025–2026: заседания ЦБ РФ по ключевой ставке (`CBR_RATE`),
+        отчётности МСФО/РСБУ (`EARNINGS`), дивидендные отсечки (`DIVIDEND`) и макростатистику (`MACRO`).
+        Поддерживает фильтрацию по `type` и `ticker`.
+      parameters:
+        - name: type
+          in: query
+          required: false
+          description: 'Необязательный фильтр по типу события.'
+          schema: { $ref: '#/components/schemas/MarketEventType' }
+        - name: ticker
+          in: query
+          required: false
+          description: 'Необязательный фильтр по тикеру MOEX (например, `SBER`, `LKOH`).'
+          schema: { type: string, minLength: 1, maxLength: 32 }
+      responses:
+        '200':
+          description: Список рыночных событий, отсортированный по дате
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MarketEventSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+  /alerts:
+    get:
+      tags: [sessions]
+      operationId: listAlerts
+      summary: Список пользовательских алертов по цене и RSI
+      description: Возвращает только алерты текущего авторизованного пользователя.
+      responses:
+        '200':
+          description: Список алертов пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PriceAlertResponse' }
+        '401': { $ref: '#/components/responses/Problem' }
+    post:
+      tags: [sessions]
+      operationId: createAlert
+      summary: Создать пользовательский алерт по цене или RSI
+      description: |
+        Создаёт новый активный алерт для текущего пользователя (лимит — не более 50 активных алертов на пользователя,
+        при превышении возвращается 409 `CONFLICT`). Требует `SESSION` и `X-XSRF-TOKEN`.
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePriceAlertRequest' }
+      responses:
+        '201':
+          description: Алерт создан
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PriceAlertResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /alerts/{id}:
+    delete:
+      tags: [sessions]
+      operationId: deleteAlert
+      summary: Удалить собственный алерт
+      description: Удаляет алерт текущего пользователя. Чужой или несуществующий алерт возвращает 404.
+      security:
+        - sessionCookie: []
+          xsrfToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { $ref: '#/components/schemas/Uuid' }
+      responses:
+        '204':
+          description: Алерт удалён
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/Problem' }
   /sessions:
     post:
       tags: [sessions]
@@ -3773,3 +3882,91 @@ components:
         twrPct: { $ref: '#/components/schemas/Pct' }
         holdingDays: { type: integer, minimum: 0 }
         cashflowsCount: { type: integer, minimum: 1 }
+    ScreenerPaper:
+      type: object
+      required:
+        - ticker
+        - name
+        - sector
+        - marketCapRub
+        - peRatio
+        - pbRatio
+        - psRatio
+        - evEbitda
+        - roe
+        - netMargin
+        - debtToEquity
+        - dividendYield
+        - beta
+        - hasFundamentals
+      properties:
+        ticker: { type: string, examples: ['SBER'] }
+        name: { type: string, examples: ['Сбербанк'] }
+        sector: { type: string, examples: ['Финансы'] }
+        marketCapRub: { $ref: '#/components/schemas/MoneyOrNull' }
+        peRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        pbRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        psRatio: { $ref: '#/components/schemas/RatioOrNull' }
+        evEbitda: { $ref: '#/components/schemas/RatioOrNull' }
+        roe: { $ref: '#/components/schemas/PctOrNull' }
+        netMargin: { $ref: '#/components/schemas/PctOrNull' }
+        debtToEquity: { $ref: '#/components/schemas/RatioOrNull' }
+        dividendYield: { $ref: '#/components/schemas/PctOrNull' }
+        beta: { $ref: '#/components/schemas/RatioOrNull' }
+        hasFundamentals: { type: boolean }
+    MarketEventType:
+      type: string
+      enum: [CBR_RATE, EARNINGS, DIVIDEND, MACRO]
+    MarketEventImportance:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+    MarketEventSummary:
+      type: object
+      required:
+        - id
+        - eventDate
+        - eventType
+        - ticker
+        - title
+        - importance
+        - description
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        eventDate: { type: string, format: date }
+        eventType: { $ref: '#/components/schemas/MarketEventType' }
+        ticker: { type: [string, 'null'], examples: ['SBER'] }
+        title: { type: string }
+        importance: { $ref: '#/components/schemas/MarketEventImportance' }
+        description: { type: string }
+    PriceAlertConditionType:
+      type: string
+      enum: [PRICE_ABOVE, PRICE_BELOW, RSI_BELOW, RSI_ABOVE]
+    CreatePriceAlertRequest:
+      type: object
+      required:
+        - ticker
+        - conditionType
+        - thresholdValue
+      properties:
+        ticker: { type: string, minLength: 1, maxLength: 32, examples: ['SBER'] }
+        conditionType: { $ref: '#/components/schemas/PriceAlertConditionType' }
+        thresholdValue: { $ref: '#/components/schemas/Price' }
+        note: { type: [string, 'null'], maxLength: 200 }
+    PriceAlertResponse:
+      type: object
+      required:
+        - id
+        - ticker
+        - conditionType
+        - thresholdValue
+        - active
+        - note
+        - createdAt
+      properties:
+        id: { $ref: '#/components/schemas/Uuid' }
+        ticker: { type: string, examples: ['SBER'] }
+        conditionType: { $ref: '#/components/schemas/PriceAlertConditionType' }
+        thresholdValue: { $ref: '#/components/schemas/Price' }
+        active: { type: boolean }
+        note: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }

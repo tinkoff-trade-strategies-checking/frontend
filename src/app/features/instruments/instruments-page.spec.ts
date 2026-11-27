@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { provideTaiga } from '@taiga-ui/core';
 import { INSTRUMENTS_API } from './data/instruments.models';
 import { StubInstrumentsApi } from './data/stub-instruments.api';
@@ -9,7 +10,7 @@ describe('InstrumentsPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [InstrumentsPage],
-      providers: [provideTaiga()],
+      providers: [provideTaiga(), provideRouter([])],
     })
       .overrideComponent(InstrumentsPage, {
         set: {
@@ -194,5 +195,65 @@ describe('InstrumentsPage', () => {
     await flushAsync();
     fixture.detectChanges();
     expect(dcaCalc.querySelectorAll('[data-dca-row]').length).toBe(5);
+  });
+
+  it('переключается на вкладку Скринер акций, применяет пресеты, сортирует и открывает профиль бумаги', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-screener')?.click();
+    fixture.detectChanges();
+
+    const initialRows = root.querySelectorAll('tbody tr.screener-row');
+    expect(initialRows.length).toBeGreaterThanOrEqual(10);
+    expect(root.querySelector('[data-screener-launch]')?.textContent).toContain('Тренироваться с');
+
+    root.querySelector<HTMLButtonElement>('[data-screener-preset="dividend_gt_10"]')?.click();
+    fixture.detectChanges();
+    const divRows = root.querySelectorAll('tbody tr.screener-row');
+    expect(divRows.length).toBeGreaterThan(0);
+    expect(divRows.length).toBeLessThan(initialRows.length);
+
+    root.querySelector<HTMLButtonElement>('[data-screener-reset]')?.click();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('tbody tr.screener-row').length).toBe(initialRows.length);
+
+    root.querySelector<HTMLButtonElement>('[data-screener-alert]')?.click();
+    fixture.detectChanges();
+    expect(root.querySelector('app-alerts-panel')).not.toBeNull();
+  });
+
+  it('переключается на вкладку События и Алерты, фильтрует события, создаёт и удаляет алерт', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    root.querySelector<HTMLButtonElement>('#tab-events-alerts')?.click();
+    fixture.detectChanges();
+
+    expect(root.querySelectorAll('.event-card').length).toBeGreaterThanOrEqual(4);
+    expect(root.querySelector('[data-event-importance="HIGH"]')).not.toBeNull();
+
+    root.querySelector<HTMLButtonElement>('[data-event-filter="CBR_RATE"]')?.click();
+    fixture.detectChanges();
+    const cbrCards = Array.from(root.querySelectorAll('.event-card'));
+    expect(cbrCards.length).toBeGreaterThan(0);
+    expect(cbrCards.every((c) => c.getAttribute('data-event-type') === 'CBR_RATE')).toBe(true);
+
+    const initialAlerts = root.querySelectorAll('.alert-item').length;
+    root.querySelector<HTMLButtonElement>('[data-alert-submit]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.alert-item').length).toBe(initialAlerts + 1);
+
+    root.querySelector<HTMLButtonElement>('[data-alert-delete]')?.click();
+    await flushAsync();
+    fixture.detectChanges();
+    expect(root.querySelectorAll('.alert-item').length).toBe(initialAlerts);
   });
 });
