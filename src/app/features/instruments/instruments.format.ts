@@ -13,6 +13,16 @@ const DURATION_FORMATTER = new Intl.NumberFormat('ru-RU', {
   maximumFractionDigits: 2,
 });
 
+const NUMBER_FORMATTER = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 4,
+});
+
+const GREEK_FORMATTER = new Intl.NumberFormat('ru-RU', {
+  minimumFractionDigits: 4,
+  maximumFractionDigits: 4,
+});
+
 export function formatRub(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '—';
@@ -20,11 +30,48 @@ export function formatRub(value: number | null | undefined): string {
   return `${RUB_FORMATTER.format(value)} ₽`;
 }
 
+export function formatSignedRub(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${RUB_FORMATTER.format(value)} ₽`;
+}
+
 export function formatPct(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return '—';
   }
   return `${PCT_FORMATTER.format(value)} %`;
+}
+
+export function formatSignedPct(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${PCT_FORMATTER.format(value)} %`;
+}
+
+export function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return NUMBER_FORMATTER.format(value);
+}
+
+export function formatGreek(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return GREEK_FORMATTER.format(value);
+}
+
+export function formatLeverage(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return '—';
+  }
+  return `${DURATION_FORMATTER.format(value)}×`;
 }
 
 export function formatDurationYears(value: number | null | undefined): string {

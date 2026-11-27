@@ -5,14 +5,34 @@ import { TuiBadge, TuiSegmented } from '@taiga-ui/kit';
 import { INSTRUMENTS_API_IMPL } from '../../api-impls';
 import { TermHint } from '../../shared/term-hint/term-hint';
 import { BondYtmCalculator } from './components/bond-ytm-calculator';
+import { FuturesCalculator } from './components/futures-calculator';
+import { OptionGreeksCalculator } from './components/option-greeks-calculator';
 import {
   BondSummary,
   ETF_CATEGORY_LABELS,
   ETF_FILTER_LABELS,
+  FuturesDirection,
+  FuturesSummary,
   INSTRUMENTS_API,
+  OptionSummary,
 } from './data/instruments.models';
-import { formatDateRu, formatDurationYears, formatPct, formatRub } from './instruments.format';
-import { BondFilter, EtfFilter, InstrumentsStore } from './instruments.store';
+import {
+  formatDateRu,
+  formatDurationYears,
+  formatNumber,
+  formatPct,
+  formatRub,
+} from './instruments.format';
+import {
+  BondFilter,
+  EtfFilter,
+  FuturesFilter,
+  InstrumentsStore,
+  InstrumentsTab,
+  OptionFilter,
+} from './instruments.store';
+
+const TAB_ORDER: readonly InstrumentsTab[] = ['bonds', 'etfs', 'futures', 'options'];
 
 const BOND_FILTERS: readonly { readonly id: BondFilter; readonly label: string }[] = [
   { id: 'all', label: 'Все' },
@@ -29,6 +49,18 @@ const ETF_FILTERS: readonly { readonly id: EtfFilter; readonly label: string }[]
   { id: 'gold_currency', label: ETF_FILTER_LABELS.gold_currency },
 ];
 
+const FUTURES_FILTERS: readonly { readonly id: FuturesFilter; readonly label: string }[] = [
+  { id: 'all', label: 'Все' },
+  { id: 'cash', label: 'Расчётные' },
+  { id: 'delivery', label: 'Поставочные' },
+];
+
+const OPTION_FILTERS: readonly { readonly id: OptionFilter; readonly label: string }[] = [
+  { id: 'all', label: 'Все' },
+  { id: 'call', label: 'Call (колл)' },
+  { id: 'put', label: 'Put (пут)' },
+];
+
 @Component({
   selector: 'app-instruments-page',
   imports: [
@@ -41,6 +73,8 @@ const ETF_FILTERS: readonly { readonly id: EtfFilter; readonly label: string }[]
     TuiTextfield,
     TermHint,
     BondYtmCalculator,
+    FuturesCalculator,
+    OptionGreeksCalculator,
   ],
   providers: [{ provide: INSTRUMENTS_API, useClass: INSTRUMENTS_API_IMPL }, InstrumentsStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -52,10 +86,13 @@ export class InstrumentsPage implements OnInit {
 
   protected readonly bondFilters = BOND_FILTERS;
   protected readonly etfFilters = ETF_FILTERS;
+  protected readonly futuresFilters = FUTURES_FILTERS;
+  protected readonly optionFilters = OPTION_FILTERS;
   protected readonly etfCategoryLabels = ETF_CATEGORY_LABELS;
 
   protected readonly formatRub = formatRub;
   protected readonly formatPct = formatPct;
+  protected readonly formatNumber = formatNumber;
   protected readonly formatDurationYears = formatDurationYears;
   protected readonly formatDateRu = formatDateRu;
 
@@ -63,8 +100,14 @@ export class InstrumentsPage implements OnInit {
     void this.store.init();
   }
 
+  protected activeTabIndex(): number {
+    const idx = TAB_ORDER.indexOf(this.store.activeTab());
+    return idx >= 0 ? idx : 0;
+  }
+
   protected onTabIndexChange(index: number): void {
-    this.store.activeTab.set(index === 1 ? 'etfs' : 'bonds');
+    const tab = TAB_ORDER[index] ?? 'bonds';
+    this.store.activeTab.set(tab);
   }
 
   protected onSelectBond(bond: BondSummary): void {
@@ -77,6 +120,50 @@ export class InstrumentsPage implements OnInit {
 
   protected onResetCalcPrice(): void {
     void this.store.resetCalcPrice();
+  }
+
+  protected onSelectFuture(future: FuturesSummary): void {
+    void this.store.selectFuture(future);
+  }
+
+  protected onFuturesDirectionChange(direction: FuturesDirection): void {
+    void this.store.updateFuturesDirection(direction);
+  }
+
+  protected onFuturesEntryPriceChange(price: number): void {
+    void this.store.updateFuturesEntryPrice(price);
+  }
+
+  protected onFuturesCurrentPriceChange(price: number): void {
+    void this.store.updateFuturesCurrentPrice(price);
+  }
+
+  protected onFuturesContractsChange(contracts: number): void {
+    void this.store.updateFuturesContracts(contracts);
+  }
+
+  protected onResetFuturesParams(): void {
+    void this.store.resetFuturesParams();
+  }
+
+  protected onSelectOption(option: OptionSummary): void {
+    void this.store.selectOption(option);
+  }
+
+  protected onOptionSpotChange(spot: number): void {
+    void this.store.updateOptionSpot(spot);
+  }
+
+  protected onOptionVolatilityChange(volatilityPct: number): void {
+    void this.store.updateOptionVolatilityPct(volatilityPct);
+  }
+
+  protected onOptionRiskFreeRateChange(ratePct: number): void {
+    void this.store.updateOptionRiskFreeRatePct(ratePct);
+  }
+
+  protected onResetOptionParams(): void {
+    void this.store.resetOptionParams();
   }
 
   protected retry(): void {

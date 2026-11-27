@@ -8,7 +8,15 @@ import {
   EtfAssetClass,
   EtfCategory,
   EtfSummary,
+  FuturesCalcParams,
+  FuturesCalculation,
+  FuturesSettlementType,
+  FuturesSummary,
   InstrumentsApi,
+  OptionCalcParams,
+  OptionGreeksCalculation,
+  OptionSummary,
+  OptionType,
 } from './instruments.models';
 
 type DecimalWire = string | number | null | undefined;
@@ -60,6 +68,71 @@ export interface EtfSummaryDto {
   readonly navPriceRub?: DecimalWire;
   readonly currency?: string | null;
   readonly description?: string | null;
+}
+
+export interface FuturesSummaryDto {
+  readonly ticker: string;
+  readonly name: string;
+  readonly underlying?: string | null;
+  readonly contractSize?: number | null;
+  readonly priceStep?: DecimalWire;
+  readonly stepPriceRub?: DecimalWire;
+  readonly initialMarginRub?: DecimalWire;
+  readonly lastPrice?: DecimalWire;
+  readonly expirationDate?: string | null;
+  readonly settlementType?: string | null;
+  readonly currency?: string | null;
+}
+
+export interface FuturesCalculationDto {
+  readonly ticker?: string | null;
+  readonly entryPrice?: DecimalWire;
+  readonly currentPrice?: DecimalWire;
+  readonly contracts?: number | null;
+  readonly asOfDate?: string | null;
+  readonly expirationDate?: string | null;
+  readonly daysToExpiration?: number | null;
+  readonly expired?: boolean | null;
+  readonly variationMarginRub?: DecimalWire;
+  readonly initialMarginTotalRub?: DecimalWire;
+  readonly notionalRub?: DecimalWire;
+  readonly roeOnMarginPct?: DecimalWire;
+  readonly effectiveLeverage?: DecimalWire;
+}
+
+export interface OptionSummaryDto {
+  readonly ticker: string;
+  readonly name: string;
+  readonly underlying?: string | null;
+  readonly optionType?: string | null;
+  readonly strike?: DecimalWire;
+  readonly expirationDate?: string | null;
+  readonly underlyingPrice?: DecimalWire;
+  readonly impliedVolPct?: DecimalWire;
+  readonly riskFreeRatePct?: DecimalWire;
+  readonly contractSize?: number | null;
+  readonly initialMarginRub?: DecimalWire;
+}
+
+export interface OptionGreeksDto {
+  readonly ticker?: string | null;
+  readonly optionType?: string | null;
+  readonly spot?: DecimalWire;
+  readonly strike?: DecimalWire;
+  readonly impliedVolPct?: DecimalWire;
+  readonly riskFreeRatePct?: DecimalWire;
+  readonly asOfDate?: string | null;
+  readonly expirationDate?: string | null;
+  readonly daysToExpiration?: number | null;
+  readonly expired?: boolean | null;
+  readonly premium?: DecimalWire;
+  readonly intrinsicValue?: DecimalWire;
+  readonly timeValue?: DecimalWire;
+  readonly delta?: DecimalWire;
+  readonly gamma?: DecimalWire;
+  readonly theta?: DecimalWire;
+  readonly vega?: DecimalWire;
+  readonly rho?: DecimalWire;
 }
 
 function parseDecimal(value: DecimalWire, fallback = 0): number {
@@ -161,6 +234,95 @@ export function mapEtfDto(dto: EtfSummaryDto): EtfSummary {
   };
 }
 
+function normalizeSettlementType(raw: string | null | undefined): FuturesSettlementType {
+  return (raw ?? '').toUpperCase() === 'DELIVERY' ? 'DELIVERY' : 'CASH';
+}
+
+function normalizeOptionType(raw: string | null | undefined): OptionType {
+  return (raw ?? '').toUpperCase() === 'PUT' ? 'PUT' : 'CALL';
+}
+
+export function mapFuturesDto(dto: FuturesSummaryDto): FuturesSummary {
+  return {
+    ticker: dto.ticker,
+    name: dto.name,
+    underlying: dto.underlying ?? '',
+    contractSize: dto.contractSize ?? 1,
+    priceStep: parseDecimal(dto.priceStep, 1),
+    stepPriceRub: parseDecimal(dto.stepPriceRub, 1),
+    initialMarginRub: parseDecimal(dto.initialMarginRub, 0),
+    lastPrice: parseDecimal(dto.lastPrice, 0),
+    expirationDate: dto.expirationDate ?? '',
+    settlementType: normalizeSettlementType(dto.settlementType),
+    currency: dto.currency ?? 'RUB',
+  };
+}
+
+export function mapFuturesCalculationDto(
+  ticker: string,
+  params: FuturesCalcParams,
+  dto: FuturesCalculationDto,
+): FuturesCalculation {
+  return {
+    ticker: dto.ticker ?? ticker,
+    entryPrice: parseDecimal(dto.entryPrice, params.entryPrice),
+    currentPrice: parseDecimal(dto.currentPrice, params.currentPrice),
+    contracts: dto.contracts ?? params.contracts,
+    asOfDate: dto.asOfDate ?? null,
+    expirationDate: dto.expirationDate ?? '',
+    daysToExpiration: dto.daysToExpiration ?? 0,
+    expired: Boolean(dto.expired),
+    variationMarginRub: parseDecimal(dto.variationMarginRub, 0),
+    initialMarginTotalRub: parseDecimal(dto.initialMarginTotalRub, 0),
+    notionalRub: parseDecimal(dto.notionalRub, 0),
+    roeOnMarginPct: parseDecimal(dto.roeOnMarginPct, 0),
+    effectiveLeverage: parseDecimal(dto.effectiveLeverage, 0),
+  };
+}
+
+export function mapOptionDto(dto: OptionSummaryDto): OptionSummary {
+  return {
+    ticker: dto.ticker,
+    name: dto.name,
+    underlying: dto.underlying ?? '',
+    optionType: normalizeOptionType(dto.optionType),
+    strike: parseDecimal(dto.strike, 0),
+    expirationDate: dto.expirationDate ?? '',
+    underlyingPrice: parseDecimal(dto.underlyingPrice, 0),
+    impliedVolPct: parseDecimal(dto.impliedVolPct, 30),
+    riskFreeRatePct: parseDecimal(dto.riskFreeRatePct, 16),
+    contractSize: dto.contractSize ?? 1,
+    initialMarginRub: parseDecimal(dto.initialMarginRub, 0),
+  };
+}
+
+export function mapOptionGreeksDto(
+  ticker: string,
+  params: OptionCalcParams,
+  dto: OptionGreeksDto,
+): OptionGreeksCalculation {
+  return {
+    ticker: dto.ticker ?? ticker,
+    optionType: normalizeOptionType(dto.optionType),
+    spot: parseDecimal(dto.spot, params.spot),
+    strike: parseDecimal(dto.strike, 0),
+    impliedVolPct: parseDecimal(dto.impliedVolPct, params.volatilityPct),
+    riskFreeRatePct: parseDecimal(dto.riskFreeRatePct, params.riskFreeRatePct),
+    asOfDate: dto.asOfDate ?? null,
+    expirationDate: dto.expirationDate ?? '',
+    daysToExpiration: dto.daysToExpiration ?? 0,
+    expired: Boolean(dto.expired),
+    premium: parseDecimal(dto.premium, 0),
+    intrinsicValue: parseDecimal(dto.intrinsicValue, 0),
+    timeValue: parseDecimal(dto.timeValue, 0),
+    delta: parseDecimal(dto.delta, 0),
+    gamma: parseDecimal(dto.gamma, 0),
+    theta: parseDecimal(dto.theta, 0),
+    vega: parseDecimal(dto.vega, 0),
+    rho: parseDecimal(dto.rho, 0),
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class HttpInstrumentsApi implements InstrumentsApi {
   private readonly http = inject(HttpClient);
@@ -186,5 +348,50 @@ export class HttpInstrumentsApi implements InstrumentsApi {
       this.http.get<readonly EtfSummaryDto[]>('/api/v1/instruments/etfs'),
     );
     return (res ?? []).map(mapEtfDto);
+  }
+
+  async listFutures(): Promise<readonly FuturesSummary[]> {
+    const res = await firstValueFrom(
+      this.http.get<readonly FuturesSummaryDto[]>('/api/v1/instruments/futures'),
+    );
+    return (res ?? []).map(mapFuturesDto);
+  }
+
+  async calculateFutures(ticker: string, params: FuturesCalcParams): Promise<FuturesCalculation> {
+    const encoded = encodeURIComponent(ticker.trim());
+    const httpParams = new HttpParams()
+      .set('entryPrice', String(params.entryPrice))
+      .set('currentPrice', String(params.currentPrice))
+      .set('contracts', String(Math.trunc(params.contracts)));
+    const res = await firstValueFrom(
+      this.http.get<FuturesCalculationDto>(`/api/v1/instruments/futures/${encoded}/calc`, {
+        params: httpParams,
+      }),
+    );
+    return mapFuturesCalculationDto(ticker, params, res);
+  }
+
+  async listOptions(): Promise<readonly OptionSummary[]> {
+    const res = await firstValueFrom(
+      this.http.get<readonly OptionSummaryDto[]>('/api/v1/instruments/options'),
+    );
+    return (res ?? []).map(mapOptionDto);
+  }
+
+  async calculateOptionGreeks(
+    ticker: string,
+    params: OptionCalcParams,
+  ): Promise<OptionGreeksCalculation> {
+    const encoded = encodeURIComponent(ticker.trim());
+    const httpParams = new HttpParams()
+      .set('spot', String(params.spot))
+      .set('volatilityPct', String(params.volatilityPct))
+      .set('riskFreeRatePct', String(params.riskFreeRatePct));
+    const res = await firstValueFrom(
+      this.http.get<OptionGreeksDto>(`/api/v1/instruments/options/${encoded}/calc`, {
+        params: httpParams,
+      }),
+    );
+    return mapOptionGreeksDto(ticker, params, res);
   }
 }

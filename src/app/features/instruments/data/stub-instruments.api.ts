@@ -1,5 +1,16 @@
 import { Injectable } from '@angular/core';
-import { BondCalculation, BondSummary, EtfSummary, InstrumentsApi } from './instruments.models';
+import {
+  BondCalculation,
+  BondSummary,
+  EtfSummary,
+  FuturesCalcParams,
+  FuturesCalculation,
+  FuturesSummary,
+  InstrumentsApi,
+  OptionCalcParams,
+  OptionGreeksCalculation,
+  OptionSummary,
+} from './instruments.models';
 
 const STUB_BONDS: readonly BondSummary[] = [
   {
@@ -306,4 +317,337 @@ export class StubInstrumentsApi implements InstrumentsApi {
   async listEtfs(): Promise<readonly EtfSummary[]> {
     return STUB_ETFS;
   }
+
+  async listFutures(): Promise<readonly FuturesSummary[]> {
+    return STUB_FUTURES;
+  }
+
+  async calculateFutures(ticker: string, params: FuturesCalcParams): Promise<FuturesCalculation> {
+    const normalized = ticker.trim().toUpperCase();
+    const spec =
+      STUB_FUTURES.find((item) => item.ticker.toUpperCase() === normalized) ?? STUB_FUTURES[0];
+    const contracts = params.contracts === 0 ? 1 : Math.trunc(params.contracts);
+    const absContracts = Math.abs(contracts);
+    const steps = (params.currentPrice - params.entryPrice) / spec.priceStep;
+    const variationMarginRub = Number((steps * spec.stepPriceRub * contracts).toFixed(2));
+    const initialMarginTotalRub = Number((spec.initialMarginRub * absContracts).toFixed(2));
+    const notionalRub = Number(
+      ((params.currentPrice / spec.priceStep) * spec.stepPriceRub * absContracts).toFixed(2),
+    );
+    const roeOnMarginPct =
+      initialMarginTotalRub > 0
+        ? Number(((variationMarginRub / initialMarginTotalRub) * 100).toFixed(2))
+        : 0;
+    const effectiveLeverage =
+      initialMarginTotalRub > 0 ? Number((notionalRub / initialMarginTotalRub).toFixed(2)) : 0;
+
+    return {
+      ticker: spec.ticker,
+      entryPrice: params.entryPrice,
+      currentPrice: params.currentPrice,
+      contracts,
+      asOfDate: '2026-11-27',
+      expirationDate: spec.expirationDate,
+      daysToExpiration: 111,
+      expired: false,
+      variationMarginRub,
+      initialMarginTotalRub,
+      notionalRub,
+      roeOnMarginPct,
+      effectiveLeverage,
+    };
+  }
+
+  async listOptions(): Promise<readonly OptionSummary[]> {
+    return STUB_OPTIONS;
+  }
+
+  async calculateOptionGreeks(
+    ticker: string,
+    params: OptionCalcParams,
+  ): Promise<OptionGreeksCalculation> {
+    const normalized = ticker.trim().toUpperCase();
+    const spec =
+      STUB_OPTIONS.find((item) => item.ticker.toUpperCase() === normalized) ?? STUB_OPTIONS[0];
+    const spot = Math.max(0.01, params.spot);
+    const strike = spec.strike;
+    const sigma = Math.max(0.0001, params.volatilityPct / 100);
+    const rate = Math.max(0, params.riskFreeRatePct / 100);
+    const daysToExpiration = 111;
+    const t = daysToExpiration / 365;
+    const sqrtT = Math.sqrt(t);
+
+    const d1 = (Math.log(spot / strike) + (rate + 0.5 * sigma * sigma) * t) / (sigma * sqrtT);
+    const d2 = d1 - sigma * sqrtT;
+    const nd1 = normalCdf(d1);
+    const nd2 = normalCdf(d2);
+    const pdfD1 = normalPdf(d1);
+    const discount = Math.exp(-rate * t);
+
+    const isCall = spec.optionType === 'CALL';
+    const premium = isCall
+      ? spot * nd1 - strike * discount * nd2
+      : strike * discount * normalCdf(-d2) - spot * normalCdf(-d1);
+    const intrinsicValue = isCall ? Math.max(0, spot - strike) : Math.max(0, strike - spot);
+    const timeValue = Math.max(0, premium - intrinsicValue);
+    const delta = isCall ? nd1 : nd1 - 1;
+    const gamma = pdfD1 / (spot * sigma * sqrtT);
+    const thetaAnnual = isCall
+      ? (-spot * pdfD1 * sigma) / (2 * sqrtT) - rate * strike * discount * nd2
+      : (-spot * pdfD1 * sigma) / (2 * sqrtT) + rate * strike * discount * normalCdf(-d2);
+    const theta = thetaAnnual / 365;
+    const vega = (spot * pdfD1 * sqrtT) / 100;
+    const rho = isCall
+      ? (strike * t * discount * nd2) / 100
+      : (-strike * t * discount * normalCdf(-d2)) / 100;
+
+    return {
+      ticker: spec.ticker,
+      optionType: spec.optionType,
+      spot: Number(spot.toFixed(2)),
+      strike,
+      impliedVolPct: Number(params.volatilityPct.toFixed(2)),
+      riskFreeRatePct: Number(params.riskFreeRatePct.toFixed(2)),
+      asOfDate: '2026-11-27',
+      expirationDate: spec.expirationDate,
+      daysToExpiration,
+      expired: false,
+      premium: Number(premium.toFixed(2)),
+      intrinsicValue: Number(intrinsicValue.toFixed(2)),
+      timeValue: Number(timeValue.toFixed(2)),
+      delta: Number(delta.toFixed(4)),
+      gamma: Number(gamma.toFixed(6)),
+      theta: Number(theta.toFixed(4)),
+      vega: Number(vega.toFixed(4)),
+      rho: Number(rho.toFixed(4)),
+    };
+  }
 }
+
+function normalPdf(x: number): number {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
+
+function normalCdf(x: number): number {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = normalPdf(x);
+  const poly =
+    t *
+    (0.31938153 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  const prob = 1 - d * poly;
+  return x >= 0 ? prob : 1 - prob;
+}
+
+const STUB_FUTURES: readonly FuturesSummary[] = [
+  {
+    ticker: 'SiH7',
+    name: 'Фьючерс USD/RUB (март 2027)',
+    underlying: 'USD/RUB',
+    contractSize: 1000,
+    priceStep: 1,
+    stepPriceRub: 1,
+    initialMarginRub: 14500,
+    lastPrice: 95400,
+    expirationDate: '2027-03-18',
+    settlementType: 'CASH',
+    currency: 'RUB',
+  },
+  {
+    ticker: 'RIH7',
+    name: 'Фьючерс на индекс РТС (март 2027)',
+    underlying: 'RTSI',
+    contractSize: 1,
+    priceStep: 10,
+    stepPriceRub: 19.08,
+    initialMarginRub: 29500,
+    lastPrice: 102500,
+    expirationDate: '2027-03-18',
+    settlementType: 'CASH',
+    currency: 'RUB',
+  },
+  {
+    ticker: 'MXH7',
+    name: 'Фьючерс на индекс МосБиржи (март 2027)',
+    underlying: 'IMOEX',
+    contractSize: 100,
+    priceStep: 25,
+    stepPriceRub: 25,
+    initialMarginRub: 42000,
+    lastPrice: 288500,
+    expirationDate: '2027-03-18',
+    settlementType: 'CASH',
+    currency: 'RUB',
+  },
+  {
+    ticker: 'BRF7',
+    name: 'Фьючерс на нефть Brent (январь 2027)',
+    underlying: 'Brent',
+    contractSize: 10,
+    priceStep: 0.01,
+    stepPriceRub: 9.54,
+    initialMarginRub: 13200,
+    lastPrice: 76.8,
+    expirationDate: '2027-01-04',
+    settlementType: 'CASH',
+    currency: 'USD',
+  },
+  {
+    ticker: 'GDH7',
+    name: 'Фьючерс на золото (март 2027)',
+    underlying: 'GOLD',
+    contractSize: 1,
+    priceStep: 0.1,
+    stepPriceRub: 9.54,
+    initialMarginRub: 24800,
+    lastPrice: 2685,
+    expirationDate: '2027-03-19',
+    settlementType: 'CASH',
+    currency: 'USD',
+  },
+  {
+    ticker: 'SRH7',
+    name: 'Фьючерс на акции Сбербанка (март 2027)',
+    underlying: 'SBER',
+    contractSize: 100,
+    priceStep: 1,
+    stepPriceRub: 1,
+    initialMarginRub: 5400,
+    lastPrice: 28650,
+    expirationDate: '2027-03-18',
+    settlementType: 'DELIVERY',
+    currency: 'RUB',
+  },
+  {
+    ticker: 'GZH7',
+    name: 'Фьючерс на акции Газпрома (март 2027)',
+    underlying: 'GAZP',
+    contractSize: 100,
+    priceStep: 1,
+    stepPriceRub: 1,
+    initialMarginRub: 3100,
+    lastPrice: 13450,
+    expirationDate: '2027-03-18',
+    settlementType: 'DELIVERY',
+    currency: 'RUB',
+  },
+  {
+    ticker: 'LKH7',
+    name: 'Фьючерс на акции Лукойла (март 2027)',
+    underlying: 'LKOH',
+    contractSize: 10,
+    priceStep: 1,
+    stepPriceRub: 1,
+    initialMarginRub: 13600,
+    lastPrice: 71200,
+    expirationDate: '2027-03-18',
+    settlementType: 'DELIVERY',
+    currency: 'RUB',
+  },
+];
+
+const STUB_OPTIONS: readonly OptionSummary[] = [
+  {
+    ticker: 'Si96000BC7',
+    name: 'Si Call 96 000 (март 2027)',
+    underlying: 'SiH7',
+    optionType: 'CALL',
+    strike: 96000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 95400,
+    impliedVolPct: 22.5,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 7200,
+  },
+  {
+    ticker: 'Si95000BO7',
+    name: 'Si Put 95 000 (март 2027)',
+    underlying: 'SiH7',
+    optionType: 'PUT',
+    strike: 95000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 95400,
+    impliedVolPct: 23.0,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 6900,
+  },
+  {
+    ticker: 'RI105000BC7',
+    name: 'RTS Call 105 000 (март 2027)',
+    underlying: 'RIH7',
+    optionType: 'CALL',
+    strike: 105000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 102500,
+    impliedVolPct: 31.0,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 14800,
+  },
+  {
+    ticker: 'RI100000BO7',
+    name: 'RTS Put 100 000 (март 2027)',
+    underlying: 'RIH7',
+    optionType: 'PUT',
+    strike: 100000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 102500,
+    impliedVolPct: 33.5,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 14100,
+  },
+  {
+    ticker: 'BR78BA7',
+    name: 'Brent Call 78 (январь 2027)',
+    underlying: 'BRF7',
+    optionType: 'CALL',
+    strike: 78,
+    expirationDate: '2027-01-04',
+    underlyingPrice: 76.8,
+    impliedVolPct: 34.0,
+    riskFreeRatePct: 16.0,
+    contractSize: 10,
+    initialMarginRub: 6400,
+  },
+  {
+    ticker: 'BR75BM7',
+    name: 'Brent Put 75 (январь 2027)',
+    underlying: 'BRF7',
+    optionType: 'PUT',
+    strike: 75,
+    expirationDate: '2027-01-04',
+    underlyingPrice: 76.8,
+    impliedVolPct: 36.0,
+    riskFreeRatePct: 16.0,
+    contractSize: 10,
+    initialMarginRub: 6100,
+  },
+  {
+    ticker: 'SR29000BC7',
+    name: 'SBER Call 29 000 (март 2027)',
+    underlying: 'SRH7',
+    optionType: 'CALL',
+    strike: 29000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 28650,
+    impliedVolPct: 28.0,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 2900,
+  },
+  {
+    ticker: 'SR28000BO7',
+    name: 'SBER Put 28 000 (март 2027)',
+    underlying: 'SRH7',
+    optionType: 'PUT',
+    strike: 28000,
+    expirationDate: '2027-03-18',
+    underlyingPrice: 28650,
+    impliedVolPct: 29.5,
+    riskFreeRatePct: 16.0,
+    contractSize: 1,
+    initialMarginRub: 2700,
+  },
+];
