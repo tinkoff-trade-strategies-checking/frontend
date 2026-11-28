@@ -41,6 +41,14 @@ export function mapLaunchOptions(options: ApiLaunchOptions): LaunchOptions {
       CandleTimeframe,
       number
     >,
+    ...(options.runMaxDurationDaysByTimeframe !== undefined
+      ? {
+          runMaxDurationDaysByTimeframe: options.runMaxDurationDaysByTimeframe as Record<
+            CandleTimeframe,
+            number
+          >,
+        }
+      : {}),
     defaultTimeframe: options.defaultTimeframe,
     regimes: options.regimes,
     defaultRegime: options.defaultRegime,
@@ -57,6 +65,7 @@ export function mapLaunchOptions(options: ApiLaunchOptions): LaunchOptions {
       slippageKappa: Number(rules.slippageKappa),
       liquidityLimitPct: Number(rules.liquidityLimitPct),
       maxBars: rules.maxBars,
+      ...(rules.runMaxBars !== undefined ? { runMaxBars: rules.runMaxBars } : {}),
     },
     archiveFrom: options.archiveFrom ?? null,
     archiveTo: options.archiveTo ?? null,

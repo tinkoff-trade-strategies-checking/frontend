@@ -367,7 +367,7 @@ describe('LaunchPage', () => {
     expect(startSpy).toHaveBeenCalledWith(expect.objectContaining({ initialCapital: '12345.67' }));
   });
 
-  it('выключает пары шаг × длительность сверх лимита свечей и подсказывает «больше 5 000 свечей»', async () => {
+  it('выключает пары шаг × длительность сверх лимита свечей и подсказывает «больше 25 000 свечей»', async () => {
     const fixture = TestBed.createComponent(LaunchPage);
     fixture.detectChanges();
     await fixture.whenStable();
@@ -388,31 +388,32 @@ describe('LaunchPage', () => {
     };
     const launchBtn = (): HTMLButtonElement => button('Запустить');
 
-    // 60 дн. при шаге 1 д: максимум шагов 1 мин и 5 мин меньше 60 дней — выключены.
+    // 60 дн. при шаге 1 д: максимум шага 1 мин (30 дн.) меньше 60 дней — выключен, 5 мин (150 дн.) доступен.
     expect(button('1 мин').disabled).toBe(true);
-    expect(button('5 мин').disabled).toBe(true);
+    expect(button('5 мин').disabled).toBe(false);
     expect(button('10 мин').disabled).toBe(false);
     expect(button('1 д').disabled).toBe(false);
-    expect(button('1 мин').title.replace(/\u00a0/g, ' ')).toBe('больше 5 000 свечей');
+    expect(button('1 мин').title.replace(/\u00a0/g, ' ')).toBe('больше 25 000 свечей');
     expect(button('1 д').title).toBe('');
     // Причина выключения видна без наведения и связана с кнопкой через aria-describedby.
     const note = root.querySelector('#launch-timeframe-note');
-    expect(note?.textContent).toContain('1 мин, 5 мин');
+    expect(note?.textContent).toContain('1 мин');
     expect(button('1 мин').getAttribute('aria-describedby')).toBe('launch-timeframe-note');
 
-    // Шаг 5 мин (максимум 30 дн.) при 20 дн.: длительности больше 30 выключены.
-    store.setDuration(20);
+    // Шаг 5 мин (максимум 150 дн.) при 60 дн.: длительность 250 дн. выключена.
+    store.setDuration(60);
     store.setTimeframe('5m');
     fixture.detectChanges();
     expect(button('20 дн.').disabled).toBe(false);
-    expect(button('60 дн.').disabled).toBe(true);
+    expect(button('60 дн.').disabled).toBe(false);
+    expect(button('120 дн.').disabled).toBe(false);
     expect(button('250 дн.').disabled).toBe(true);
     expect(launchBtn().disabled).toBe(false);
 
-    // Своя дата: лимит 5 000 свечей действует для всех ручных сессий (и RANDOM, и CUSTOM).
+    // Своя дата: лимит 25 000 свечей действует для всех ручных сессий (и RANDOM, и CUSTOM).
     await store.setStartMode('custom');
     fixture.detectChanges();
-    expect(button('60 дн.').disabled).toBe(true);
+    expect(button('250 дн.').disabled).toBe(true);
     expect(button('1 мин').disabled).toBe(true);
 
     // Недопустимая пара (программно): запуск заблокирован и в custom, и при возврате в random.

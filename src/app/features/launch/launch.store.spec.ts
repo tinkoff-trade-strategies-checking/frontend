@@ -185,19 +185,20 @@ describe('LaunchStore: фоновый алгоритм', () => {
 
     expect(store.isBlind()).toBe(true);
     expect(store.isPairDisabled(60, '1m')).toBe(true);
-    expect(store.isPairDisabled(60, '5m')).toBe(true);
+    expect(store.isPairDisabled(60, '5m')).toBe(false);
+    expect(store.isPairDisabled(250, '5m')).toBe(true);
     expect(store.isPairDisabled(60, '1d')).toBe(false);
 
     await store.setStartMode('custom');
     expect(store.isBlind()).toBe(false);
     expect(store.isPairDisabled(60, '1m')).toBe(true);
-    expect(store.isPairDisabled(60, '5m')).toBe(true);
+    expect(store.isPairDisabled(250, '5m')).toBe(true);
     expect(store.isPairDisabled(60, '1d')).toBe(false);
 
     store.setTimeframe('1m');
     expect(store.pairExceedsLimit()).toBe(true);
     expect(store.canSubmit()).toBe(false);
-    expect(store.submitError()).toContain('больше 5');
+    expect(store.submitError()).toContain('больше 25');
   });
 
   it('applyPreset устанавливает все параметры сценария, включает слепой режим и сбрасывает custom-бумаги', async () => {

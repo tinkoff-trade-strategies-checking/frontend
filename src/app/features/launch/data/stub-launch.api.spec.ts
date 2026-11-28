@@ -10,12 +10,20 @@ describe('StubLaunchApi', () => {
     expect(opts.defaultTimeframe).toBe('1d');
     expect(opts.availableTimeframes).toEqual(['1m', '5m', '10m', '15m', '1h', '1d']);
     expect(opts.maxDurationDaysByTimeframe).toEqual({
-      '1m': 6,
-      '5m': 30,
-      '10m': 60,
-      '15m': 90,
-      '1h': 357,
-      '1d': 5000,
+      '1m': 30,
+      '5m': 150,
+      '10m': 300,
+      '15m': 450,
+      '1h': 1785,
+      '1d': 25000,
+    });
+    expect(opts.runMaxDurationDaysByTimeframe).toEqual({
+      '1m': 300,
+      '5m': 1500,
+      '10m': 3000,
+      '15m': 4500,
+      '1h': 17857,
+      '1d': 250000,
     });
     expect(opts.regimes).toEqual(['calm', 'medium', 'stress']);
     expect(opts.capitalPresetsRub.length).toBeGreaterThan(0);
@@ -23,7 +31,8 @@ describe('StubLaunchApi', () => {
     expect(opts.minPapers).toBe(1);
     expect(opts.maxPapers).toBeGreaterThanOrEqual(50);
     expect(opts.defaultPaperCount).toBe(3);
-    expect(opts.executionRules.maxBars).toBe(5000);
+    expect(opts.executionRules.maxBars).toBe(25_000);
+    expect(opts.executionRules.runMaxBars).toBe(250_000);
     expect(opts.executionRules.slippageKappa).toBe(0.1);
 
     const serialized = JSON.stringify(opts);
@@ -95,12 +104,12 @@ describe('StubLaunchApi', () => {
     }
   });
 
-  it('отклоняет запуск с TOO_MANY_BARS при превышении 5000 свечей', async () => {
+  it('отклоняет запуск с TOO_MANY_BARS при превышении 25 000 свечей', async () => {
     const api = new StubLaunchApi();
     const res = await api.startSession({
       traderKind: 'human',
       durationDays: 60,
-      timeframe: '5m',
+      timeframe: '1m',
       regime: 'medium',
       startMode: 'random',
       customStartDate: null,
@@ -113,8 +122,8 @@ describe('StubLaunchApi', () => {
     expect(res.accepted).toBe(false);
     if (!res.accepted) {
       expect(res.reason).toBe('TOO_MANY_BARS');
-      expect(res.barsCount).toBeGreaterThan(5000);
-      expect(res.maxBars).toBe(5000);
+      expect(res.barsCount).toBeGreaterThan(25_000);
+      expect(res.maxBars).toBe(25_000);
     }
   });
 

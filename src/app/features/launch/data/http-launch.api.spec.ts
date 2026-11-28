@@ -37,7 +37,8 @@ describe('HttpLaunchApi', () => {
       durations: [20, 60],
       defaultDuration: 60,
       availableTimeframes: ['1h', '1d'],
-      maxDurationDaysByTimeframe: { '1h': 357, '1d': 5000 },
+      maxDurationDaysByTimeframe: { '1h': 1785, '1d': 25000 },
+      runMaxDurationDaysByTimeframe: { '1h': 17857, '1d': 250000 },
       defaultTimeframe: '1d',
       regimes: ['calm', 'medium', 'stress'],
       defaultRegime: 'medium',
@@ -53,7 +54,8 @@ describe('HttpLaunchApi', () => {
         spreadPct: '0.1',
         slippageKappa: '0.1',
         liquidityLimitPct: '10',
-        maxBars: 5000,
+        maxBars: 25000,
+        runMaxBars: 250000,
       },
       archiveFrom: '2020-01-03',
       archiveTo: '2025-12-31',
@@ -61,8 +63,13 @@ describe('HttpLaunchApi', () => {
     const options = await pending;
     expect(options.capitalPresetsRub).toEqual([100000, 1000000]);
     expect(options.defaultCapitalRub).toBe(1000000);
-    expect(options.maxDurationDaysByTimeframe['1h']).toBe(357);
-    expect(options.executionRules).toMatchObject({ commissionPct: 0.3, maxBars: 5000 });
+    expect(options.maxDurationDaysByTimeframe['1h']).toBe(1785);
+    expect(options.runMaxDurationDaysByTimeframe?.['1h']).toBe(17857);
+    expect(options.executionRules).toMatchObject({
+      commissionPct: 0.3,
+      maxBars: 25000,
+      runMaxBars: 250000,
+    });
     expect(options.archiveFrom).toBe('2020-01-03');
     expect(options.archiveTo).toBe('2025-12-31');
   });
