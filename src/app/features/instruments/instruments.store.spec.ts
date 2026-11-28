@@ -16,23 +16,52 @@ describe('InstrumentsStore', () => {
     store = TestBed.inject(InstrumentsStore);
   });
 
-  it('лениво загружает вкладки: при init запрашивает только облигации, остальные — при переключении', async () => {
+  it('при init загружает облигации, затем в фоне подгружает каталоги для счётчиков без запуска калькуляторов', async () => {
     const bondsSpy = vi.spyOn(api, 'listBonds');
     const etfsSpy = vi.spyOn(api, 'listEtfs');
+    const futuresSpy = vi.spyOn(api, 'listFutures');
+    const futuresCalcSpy = vi.spyOn(api, 'calculateFutures');
+    const optionsCalcSpy = vi.spyOn(api, 'calculateOptionGreeks');
+    const dividendsCalcSpy = vi.spyOn(api, 'calculateDividendPayout');
+    const taxCalcSpy = vi.spyOn(api, 'calculateTax');
+    const dcaCalcSpy = vi.spyOn(api, 'calculateDca');
+
     await store.init();
     expect(bondsSpy).toHaveBeenCalledTimes(1);
-    expect(etfsSpy).not.toHaveBeenCalled();
+    expect(store.isTabLoaded('bonds')).toBe(true);
     expect(store.bonds().length).toBeGreaterThan(0);
     expect(store.selectedBondTicker()).toBe(store.bonds()[0].ticker);
     expect(store.calcResult()?.ticker).toBe(store.bonds()[0].ticker);
 
-    await store.setActiveTab('etfs');
+    // Фоновый предзагрузчик подгружает каталоги остальных вкладок, но не трогает калькуляторы.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(etfsSpy).toHaveBeenCalledTimes(1);
+    expect(futuresSpy).toHaveBeenCalledTimes(1);
+    expect(store.isTabLoaded('etfs')).toBe(true);
+    expect(store.isTabLoaded('futures')).toBe(true);
+    expect(store.isTabLoaded('options')).toBe(true);
+    expect(store.isTabLoaded('dividends')).toBe(true);
+    expect(store.isTabLoaded('screener')).toBe(true);
+    expect(store.isTabLoaded('events_alerts')).toBe(true);
     expect(store.etfs().length).toBeGreaterThan(0);
+    expect(store.futures().length).toBeGreaterThan(0);
+    expect(store.eventsAndAlertsCount()).toBe(store.marketEvents().length + store.alerts().length);
+    expect(futuresCalcSpy).not.toHaveBeenCalled();
+    expect(optionsCalcSpy).not.toHaveBeenCalled();
+    expect(dividendsCalcSpy).not.toHaveBeenCalled();
+    expect(taxCalcSpy).not.toHaveBeenCalled();
+    expect(dcaCalcSpy).not.toHaveBeenCalled();
+
+    // Переключение на вкладку не перезапрашивает каталог, но лениво запускает её калькулятор.
+    await store.setActiveTab('futures');
+    expect(futuresSpy).toHaveBeenCalledTimes(1);
+    expect(futuresCalcSpy).toHaveBeenCalledTimes(1);
+
     // Повторное переключение не делает лишних запросов.
     await store.setActiveTab('bonds');
-    await store.setActiveTab('etfs');
-    expect(etfsSpy).toHaveBeenCalledTimes(1);
+    await store.setActiveTab('futures');
+    expect(futuresSpy).toHaveBeenCalledTimes(1);
+    expect(futuresCalcSpy).toHaveBeenCalledTimes(1);
   });
 
   it('фильтрует облигации по типу, амортизации и поисковому запросу', async () => {

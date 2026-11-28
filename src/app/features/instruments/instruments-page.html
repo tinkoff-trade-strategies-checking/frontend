@@ -14,21 +14,48 @@
       [activeItemIndex]="activeTabIndex()"
       (activeItemIndexChange)="onTabIndexChange($event)"
     >
-      <button id="tab-bonds" type="button">Облигации ({{ store.bonds().length }})</button>
-      <button id="tab-etfs" type="button">БПИФ / ETF ({{ store.etfs().length }})</button>
-      <button id="tab-futures" type="button">
-        Фьючерсы (ФОРТС) ({{ store.futures().length }})
+      <button id="tab-bonds" type="button">
+        Облигации
+        @if (store.isTabLoaded('bonds')) {
+          ({{ store.bonds().length }})
+        }
       </button>
-      <button id="tab-options" type="button">Опционы (ФОРТС) ({{ store.options().length }})</button>
+      <button id="tab-etfs" type="button">
+        БПИФ / ETF
+        @if (store.isTabLoaded('etfs')) {
+          ({{ store.etfs().length }})
+        }
+      </button>
+      <button id="tab-futures" type="button">
+        Фьючерсы (ФОРТС)
+        @if (store.isTabLoaded('futures')) {
+          ({{ store.futures().length }})
+        }
+      </button>
+      <button id="tab-options" type="button">
+        Опционы (ФОРТС)
+        @if (store.isTabLoaded('options')) {
+          ({{ store.options().length }})
+        }
+      </button>
       <button id="tab-dividends" type="button">
-        Дивиденды (T+1) ({{ store.dividends().length }})
+        Дивиденды (T+1)
+        @if (store.isTabLoaded('dividends')) {
+          ({{ store.dividends().length }})
+        }
       </button>
       <button id="tab-tax-dca" type="button">Налоги (ИИС) и DCA</button>
       <button id="tab-screener" type="button">
-        Скринер акций ({{ store.screenerPapers().length }})
+        Скринер акций
+        @if (store.isTabLoaded('screener')) {
+          ({{ store.screenerPapers().length }})
+        }
       </button>
       <button id="tab-events-alerts" type="button">
-        События и Алерты ({{ store.alerts().length }})
+        События и Алерты
+        @if (store.isTabLoaded('events_alerts')) {
+          ({{ store.eventsAndAlertsCount() }})
+        }
       </button>
     </tui-segmented>
   </header>
