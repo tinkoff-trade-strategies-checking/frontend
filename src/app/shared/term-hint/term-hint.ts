@@ -3,17 +3,25 @@ import {
   Component,
   ElementRef,
   HostListener,
+  effect,
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
+
+const VIEWPORT_MARGIN = 12;
+const POPOVER_GAP = 6;
+const MAX_POPOVER_WIDTH = 272;
+const FALLBACK_POPOVER_HEIGHT = 96;
 
 @Component({
   selector: 'app-term-hint',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <span class="term-hint" [class.position-top]="position() === 'top'">
+    <span class="term-hint">
       <button
+        #triggerBtn
         type="button"
         class="hint-btn"
         [class.active]="open()"
@@ -25,7 +33,14 @@ import {
         ?
       </button>
       @if (open()) {
-        <span class="term-hint-popover" role="tooltip">
+        <span
+          #popoverEl
+          class="term-hint-popover"
+          role="tooltip"
+          [attr.data-placement]="popoverPlacement()"
+          [style.left.px]="popoverLeft()"
+          [style.top.px]="popoverTop()"
+        >
           @if (term()) {
             <strong class="term-hint-title">{{ term() }}</strong>
           }
@@ -82,15 +97,14 @@ import {
     }
 
     .term-hint-popover {
-      position: absolute;
-      left: 50%;
-      top: calc(100% + 0.4rem);
-      transform: translateX(-50%);
-      z-index: 600;
+      position: fixed;
+      z-index: 10000;
       display: flex;
       flex-direction: column;
       gap: 0.2rem;
-      width: min(17rem, 72vw);
+      width: min(17rem, calc(100vw - 24px));
+      max-width: calc(100vw - 24px);
+      box-sizing: border-box;
       padding: 0.55rem 0.7rem;
       border-radius: var(--tui-radius-m, 10px);
       border: 1px solid var(--ttsc-border, var(--tui-border-normal));
@@ -102,11 +116,6 @@ import {
       line-height: 1.4;
       text-align: left;
       white-space: normal;
-    }
-
-    .term-hint.position-top .term-hint-popover {
-      top: auto;
-      bottom: calc(100% + 0.4rem);
     }
 
     .term-hint-title {
@@ -122,16 +131,63 @@ import {
 })
 export class TermHint {
   private readonly elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly triggerBtn = viewChild<ElementRef<HTMLButtonElement>>('triggerBtn');
+  private readonly popoverEl = viewChild<ElementRef<HTMLElement>>('popoverEl');
 
   readonly term = input<string>('');
   readonly text = input.required<string>();
   readonly position = input<'top' | 'bottom'>('bottom');
 
   protected readonly open = signal(false);
+  protected readonly popoverLeft = signal(VIEWPORT_MARGIN);
+  protected readonly popoverTop = signal(VIEWPORT_MARGIN);
+  protected readonly popoverPlacement = signal<'top' | 'bottom'>('bottom');
+
+  constructor() {
+    effect((onCleanup) => {
+      if (!this.open()) {
+        return;
+      }
+
+      // Пересчитываем позицию после появления поповера в DOM, чтобы учесть его реальные размеры.
+      const popover = this.popoverEl()?.nativeElement;
+      if (popover) {
+        this.updatePosition(popover);
+      }
+
+      const onScroll = (event: Event): void => {
+        const currentPopover = this.popoverEl()?.nativeElement;
+        if (
+          currentPopover &&
+          event.target instanceof Node &&
+          currentPopover.contains(event.target)
+        ) {
+          return;
+        }
+        this.open.set(false);
+      };
+
+      window.addEventListener('scroll', onScroll, true);
+      onCleanup(() => {
+        window.removeEventListener('scroll', onScroll, true);
+      });
+    });
+  }
 
   protected toggle(event: MouseEvent): void {
     event.stopPropagation();
-    this.open.update((prev) => !prev);
+    const nextOpen = !this.open();
+    if (nextOpen) {
+      this.updatePosition();
+    }
+    this.open.set(nextOpen);
+  }
+
+  @HostListener('window:resize')
+  protected onWindowResize(): void {
+    if (this.open()) {
+      this.updatePosition(this.popoverEl()?.nativeElement);
+    }
   }
 
   @HostListener('document:keydown.escape')
@@ -146,5 +202,50 @@ export class TermHint {
     if (this.open() && !this.elementRef.nativeElement.contains(event.target as Node)) {
       this.open.set(false);
     }
+  }
+
+  private updatePosition(popoverElement?: HTMLElement): void {
+    const trigger = this.triggerBtn()?.nativeElement;
+    if (!trigger) {
+      return;
+    }
+
+    const triggerRect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || 1024;
+    const viewportHeight = window.innerHeight || 768;
+
+    const popoverRect = popoverElement?.getBoundingClientRect();
+    const popoverWidth =
+      popoverRect && popoverRect.width > 0
+        ? popoverRect.width
+        : Math.min(MAX_POPOVER_WIDTH, Math.max(0, viewportWidth - VIEWPORT_MARGIN * 2));
+    const popoverHeight =
+      popoverRect && popoverRect.height > 0 ? popoverRect.height : FALLBACK_POPOVER_HEIGHT;
+
+    const centeredLeft = triggerRect.left + triggerRect.width / 2 - popoverWidth / 2;
+    const maxLeft = Math.max(VIEWPORT_MARGIN, viewportWidth - popoverWidth - VIEWPORT_MARGIN);
+    const left = Math.round(Math.min(Math.max(centeredLeft, VIEWPORT_MARGIN), maxLeft));
+
+    const preferred = this.position();
+    const spaceBelow = viewportHeight - triggerRect.bottom - POPOVER_GAP - VIEWPORT_MARGIN;
+    const spaceAbove = triggerRect.top - POPOVER_GAP - VIEWPORT_MARGIN;
+
+    let placement: 'top' | 'bottom' = preferred;
+    if (preferred === 'bottom' && spaceBelow < popoverHeight && spaceAbove > spaceBelow) {
+      placement = 'top';
+    } else if (preferred === 'top' && spaceAbove < popoverHeight && spaceBelow > spaceAbove) {
+      placement = 'bottom';
+    }
+
+    const rawTop =
+      placement === 'bottom'
+        ? triggerRect.bottom + POPOVER_GAP
+        : triggerRect.top - POPOVER_GAP - popoverHeight;
+    const maxTop = Math.max(VIEWPORT_MARGIN, viewportHeight - popoverHeight - VIEWPORT_MARGIN);
+    const top = Math.round(Math.min(Math.max(rawTop, VIEWPORT_MARGIN), maxTop));
+
+    this.popoverLeft.set(left);
+    this.popoverTop.set(top);
+    this.popoverPlacement.set(placement);
   }
 }
