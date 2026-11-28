@@ -178,11 +178,17 @@ export class WorkshopCompareLaunch implements OnInit {
 
   protected isPairDisabled(days: SessionDurationDays, tf: CandleTimeframe): boolean {
     const opts = this.options();
-    if (!opts || this.startMode() !== 'random') {
+    if (!opts) {
       return false;
     }
-    const maxDays = opts.maxDurationDaysByTimeframe[tf];
+    const limits = opts.runMaxDurationDaysByTimeframe ?? opts.maxDurationDaysByTimeframe;
+    const maxDays = limits[tf];
     return maxDays !== undefined && days > maxDays;
+  }
+
+  protected runLimitHint(opts: LaunchOptions): string {
+    const maxBars = opts.executionRules.runMaxBars ?? opts.executionRules.maxBars;
+    return `больше ${maxBars.toLocaleString('ru-RU')} свечей`;
   }
 
   protected optionIndex<T>(items: readonly T[], current: T): number {

@@ -11,7 +11,8 @@ import {
   StartSessionCommand,
 } from './launch.models';
 
-const MAX_MANUAL_BARS = 5000;
+const MAX_MANUAL_BARS = 25_000;
+const MAX_RUN_BARS = 250_000;
 const MIN_PAPERS = 1;
 
 const BARS_PER_DAY: Readonly<Record<CandleTimeframe, number>> = {
@@ -100,12 +101,20 @@ export class StubLaunchApi implements LaunchApi {
       defaultDuration: 60,
       availableTimeframes: ['1m', '5m', '10m', '15m', '1h', '1d'],
       maxDurationDaysByTimeframe: {
-        '1m': 6,
-        '5m': 30,
-        '10m': 60,
-        '15m': 90,
-        '1h': 357,
-        '1d': 5000,
+        '1m': 30,
+        '5m': 150,
+        '10m': 300,
+        '15m': 450,
+        '1h': 1785,
+        '1d': 25000,
+      },
+      runMaxDurationDaysByTimeframe: {
+        '1m': 300,
+        '5m': 1500,
+        '10m': 3000,
+        '15m': 4500,
+        '1h': 17857,
+        '1d': 250000,
       },
       defaultTimeframe: '1d',
       regimes: ['calm', 'medium', 'stress'],
@@ -123,6 +132,7 @@ export class StubLaunchApi implements LaunchApi {
         slippageKappa: 0.1,
         liquidityLimitPct: 10,
         maxBars: MAX_MANUAL_BARS,
+        runMaxBars: MAX_RUN_BARS,
       },
       archiveFrom: '2020-01-03',
       archiveTo: '2025-12-31',

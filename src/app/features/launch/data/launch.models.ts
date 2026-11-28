@@ -83,6 +83,7 @@ export interface ExecutionRulesSummary {
   readonly slippageKappa: number;
   readonly liquidityLimitPct: number;
   readonly maxBars: number;
+  readonly runMaxBars?: number;
 }
 
 export interface LaunchOptions {
@@ -90,6 +91,7 @@ export interface LaunchOptions {
   readonly defaultDuration: SessionDurationDays;
   readonly availableTimeframes: readonly CandleTimeframe[];
   readonly maxDurationDaysByTimeframe: Readonly<Record<CandleTimeframe, number>>;
+  readonly runMaxDurationDaysByTimeframe?: Readonly<Record<CandleTimeframe, number>>;
   readonly defaultTimeframe: CandleTimeframe;
   readonly regimes: readonly MarketRegime[];
   readonly defaultRegime: MarketRegime;

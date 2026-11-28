@@ -32,7 +32,7 @@ export function formatLaunchRejection(
         options?.barsCount !== null && options?.barsCount !== undefined
           ? `${options.barsCount.toLocaleString('ru-RU')} свечей`
           : 'превышен лимит свечей';
-      const maxText = (options?.maxBars ?? 5000).toLocaleString('ru-RU');
+      const maxText = (options?.maxBars ?? 25_000).toLocaleString('ru-RU');
       return {
         title: `Слишком много свечей: ${countText} при лимите ${maxText}`,
         suggestion: 'Уменьшите длительность сессии или выберите более крупный шаг свечей.',

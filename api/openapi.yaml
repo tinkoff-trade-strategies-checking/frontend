@@ -1739,6 +1739,7 @@ components:
         slippageKappa: { $ref: '#/components/schemas/Ratio' }
         liquidityLimitPct: { $ref: '#/components/schemas/Pct' }
         maxBars: { type: integer }
+        runMaxBars: { type: integer, description: Предел числа свечей для прогонов и сравнения алгоритмов в Мастерской }
     LaunchOptions:
       type: object
       required: [durations, defaultDuration, availableTimeframes, maxDurationDaysByTimeframe, defaultTimeframe, regimes, defaultRegime, capitalPresets, defaultCapital, backgroundAlgorithmName, minPapers, maxPapers, defaultPaperCount, executionRules, archiveFrom, archiveTo]
@@ -1753,6 +1754,14 @@ components:
             шкалы сессии заведомо не больше `executionRules.maxBars`. Оценка консервативная, по наибольшему числу
             шагов за день в архиве. Длительности из `durations` больше этого значения экран выключает; пограничные
             случаи решает отказ `TOO_MANY_BARS` при запуске.
+          propertyNames: { $ref: '#/components/schemas/Timeframe' }
+          additionalProperties: { type: integer, minimum: 0 }
+        runMaxDurationDaysByTimeframe:
+          type: object
+          description: |
+            Для каждого шага из `availableTimeframes` — наибольшая длительность в торговых днях для прогонов алгоритмов
+            в Мастерской, при которой шагов шкалы заведомо не больше `executionRules.runMaxBars`. Оценка консервативная,
+            по наибольшему числу шагов за день в архиве.
           propertyNames: { $ref: '#/components/schemas/Timeframe' }
           additionalProperties: { type: integer, minimum: 0 }
         defaultTimeframe: { $ref: '#/components/schemas/Timeframe' }
