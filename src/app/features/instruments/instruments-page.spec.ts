@@ -24,6 +24,51 @@ describe('InstrumentsPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
 
+  it('не показывает фиктивные (0) на незагруженных вкладках и автоматически подставляет реальные счётчики', async () => {
+    const fixture = TestBed.createComponent(InstrumentsPage);
+    const api = fixture.debugElement.injector.get(INSTRUMENTS_API);
+    let resolveEtfs!: (value: Awaited<ReturnType<typeof api.listEtfs>>) => void;
+    const originalListEtfs = api.listEtfs.bind(api);
+    api.listEtfs = () =>
+      new Promise((resolve) => {
+        resolveEtfs = resolve;
+      });
+
+    fixture.detectChanges();
+    await flushAsync();
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    const etfsTab = root.querySelector<HTMLButtonElement>('#tab-etfs')!;
+    // Пока список БПИФ/ETF не загружен, на вкладке нет вводящего в заблуждение (0).
+    expect(etfsTab.textContent?.trim()).toBe('БПИФ / ETF');
+    expect(etfsTab.textContent).not.toContain('(0)');
+
+    // Остальные вкладки уже получили реальные счётчики фоновой подгрузкой.
+    expect(root.querySelector('#tab-bonds')?.textContent).toMatch(/Облигации\s*\([1-9]\d*\)/);
+    expect(root.querySelector('#tab-futures')?.textContent).toMatch(
+      /Фьючерсы \(ФОРТС\)\s*\([1-9]\d*\)/,
+    );
+    expect(root.querySelector('#tab-options')?.textContent).toMatch(
+      /Опционы \(ФОРТС\)\s*\([1-9]\d*\)/,
+    );
+    expect(root.querySelector('#tab-dividends')?.textContent).toMatch(
+      /Дивиденды \(T\+1\)\s*\([1-9]\d*\)/,
+    );
+    expect(root.querySelector('#tab-screener')?.textContent).toMatch(
+      /Скринер акций\s*\([1-9]\d*\)/,
+    );
+    expect(root.querySelector('#tab-events-alerts')?.textContent).toMatch(
+      /События и Алерты\s*\([1-9]\d*\)/,
+    );
+
+    // После завершения загрузки БПИФ/ETF появляется актуальный счётчик.
+    resolveEtfs(await originalListEtfs());
+    await flushAsync();
+    fixture.detectChanges();
+    expect(etfsTab.textContent).toMatch(/БПИФ \/ ETF\s*\([1-9]\d*\)/);
+  });
+
   it('отображает вкладку облигаций с фильтрами, таблицей, подсказками TermHint и YTM-калькулятором', async () => {
     const fixture = TestBed.createComponent(InstrumentsPage);
     fixture.detectChanges();
